@@ -14,26 +14,28 @@ localClawd is a local-first coding CLI derived from the original codebase and re
 
 Set one backend and then launch localClawd.
 
+localClawd accepts native environment variable names. Legacy `CLAUDE_CODE_*` names are still accepted as compatibility aliases, but new setups should prefer `LOCALCLAWD_*`.
+
 For vLLM:
 
 ```powershell
-$env:CLAUDE_CODE_USE_VLLM = '1'
-$env:CLAUDE_CODE_LOCAL_BASE_URL = 'http://127.0.0.1:8000/v1'
-$env:CLAUDE_CODE_LOCAL_MODEL = 'Qwen/Qwen2.5-Coder-32B-Instruct'
+$env:LOCALCLAWD_USE_VLLM = '1'
+$env:LOCALCLAWD_LOCAL_BASE_URL = 'http://127.0.0.1:8000/v1'
+$env:LOCALCLAWD_LOCAL_MODEL = 'Qwen/Qwen2.5-Coder-32B-Instruct'
 ```
 
 For Ollama:
 
 ```powershell
-$env:CLAUDE_CODE_USE_OLLAMA = '1'
-$env:CLAUDE_CODE_LOCAL_BASE_URL = 'http://127.0.0.1:11434/v1'
-$env:CLAUDE_CODE_LOCAL_MODEL = 'qwen2.5-coder:32b'
+$env:LOCALCLAWD_USE_OLLAMA = '1'
+$env:LOCALCLAWD_LOCAL_BASE_URL = 'http://127.0.0.1:11434/v1'
+$env:LOCALCLAWD_LOCAL_MODEL = 'qwen2.5-coder:32b'
 ```
 
 Optional:
 
 ```powershell
-$env:CLAUDE_CODE_LOCAL_API_KEY = 'anything'
+$env:LOCALCLAWD_LOCAL_API_KEY = 'anything'
 ```
 
 Then run:
@@ -48,6 +50,8 @@ This repository currently contains the source tree and assets for localClawd, bu
 
 1. Use a prebuilt `localClawd` binary for your platform once release artifacts are published for this fork.
 2. Run a locally built `localClawd` executable from your own development workflow, then use the native installer command below to place it in your user bin directory.
+
+### Native install
 
 If you already have a runnable `localClawd` executable, install it natively with:
 
@@ -72,6 +76,29 @@ To update an existing native install:
 ```powershell
 localClawd update
 ```
+
+### Backend environment variables
+
+localClawd currently recognizes both native and legacy variable names for the local backend configuration. Prefer the native names below for new setups:
+
+- `LOCALCLAWD_USE_VLLM`
+- `LOCALCLAWD_USE_OLLAMA`
+- `LOCALCLAWD_LOCAL_BASE_URL`
+- `LOCALCLAWD_LOCAL_MODEL`
+- `LOCALCLAWD_LOCAL_API_KEY`
+- `LOCALCLAWD_AUTO_COMPACT_WINDOW`
+
+Legacy compatibility aliases that still work:
+
+- Existing legacy environment variable aliases from the upstream fork are still accepted.
+
+### Production checklist
+
+For a production-style rollout of this fork:
+
+1. Build and publish platform binaries named `localClawd`.
+2. Verify `localClawd install`, `localClawd update`, and `localClawd doctor` against those release artifacts.
+3. Keep the legacy env aliases enabled until downstream wrappers and scripts have migrated.
 
 ## Installation flow
 

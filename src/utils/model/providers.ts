@@ -5,11 +5,21 @@ export type APIProvider = 'firstParty' | 'bedrock' | 'vertex' | 'foundry' | 'loc
 
 export type LocalLLMProvider = 'vllm' | 'ollama'
 
+function getEnvAlias(localKey: string, legacyKey: string): string | undefined {
+  return process.env[localKey] ?? process.env[legacyKey]
+}
+
 export function getLocalLLMProvider(): LocalLLMProvider | null {
-  if (isEnvTruthy(process.env.CLAUDE_CODE_USE_VLLM)) {
+  if (
+    isEnvTruthy(getEnvAlias('LOCALCLAWD_USE_VLLM', 'CLAUDE_CODE_USE_VLLM'))
+  ) {
     return 'vllm'
   }
-  if (isEnvTruthy(process.env.CLAUDE_CODE_USE_OLLAMA)) {
+  if (
+    isEnvTruthy(
+      getEnvAlias('LOCALCLAWD_USE_OLLAMA', 'CLAUDE_CODE_USE_OLLAMA'),
+    )
+  ) {
     return 'ollama'
   }
   return null
@@ -20,7 +30,10 @@ export function isLocalLLMProviderEnabled(): boolean {
 }
 
 export function getLocalLLMBaseUrl(provider = getLocalLLMProvider()): string {
-  const configured = process.env.CLAUDE_CODE_LOCAL_BASE_URL?.trim()
+  const configured = getEnvAlias(
+    'LOCALCLAWD_LOCAL_BASE_URL',
+    'CLAUDE_CODE_LOCAL_BASE_URL',
+  )?.trim()
   if (configured) {
     return configured
   }
@@ -31,13 +44,16 @@ export function getLocalLLMBaseUrl(provider = getLocalLLMProvider()): string {
 
 export function getLocalLLMApiKey(provider = getLocalLLMProvider()): string {
   return (
-    process.env.CLAUDE_CODE_LOCAL_API_KEY?.trim() ||
+    getEnvAlias('LOCALCLAWD_LOCAL_API_KEY', 'CLAUDE_CODE_LOCAL_API_KEY')?.trim() ||
     (provider === 'ollama' ? 'ollama' : 'local')
   )
 }
 
 export function getLocalLLMModel(): string | undefined {
-  const model = process.env.CLAUDE_CODE_LOCAL_MODEL?.trim()
+  const model = getEnvAlias(
+    'LOCALCLAWD_LOCAL_MODEL',
+    'CLAUDE_CODE_LOCAL_MODEL',
+  )?.trim()
   return model ? model : undefined
 }
 

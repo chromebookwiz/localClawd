@@ -5,6 +5,10 @@ import { isEnvTruthy } from './envUtils.js'
 import { getCanonicalName } from './model/model.js'
 import { getModelCapability } from './model/modelCapabilities.js'
 
+function getEnvAlias(localKey: string, legacyKey: string): string | undefined {
+  return process.env[localKey] ?? process.env[legacyKey]
+}
+
 // Model context window size (200k tokens for all models right now)
 export const MODEL_CONTEXT_WINDOW_DEFAULT = 200_000
 export const COMPACT_CONTEXT_WINDOW_CHOICES = [
@@ -38,7 +42,12 @@ export const ESCALATED_MAX_TOKENS = 64_000
  * Used by C4E admins to disable 1M context for HIPAA compliance.
  */
 export function is1mContextDisabled(): boolean {
-  return isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_1M_CONTEXT)
+  return isEnvTruthy(
+    getEnvAlias(
+      'LOCALCLAWD_DISABLE_1M_CONTEXT',
+      'CLAUDE_CODE_DISABLE_1M_CONTEXT',
+    ),
+  )
 }
 
 export function has1mContext(model: string): boolean {
@@ -67,9 +76,15 @@ export function getContextWindowForModel(
   // while still using a 1M-capable endpoint.
   if (
     process.env.USER_TYPE === 'ant' &&
-    process.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS
+    getEnvAlias('LOCALCLAWD_MAX_CONTEXT_TOKENS', 'CLAUDE_CODE_MAX_CONTEXT_TOKENS')
   ) {
-    const override = parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS, 10)
+    const override = parseInt(
+      getEnvAlias(
+        'LOCALCLAWD_MAX_CONTEXT_TOKENS',
+        'CLAUDE_CODE_MAX_CONTEXT_TOKENS',
+      ) as string,
+      10,
+    )
     if (!isNaN(override) && override > 0) {
       return override
     }
@@ -121,7 +136,10 @@ export function formatCompactContextWindowOption(
 }
 
 export function getConfiguredCompactContextWindow(): number | undefined {
-  const envOverride = process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW
+  const envOverride = getEnvAlias(
+    'LOCALCLAWD_AUTO_COMPACT_WINDOW',
+    'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
+  )
   if (envOverride) {
     const parsed = parseInt(envOverride, 10)
     if (!isNaN(parsed) && parsed > 0) {
