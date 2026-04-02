@@ -403,7 +403,7 @@ export const BaseHookInputSchema = lazySchema(() =>
       .string()
       .optional()
       .describe(
-        'Agent type name (e.g., "general-purpose", "code-reviewer"). Present when the ' +
+        'Agent type name (e.g., "Odin", "code-reviewer"). Present when the ' +
           'hook fires from within a subagent (alongside agent_id), or on the main thread ' +
           'of a session started with --agent (without agent_id).',
       ),
@@ -1030,7 +1030,7 @@ export const SlashCommandSchema = lazySchema(() =>
 export const AgentInfoSchema = lazySchema(() =>
   z
     .object({
-      name: z.string().describe('Agent type identifier (e.g., "Explore")'),
+      name: z.string().describe('Agent type identifier (e.g., "Huginn")'),
       description: z.string().describe('Description of when to use this agent'),
       model: z
         .string()

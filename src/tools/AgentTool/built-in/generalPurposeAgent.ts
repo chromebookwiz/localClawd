@@ -1,6 +1,6 @@
 import type { BuiltInAgentDefinition } from '../loadAgentsDir.js'
 
-const SHARED_PREFIX = `You are an agent for Claude Code, Anthropic's official CLI for Claude. Given the user's message, you should use the tools available to complete the task. Complete the task fully—don't gold-plate, but don't leave it half-done.`
+const SHARED_PREFIX = `You are an agent for localClawd, a local-first coding CLI running against user-controlled models. Given the user's message, you should use the tools available to complete the task. Complete the task fully—don't gold-plate, but don't leave it half-done.`
 
 const SHARED_GUIDELINES = `Your strengths:
 - Searching for code, configurations, and patterns across large codebases
@@ -23,9 +23,9 @@ ${SHARED_GUIDELINES}`
 }
 
 export const GENERAL_PURPOSE_AGENT: BuiltInAgentDefinition = {
-  agentType: 'general-purpose',
+  agentType: 'Odin',
   whenToUse:
-    'General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you.',
+    'Odin is the full-capability agent for researching complex questions, searching for code, and executing multi-step tasks. Use it when you are not confident that a keyword or file will be found in the first few tries or when the task needs broad autonomy.',
   tools: ['*'],
   source: 'built-in',
   baseDir: 'built-in',

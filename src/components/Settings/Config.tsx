@@ -42,6 +42,7 @@ import { isEnvTruthy, isRunningOnHomespace } from 'src/utils/envUtils.js';
 import type { LocalJSXCommandContext, CommandResultDisplay } from '../../commands.js';
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js';
 import { isAgentSwarmsEnabled } from '../../utils/agentSwarmsEnabled.js';
+import { COMPACT_CONTEXT_WINDOW_CHOICES, formatCompactContextWindowOption } from '../../utils/context.js';
 import { getCliTeammateModeOverride, clearCliTeammateModeOverride } from '../../utils/swarm/backends/teammateModeSnapshot.js';
 import { getHardcodedTeammateModelFallback } from '../../utils/swarm/teammateModel.js';
 import { useSearchInput } from '../../hooks/useSearchInput.js';
@@ -279,6 +280,26 @@ export function Config({
       });
       logEvent('tengu_auto_compact_setting_changed', {
         enabled: autoCompactEnabled
+      });
+    }
+  }, {
+    id: 'compactContextWindowTokens',
+    label: 'Compact context window',
+    value: formatCompactContextWindowOption(globalConfig.compactContextWindowTokens),
+    options: [formatCompactContextWindowOption(undefined), ...COMPACT_CONTEXT_WINDOW_CHOICES.map(formatCompactContextWindowOption)],
+    type: 'enum' as const,
+    onChange(value: string) {
+      const compactContextWindowTokens = COMPACT_CONTEXT_WINDOW_CHOICES.find(tokens => formatCompactContextWindowOption(tokens) === value);
+      saveGlobalConfig(current_0 => ({
+        ...current_0,
+        compactContextWindowTokens
+      }));
+      setGlobalConfig({
+        ...getGlobalConfig(),
+        compactContextWindowTokens
+      });
+      logEvent('tengu_compact_context_window_changed', {
+        context_window: (compactContextWindowTokens ?? 'model-default') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
       });
     }
   }, {
@@ -1138,6 +1159,9 @@ export function Config({
     }
     if (globalConfig.autoCompactEnabled !== initialConfig.current.autoCompactEnabled) {
       formattedChanges.push(`${globalConfig.autoCompactEnabled ? 'Enabled' : 'Disabled'} auto-compact`);
+    }
+    if (globalConfig.compactContextWindowTokens !== initialConfig.current.compactContextWindowTokens) {
+      formattedChanges.push(`Set compact context window to ${chalk.bold(formatCompactContextWindowOption(globalConfig.compactContextWindowTokens))}`);
     }
     if (globalConfig.respectGitignore !== initialConfig.current.respectGitignore) {
       formattedChanges.push(`${globalConfig.respectGitignore ? 'Enabled' : 'Disabled'} respect .gitignore in file picker`);

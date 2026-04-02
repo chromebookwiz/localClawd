@@ -6,7 +6,9 @@ import { useExitOnCtrlCDWithKeybindings } from '../hooks/useExitOnCtrlCDWithKeyb
 import { Box, Link, Newline, Text, useTheme } from '../ink.js';
 import { useKeybindings } from '../keybindings/useKeybinding.js';
 import { isAnthropicAuthEnabled } from '../utils/auth.js';
+import { saveGlobalConfig } from '../utils/config.js';
 import { normalizeApiKeyForConfig } from '../utils/authPortable.js';
+import { COMPACT_CONTEXT_WINDOW_CHOICES, formatCompactContextWindowOption } from '../utils/context.js';
 import { getCustomApiKeyStatus } from '../utils/config.js';
 import { env } from '../utils/env.js';
 import { isRunningOnHomespace } from '../utils/envUtils.js';
@@ -19,7 +21,7 @@ import { WelcomeV2 } from './LogoV2/WelcomeV2.js';
 import { PressEnterToContinue } from './PressEnterToContinue.js';
 import { ThemePicker } from './ThemePicker.js';
 import { OrderedList } from './ui/OrderedList.js';
-type StepId = 'preflight' | 'theme' | 'oauth' | 'api-key' | 'security' | 'terminal-setup';
+type StepId = 'preflight' | 'theme' | 'compact-context' | 'oauth' | 'api-key' | 'security' | 'terminal-setup';
 interface OnboardingStep {
   id: StepId;
   component: React.ReactNode;
@@ -62,6 +64,28 @@ export function Onboarding({
       <ThemePicker onThemeSelect={handleThemeSelection} showIntroText={true} helpText="To change this later, run /theme" hideEscToCancel={true} skipExitHandling={true} // Skip exit handling as Onboarding already handles it
     />
     </Box>;
+  const compactContextStep = <Box flexDirection="column" gap={1} paddingLeft={1} width={70}>
+      <Text bold>Choose a compact context window</Text>
+      <Text dimColor wrap="wrap">
+        localClawd can compact earlier than the model&apos;s full advertised window.
+        This is useful for local models that degrade before hitting their theoretical limit.
+      </Text>
+      <Select options={[{
+      label: `${formatCompactContextWindowOption(undefined)} (recommended)`,
+      value: 'default'
+    }, ...COMPACT_CONTEXT_WINDOW_CHOICES.map(tokens => ({
+      label: formatCompactContextWindowOption(tokens),
+      value: String(tokens)
+    }))]} onChange={value => {
+      const compactContextWindowTokens = value === 'default' ? undefined : parseInt(value, 10);
+      saveGlobalConfig(current => ({
+        ...current,
+        compactContextWindowTokens
+      }));
+      goToNextStep();
+    }} onCancel={goToNextStep} />
+      <Text dimColor>Change this later in /config under Compact context window.</Text>
+    </Box>;
   const securityStep = <Box flexDirection="column" gap={1} paddingLeft={1}>
       <Text bold>Security notes:</Text>
       <Box flexDirection="column" width={70}>
@@ -71,9 +95,9 @@ export function Onboarding({
          */}
         <OrderedList>
           <OrderedList.Item>
-            <Text>Claude can make mistakes</Text>
+            <Text>localClawd can make mistakes</Text>
             <Text dimColor wrap="wrap">
-              You should always review Claude&apos;s responses, especially when
+              You should always review localClawd&apos;s responses, especially when
               <Newline />
               running code.
               <Newline />
@@ -86,7 +110,7 @@ export function Onboarding({
             <Text dimColor wrap="wrap">
               For more details see:
               <Newline />
-              <Link url="https://code.claude.com/docs/en/security" />
+              <Link url="https://github.com/chromebookwiz/localClawd" />
             </Text>
           </OrderedList.Item>
         </OrderedList>
@@ -124,6 +148,10 @@ export function Onboarding({
     id: 'theme',
     component: themeStep
   });
+  steps.push({
+    id: 'compact-context',
+    component: compactContextStep
+  });
   if (apiKeyNeedingApproval) {
     steps.push({
       id: 'api-key',
@@ -146,7 +174,7 @@ export function Onboarding({
     steps.push({
       id: 'terminal-setup',
       component: <Box flexDirection="column" gap={1} paddingLeft={1}>
-          <Text bold>Use Claude Code&apos;s terminal setup?</Text>
+          <Text bold>Use localClawd&apos;s terminal setup?</Text>
           <Box flexDirection="column" width={70} gap={1}>
             <Text>
               For the optimal coding experience, enable the recommended settings

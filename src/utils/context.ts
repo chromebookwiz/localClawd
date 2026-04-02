@@ -7,6 +7,15 @@ import { getModelCapability } from './model/modelCapabilities.js'
 
 // Model context window size (200k tokens for all models right now)
 export const MODEL_CONTEXT_WINDOW_DEFAULT = 200_000
+export const COMPACT_CONTEXT_WINDOW_CHOICES = [
+  32_000,
+  64_000,
+  128_000,
+  200_000,
+  256_000,
+  512_000,
+  1_000_000,
+] as const
 
 // Maximum output tokens for compact operations
 export const COMPACT_MAX_OUTPUT_TOKENS = 20_000
@@ -95,6 +104,37 @@ export function getContextWindowForModel(
     }
   }
   return MODEL_CONTEXT_WINDOW_DEFAULT
+}
+
+export function formatCompactContextWindowOption(
+  tokens?: number,
+): string {
+  if (!tokens) {
+    return 'Model default'
+  }
+
+  if (tokens >= 1_000_000) {
+    return '1M tokens'
+  }
+
+  return `${Math.round(tokens / 1_000)}k tokens`
+}
+
+export function getConfiguredCompactContextWindow(): number | undefined {
+  const envOverride = process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW
+  if (envOverride) {
+    const parsed = parseInt(envOverride, 10)
+    if (!isNaN(parsed) && parsed > 0) {
+      return parsed
+    }
+  }
+
+  const configured = getGlobalConfig().compactContextWindowTokens
+  if (typeof configured === 'number' && configured > 0) {
+    return configured
+  }
+
+  return undefined
 }
 
 export function getSonnet1mExpTreatmentEnabled(model: string): boolean {
