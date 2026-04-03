@@ -98,7 +98,7 @@ function DistTagsDisplay(t0) {
   return t3;
 }
 export function Doctor(t0) {
-  const $ = _c(84);
+  const $ = _c(103);
   const {
     onDone
   } = t0;
@@ -322,6 +322,20 @@ export function Doctor(t0) {
   } else {
     t18 = $[31];
   }
+  const t18a = diagnostic.localBackend.status === "ok" ? "OK" : diagnostic.localBackend.status === "warning" ? "Needs attention" : "Unreachable";
+  let t18b;
+  if ($[84] !== diagnostic.localBackend.authConfigured || $[85] !== diagnostic.localBackend.baseUrl || $[86] !== diagnostic.localBackend.detail || $[87] !== diagnostic.localBackend.model || $[88] !== diagnostic.localBackend.provider || $[89] !== t18a) {
+    t18b = <><Text>└ Local backend: {diagnostic.localBackend.provider} ({t18a})</Text><Text>  └ Endpoint: {diagnostic.localBackend.baseUrl}</Text><Text>  └ Model: {diagnostic.localBackend.model}</Text><Text>  └ Auth: {diagnostic.localBackend.authConfigured ? "configured" : "not configured"}</Text><Text>  └ Check: {diagnostic.localBackend.detail}</Text></>;
+    $[84] = diagnostic.localBackend.authConfigured;
+    $[85] = diagnostic.localBackend.baseUrl;
+    $[86] = diagnostic.localBackend.detail;
+    $[87] = diagnostic.localBackend.model;
+    $[88] = diagnostic.localBackend.provider;
+    $[89] = t18a;
+    $[90] = t18b;
+  } else {
+    t18b = $[90];
+  }
   let t19;
   if ($[32] !== diagnostic.recommendation) {
     t19 = diagnostic.recommendation && <><Text /><Text color="warning">Recommendation: {diagnostic.recommendation.split("\n")[0]}</Text><Text dimColor={true}>{diagnostic.recommendation.split("\n")[1]}</Text></>;
@@ -355,21 +369,22 @@ export function Doctor(t0) {
     t22 = $[39];
   }
   let t23;
-  if ($[40] !== t11 || $[41] !== t12 || $[42] !== t13 || $[43] !== t14 || $[44] !== t15 || $[45] !== t18 || $[46] !== t19 || $[47] !== t20 || $[48] !== t21 || $[49] !== t22) {
-    t23 = <Box flexDirection="column">{t10}{t11}{t12}{t13}{t14}{t15}{t18}{t19}{t20}{t21}{t22}</Box>;
-    $[40] = t11;
-    $[41] = t12;
-    $[42] = t13;
-    $[43] = t14;
-    $[44] = t15;
-    $[45] = t18;
-    $[46] = t19;
-    $[47] = t20;
-    $[48] = t21;
-    $[49] = t22;
-    $[50] = t23;
+  if ($[91] !== t11 || $[92] !== t12 || $[93] !== t13 || $[94] !== t14 || $[95] !== t15 || $[96] !== t18 || $[97] !== t18b || $[98] !== t19 || $[99] !== t20 || $[100] !== t21 || $[101] !== t22) {
+    t23 = <Box flexDirection="column">{t10}{t11}{t12}{t13}{t14}{t15}{t18}{t18b}{t19}{t20}{t21}{t22}</Box>;
+    $[91] = t11;
+    $[92] = t12;
+    $[93] = t13;
+    $[94] = t14;
+    $[95] = t15;
+    $[96] = t18;
+    $[97] = t18b;
+    $[98] = t19;
+    $[99] = t20;
+    $[100] = t21;
+    $[101] = t22;
+    $[102] = t23;
   } else {
-    t23 = $[50];
+    t23 = $[102];
   }
   let t24;
   if ($[51] === Symbol.for("react.memo_cache_sentinel")) {

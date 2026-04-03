@@ -28,6 +28,8 @@ powershell -ExecutionPolicy Bypass -File .\tools\install-localclawd.ps1
 
 The bootstrap installer downloads the current source bundle, bootstraps Bun with `winget` if needed, then adds a `localClawd` launcher to your user PATH.
 
+The install location is derived from each user's home directory, so the same `curl` command works for other users too. On Windows it defaults to `%USERPROFILE%\.localClawd\source` for the source checkout and `%USERPROFILE%\.local\bin` for the launchers.
+
 localClawd accepts native environment variable names. Legacy `CLAUDE_CODE_*` names are still accepted as compatibility aliases, but new setups should prefer `LOCALCLAWD_*`.
 
 For vLLM:

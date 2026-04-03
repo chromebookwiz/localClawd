@@ -36,6 +36,12 @@ import { SandboxManager } from './sandbox/sandbox-adapter.js'
 import { getManagedFilePath } from './settings/managedPath.js'
 import { CUSTOMIZATION_SURFACES } from './settings/types.js'
 import {
+  getLocalLLMApiKey,
+  getLocalLLMBaseUrl,
+  getLocalLLMModel,
+  getLocalLLMProvider,
+} from './model/providers.js'
+import {
   findClaudeAlias,
   findValidClaudeAlias,
   getShellConfigPaths,
@@ -67,6 +73,99 @@ export type DiagnosticInfo = {
     working: boolean
     mode: 'system' | 'builtin' | 'embedded'
     systemPath: string | null
+  }
+  localBackend: {
+    provider: string
+    baseUrl: string
+    model: string
+    authConfigured: boolean
+    status: 'ok' | 'warning' | 'error'
+    detail: string
+  }
+}
+
+function normalizeOpenAIBaseUrl(baseUrl: string): string {
+  return baseUrl.replace(/\/+$/, '')
+}
+
+function stripV1Suffix(baseUrl: string): string {
+  return normalizeOpenAIBaseUrl(baseUrl).replace(/\/v1$/i, '')
+}
+
+async function fetchWithTimeout(
+  url: string,
+  headers: Record<string, string>,
+  timeoutMs = 3000,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, {
+      method: 'GET',
+      headers,
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function checkLocalBackend(): Promise<DiagnosticInfo['localBackend']> {
+  const provider = getLocalLLMProvider()
+  const baseUrl = getLocalLLMBaseUrl(provider)
+  const model = getLocalLLMModel(provider) || 'unknown'
+  const apiKey = getLocalLLMApiKey(provider)
+  const headers: Record<string, string> = apiKey
+    ? { Authorization: `Bearer ${apiKey}` }
+    : {}
+
+  const probes =
+    provider === 'ollama'
+      ? [
+          `${normalizeOpenAIBaseUrl(baseUrl)}/models`,
+          `${stripV1Suffix(baseUrl)}/api/tags`,
+        ]
+      : [`${normalizeOpenAIBaseUrl(baseUrl)}/models`]
+
+  let lastError = 'No response from backend'
+  for (const probe of probes) {
+    try {
+      const response = await fetchWithTimeout(probe, headers)
+      if (response.ok) {
+        return {
+          provider,
+          baseUrl,
+          model,
+          authConfigured: Boolean(apiKey),
+          status: 'ok',
+          detail: `Reachable via ${probe}`,
+        }
+      }
+
+      if (response.status === 401 || response.status === 403) {
+        return {
+          provider,
+          baseUrl,
+          model,
+          authConfigured: Boolean(apiKey),
+          status: 'warning',
+          detail: `Endpoint responded with HTTP ${response.status}. Check your API key or gateway auth settings.`,
+        }
+      }
+
+      lastError = `HTTP ${response.status} from ${probe}`
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  return {
+    provider,
+    baseUrl,
+    model,
+    authConfigured: Boolean(apiKey),
+    status: 'error',
+    detail: lastError,
   }
 }
 
@@ -601,6 +700,17 @@ export async function getDoctorDiagnostic(): Promise<DiagnosticInfo> {
     installationType === 'package-manager'
       ? await getPackageManager()
       : undefined
+  const localBackend = await checkLocalBackend()
+
+  if (localBackend.status !== 'ok') {
+    warnings.push({
+      issue: `Local backend check failed for ${localBackend.provider} at ${localBackend.baseUrl}`,
+      fix:
+        localBackend.status === 'warning'
+          ? localBackend.detail
+          : `Start the local server or update /config. Last error: ${localBackend.detail}`,
+    })
+  }
 
   const diagnostic: DiagnosticInfo = {
     installationType,
@@ -619,6 +729,7 @@ export async function getDoctorDiagnostic(): Promise<DiagnosticInfo> {
     warnings,
     packageManager,
     ripgrepStatus,
+    localBackend,
   }
 
   return diagnostic
