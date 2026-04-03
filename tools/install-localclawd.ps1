@@ -65,13 +65,27 @@ $ps1Path = Join-Path $BinDir 'localClawd.ps1'
 $cmdContent = @"
 @echo off
 setlocal
-"$bunPath" --bun "$entrypoint" %*
+if defined NODE_PATH (
+    set "NODE_PATH=$RepoRoot;%NODE_PATH%"
+) else (
+    set "NODE_PATH=$RepoRoot"
+)
+if not defined USER_TYPE set "USER_TYPE=external"
+"$bunPath" --install=auto --bun "$entrypoint" %*
 endlocal
 "@
 
 $ps1Content = @"
 `$ErrorActionPreference = 'Stop'
-& "$bunPath" --bun "$entrypoint" @args
+if (`$env:NODE_PATH) {
+    `$env:NODE_PATH = "$RepoRoot;`$env:NODE_PATH"
+} else {
+    `$env:NODE_PATH = "$RepoRoot"
+}
+if (-not `$env:USER_TYPE) {
+    `$env:USER_TYPE = 'external'
+}
+& "$bunPath" --install=auto --bun "$entrypoint" @args
 "@
 
 Set-Content -Path $cmdPath -Value $cmdContent -Encoding ASCII
@@ -94,5 +108,5 @@ if (($env:Path.Split(';', [System.StringSplitOptions]::RemoveEmptyEntries)) -not
 
 Write-Host "Installed localClawd launcher at $cmdPath"
 Write-Host "Added $BinDir to your user PATH if it was missing."
-Write-Host "Launcher runtime: $bunPath --bun"
-Write-Host 'Open a new terminal, then run: localClawd --help'
+Write-Host "Launcher runtime: $bunPath --install=auto --bun"
+Write-Host 'Open a new terminal, then run: localClawd'

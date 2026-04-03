@@ -1,33 +1,33 @@
 # localClawd
 
-localClawd is a local-first fork of Claude Code. It keeps the terminal-first coding workflow, tool loop, agents, and computer-use model from Claude Code, but swaps the hosted Claude dependency for user-controlled backends such as vLLM, Ollama, and other OpenAI-compatible endpoints.
+localClawd is a local-first fork of Claude Code focused on self-hosted inference. It preserves the terminal-first coding loop, tool orchestration, agents, and computer-use workflow, while replacing the hosted Claude dependency with user-controlled backends such as vLLM, Ollama, and OpenAI-compatible gateways.
 
-The intent is not to rebuild the product from scratch. The intent is to keep the parts Claude Code got right, then expand them for self-hosted and gateway-based local inference.
+## Overview
 
-## What localClawd adds on top
+localClawd keeps the parts of Claude Code that were operationally strong and extends them for local deployment. The project is designed for users who want Claude Code-style workflows without depending on Anthropic-hosted inference.
 
-- In-app local backend setup: onboarding and `/config` now let you choose the provider, endpoint base URL, model, and optional API key without relying only on environment variables.
-- OpenAI-compatible transport layer: internal Claude-style requests are translated to `/v1/chat/completions`, so the CLI can talk to vLLM, Ollama, and similar gateways.
-- vLLM-first defaults: the default local backend path assumes an OpenAI-compatible vLLM server rather than a hosted Claude endpoint.
-- Expanded backend support: Ollama and generic OpenAI-compatible endpoints are first-class options alongside vLLM.
-- Backend health diagnostics: `localClawd doctor` now checks whether the configured local backend is reachable and reports the endpoint, model, auth state, and last probe result.
-- Local-model context controls: setup includes a compact-context cap for models that degrade before their advertised context window.
-- Multimodal passthrough for local models: pasted images and browser/computer-use screenshots flow through when the selected backend model supports them.
-- Local-first install branding: the launcher, onboarding, prompts, and bundled naming are reworked around `localClawd`.
+### Key additions
 
-## Quick start
+- In-app backend setup for provider, endpoint, model, and optional API key during onboarding or later in `/config`.
+- An OpenAI-compatible transport layer that maps internal Claude-style requests onto `/v1/chat/completions`.
+- vLLM-first defaults, with Ollama and generic OpenAI-compatible endpoints supported as first-class backends.
+- Backend diagnostics in `localClawd doctor`, including endpoint reachability, auth state, and last probe result.
+- Compact-context controls for local models that degrade before their advertised context limit.
+- Multimodal passthrough for local models that support image and screenshot input.
 
-By default, localClawd targets a vLLM-compatible endpoint. During onboarding, the CLI now asks you which backend to use, what base URL to call, and which model to select.
+## Installation
 
-## Setup
+The bootstrap installers use a release-first strategy. They attempt to install a platform-native binary from GitHub Releases and fall back to a source checkout when no matching release asset is available yet.
 
 ### Windows
 
-One-line GitHub install in PowerShell:
+One-line install in PowerShell:
 
 ```powershell
 curl.exe -fsSL https://raw.githubusercontent.com/chromebookwiz/localClawd/main/tools/bootstrap-localclawd.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -Command -
 ```
+
+Do not use the Linux/macOS `bootstrap-localclawd.sh` command from PowerShell. PowerShell aliases `curl` to `Invoke-WebRequest`, so the Unix `curl -fsSL ... | bash` form will fail there.
 
 PowerShell-native equivalent:
 
@@ -41,68 +41,72 @@ From an existing checkout:
 powershell -ExecutionPolicy Bypass -File .\tools\install-localclawd.ps1
 ```
 
-The bootstrap installer downloads the current source bundle, bootstraps Bun with `winget` if needed, then adds a `localClawd` launcher to your user PATH. On Windows, use `curl.exe` instead of `curl` inside PowerShell because `curl` is an alias for `Invoke-WebRequest` there.
+The Windows bootstrap installer first looks for a matching GitHub Release binary. If no release asset is available, it downloads the repository source bundle, bootstraps Bun with `winget` if needed, and creates a source-checkout launcher.
 
-The install location is derived from each user's home directory, so the same `curl` command works for other users too. On Windows it defaults to `%USERPROFILE%\.localClawd\source` for the source checkout and `%USERPROFILE%\.local\bin` for the launchers.
+Default Windows paths:
+
+- Native binary install: `%USERPROFILE%\.local\bin\localClawd.exe`
+- Source fallback checkout: `%USERPROFILE%\.localClawd\source`
+- Source fallback launcher: `%USERPROFILE%\.local\bin\localClawd.cmd`
 
 ### Linux
 
-Linux setup currently uses a source checkout plus Bun.
-
-1. Install Bun.
-2. Clone the repository.
-3. Run the source entrypoint from the checkout.
-
-Example:
+One-line install in a Unix shell such as `bash` or `zsh`:
 
 ```bash
-curl -fsSL https://bun.sh/install | bash
-git clone https://github.com/chromebookwiz/localClawd.git ~/.localClawd/source
-cd ~/.localClawd/source
-bun --bun src/entrypoints/source-cli.ts --help
+curl -fsSL https://raw.githubusercontent.com/chromebookwiz/localClawd/main/tools/bootstrap-localclawd.sh | bash
 ```
 
-Optional launcher:
+This command is for Linux shells only. If you are on Windows PowerShell, use the Windows command above instead.
+
+From an existing checkout:
 
 ```bash
-mkdir -p ~/.local/bin
-cat > ~/.local/bin/localClawd <<'EOF'
-#!/usr/bin/env bash
-exec bun --bun "$HOME/.localClawd/source/src/entrypoints/source-cli.ts" "$@"
-EOF
-chmod +x ~/.local/bin/localClawd
+bash ./tools/install-localclawd.sh
 ```
+
+The Unix bootstrap installer first looks for a matching GitHub Release binary. If no release asset is available, it downloads the source bundle, installs Bun if needed, writes the source-checkout launcher to `~/.local/bin/localClawd`, and updates common shell startup files so that directory is on your `PATH`.
 
 Default Linux paths:
 
-- Source checkout: `~/.localClawd/source`
-- Optional launcher: `~/.local/bin/localClawd`
+- Native binary install: `~/.local/bin/localClawd`
+- Source fallback checkout: `~/.localClawd/source`
+- Source fallback launcher: `~/.local/bin/localClawd`
 
 ### macOS
 
-macOS setup is the same as Linux today: install Bun, clone the repository, then run the source entrypoint or add a small launcher script.
-
-Example:
+One-line install in Terminal, iTerm, or another Unix shell:
 
 ```bash
-curl -fsSL https://bun.sh/install | bash
-git clone https://github.com/chromebookwiz/localClawd.git ~/.localClawd/source
-cd ~/.localClawd/source
-bun --bun src/entrypoints/source-cli.ts --help
+curl -fsSL https://raw.githubusercontent.com/chromebookwiz/localClawd/main/tools/bootstrap-localclawd.sh | bash
 ```
 
-Optional launcher:
+This command is for macOS shells only. If you are on Windows PowerShell, use the Windows command above instead.
+
+From an existing checkout:
 
 ```bash
-mkdir -p ~/.local/bin
-cat > ~/.local/bin/localClawd <<'EOF'
-#!/usr/bin/env bash
-exec bun --bun "$HOME/.localClawd/source/src/entrypoints/source-cli.ts" "$@"
-EOF
-chmod +x ~/.local/bin/localClawd
+bash ./tools/install-localclawd.sh
 ```
 
-If `~/.local/bin` is not already on your shell `PATH`, add it in your shell profile such as `~/.zshrc` or `~/.bashrc`.
+The macOS flow matches Linux: the bootstrap installer prefers a release binary and falls back to the source-checkout launcher when no release asset is available.
+
+Default macOS paths:
+
+- Native binary install: `~/.local/bin/localClawd`
+- Source fallback checkout: `~/.localClawd/source`
+- Source fallback launcher: `~/.local/bin/localClawd`
+
+### Release asset naming
+
+The bootstrap scripts expect release assets to follow the native installer platform naming already used in the codebase:
+
+- `localClawd-win32-x64.exe`
+- `localClawd-win32-arm64.exe`
+- `localClawd-linux-x64`
+- `localClawd-linux-arm64`
+- `localClawd-darwin-x64`
+- `localClawd-darwin-arm64`
 
 ### Backend setup after install
 
@@ -138,12 +142,9 @@ Then run:
 localClawd
 ```
 
-## Installation
+## Release status
 
-This repository currently contains the source tree and assets for localClawd, but it does not yet include package-manager metadata or release automation files in-tree. That means there are two practical install paths today:
-
-1. Use a prebuilt `localClawd` binary for your platform once release artifacts are published for this fork.
-2. Run localClawd from a source checkout with Bun, or use a locally built `localClawd` executable from your own development workflow, then use the native installer command below to place it in your user bin directory.
+The repository contains source code and bootstrap installers, but it does not yet contain the complete release automation needed to publish and verify a full `1.0` native rollout from this checkout alone. The universal bootstrap path is ready to consume GitHub Release assets as soon as they are published. Until then, it falls back to the Bun-based source launcher.
 
 ### Native install
 
@@ -173,10 +174,12 @@ localClawd update
 
 ### Power tools
 
-- `tools\install-localclawd.ps1` bootstraps Bun if needed, creates a launcher for this checkout, and adds the launcher directory to your user PATH.
-- `tools\bootstrap-localclawd.ps1` downloads the repository source bundle, installs a checkout under `~/.localClawd/source`, and then runs the local installer.
-- `tools\rebrand-localclawd.ps1` aggressively rewrites `Claude` and `claude` occurrences across the repo to `localClawd`.
-- `tools\localclawd-tools.ps1` wraps install, rebrand, and branding audit in a single entrypoint.
+- `tools\bootstrap-localclawd.ps1` installs a Windows release binary when one exists and otherwise falls back to the source-checkout installer.
+- `tools/bootstrap-localclawd.sh` installs a Unix release binary when one exists and otherwise falls back to the source-checkout installer.
+- `tools\install-localclawd.ps1` creates a Bun-based launcher for a checked-out repository on Windows.
+- `tools/install-localclawd.sh` creates a Bun-based launcher for a checked-out repository on Unix-like systems.
+- `tools\rebrand-localclawd.ps1` performs broad rebranding replacements across the repository.
+- `tools\localclawd-tools.ps1` wraps install, rebrand, and branding audit operations in one PowerShell entrypoint.
 
 ### Backend environment variables
 
@@ -201,13 +204,14 @@ Legacy compatibility aliases that still work:
 
 For a production-style rollout of this fork:
 
-1. Build and publish platform binaries named `localClawd`.
-2. Verify `localClawd install`, `localClawd update`, and `localClawd doctor` against those release artifacts.
-3. Keep the legacy env aliases enabled until downstream wrappers and scripts have migrated.
+1. Build and publish platform binaries named according to the release asset convention listed above.
+2. Verify `localClawd install`, `localClawd update`, and `localClawd doctor` against those published artifacts.
+3. Add release automation for tagging, asset publication, and post-publish verification.
+4. Keep the legacy environment-variable aliases enabled until downstream wrappers and scripts have migrated.
 
-## Installation flow
+## CLI install flow
 
-The native install and update commands are exposed directly from the CLI:
+The native install and update commands are exposed directly from the CLI for packaged builds:
 
 ```powershell
 localClawd install
