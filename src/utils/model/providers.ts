@@ -3,30 +3,29 @@ import { isEnvTruthy } from '../envUtils.js'
 
 export type APIProvider = 'firstParty' | 'bedrock' | 'vertex' | 'foundry' | 'local'
 
-export type LocalLLMProvider = 'vllm' | 'ollama'
+export type LocalLLMProvider = 'spark' | 'ollama'
 
 function getEnvAlias(localKey: string, legacyKey: string): string | undefined {
   return process.env[localKey] ?? process.env[legacyKey]
 }
 
-export function getLocalLLMProvider(): LocalLLMProvider | null {
+export function getLocalLLMProvider(): LocalLLMProvider {
   if (
-    isEnvTruthy(getEnvAlias('LOCALCLAWD_USE_VLLM', 'CLAUDE_CODE_USE_VLLM'))
-  ) {
-    return 'vllm'
-  }
-  if (
-    isEnvTruthy(
-      getEnvAlias('LOCALCLAWD_USE_OLLAMA', 'CLAUDE_CODE_USE_OLLAMA'),
-    )
+    isEnvTruthy(getEnvAlias('LOCALCLAWD_USE_OLLAMA', 'CLAUDE_CODE_USE_OLLAMA'))
   ) {
     return 'ollama'
   }
-  return null
+  if (
+    isEnvTruthy(getEnvAlias('LOCALCLAWD_USE_SPARK', 'LOCALCLAWD_USE_VLLM')) ||
+    isEnvTruthy(getEnvAlias('CLAUDE_CODE_USE_SPARK', 'CLAUDE_CODE_USE_VLLM'))
+  ) {
+    return 'spark'
+  }
+  return 'spark'
 }
 
 export function isLocalLLMProviderEnabled(): boolean {
-  return getLocalLLMProvider() !== null
+  return true
 }
 
 export function getLocalLLMBaseUrl(provider = getLocalLLMProvider()): string {
@@ -39,13 +38,15 @@ export function getLocalLLMBaseUrl(provider = getLocalLLMProvider()): string {
   }
   return provider === 'ollama'
     ? 'http://127.0.0.1:11434/v1'
-    : 'http://127.0.0.1:8000/v1'
+    : 'https://integrate.api.nvidia.com/v1'
 }
 
 export function getLocalLLMApiKey(provider = getLocalLLMProvider()): string {
   return (
     getEnvAlias('LOCALCLAWD_LOCAL_API_KEY', 'CLAUDE_CODE_LOCAL_API_KEY')?.trim() ||
-    (provider === 'ollama' ? 'ollama' : 'local')
+    process.env.NVIDIA_API_KEY?.trim() ||
+    process.env.NVAPI_KEY?.trim() ||
+    (provider === 'ollama' ? 'ollama' : '')
   )
 }
 
@@ -54,7 +55,12 @@ export function getLocalLLMModel(): string | undefined {
     'LOCALCLAWD_LOCAL_MODEL',
     'CLAUDE_CODE_LOCAL_MODEL',
   )?.trim()
-  return model ? model : undefined
+  if (model) {
+    return model
+  }
+  return getLocalLLMProvider() === 'ollama'
+    ? 'qwen2.5-coder:32b'
+    : 'qwen/qwen2.5-coder-32b-instruct'
 }
 
 export function getAPIProvider(): APIProvider {
