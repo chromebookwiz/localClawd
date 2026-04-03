@@ -17,7 +17,13 @@ By default, localClawd targets a vLLM-compatible endpoint. During onboarding, th
 Single-command Windows install from GitHub:
 
 ```powershell
-curl -fsSL https://raw.githubusercontent.com/chromebookwiz/localClawd/main/tools/bootstrap-localclawd.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -Command -
+curl.exe -fsSL https://raw.githubusercontent.com/chromebookwiz/localClawd/main/tools/bootstrap-localclawd.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -Command -
+```
+
+PowerShell-native equivalent:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/chromebookwiz/localClawd/main/tools/bootstrap-localclawd.ps1').Content))"
 ```
 
 One-command Windows install from this checkout:
@@ -26,7 +32,7 @@ One-command Windows install from this checkout:
 powershell -ExecutionPolicy Bypass -File .\tools\install-localclawd.ps1
 ```
 
-The bootstrap installer downloads the current source bundle, bootstraps Bun with `winget` if needed, then adds a `localClawd` launcher to your user PATH.
+The bootstrap installer downloads the current source bundle, bootstraps Bun with `winget` if needed, then adds a `localClawd` launcher to your user PATH. On Windows, use `curl.exe` instead of `curl` inside PowerShell because `curl` is an alias for `Invoke-WebRequest` there.
 
 The install location is derived from each user's home directory, so the same `curl` command works for other users too. On Windows it defaults to `%USERPROFILE%\.localClawd\source` for the source checkout and `%USERPROFILE%\.local\bin` for the launchers.
 
