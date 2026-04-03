@@ -20,6 +20,7 @@ import { ThemePicker } from '../ThemePicker.js';
 import { useAppState, useSetAppState, useAppStateStore } from '../../state/AppState.js';
 import { ModelPicker } from '../ModelPicker.js';
 import { modelDisplayString, isOpus1mMergeEnabled } from '../../utils/model/model.js';
+import { LocalBackendSetup } from '../LocalBackendSetup.js';
 import { isBilledAsExtraUsage } from '../../utils/extraUsage.js';
 import { ClaudeMdExternalIncludesDialog } from '../ClaudeMdExternalIncludesDialog.js';
 import { ChannelDowngradeDialog, type ChannelDowngradeChoice } from '../ChannelDowngradeDialog.js';
@@ -49,6 +50,7 @@ import { useSearchInput } from '../../hooks/useSearchInput.js';
 import { useTerminalSize } from '../../hooks/useTerminalSize.js';
 import { clearFastModeCooldown, FAST_MODE_MODEL_DISPLAY, isFastModeAvailable, isFastModeEnabled, getFastModeModel, isFastModeSupportedByModel } from '../../utils/fastMode.js';
 import { isFullscreenEnvEnabled } from '../../utils/fullscreen.js';
+import { getLocalLLMProviderLabel, normalizeLocalLLMConfig, type LocalLLMConfig } from '../../utils/model/providers.js';
 type Props = {
   onClose: (result?: string, options?: {
     display?: CommandResultDisplay;
@@ -82,7 +84,7 @@ type Setting = (SettingBase & {
   onChange(value: string): void;
   type: 'managedEnum';
 });
-type SubMenu = 'Theme' | 'Model' | 'TeammateModel' | 'ExternalIncludes' | 'OutputStyle' | 'ChannelDowngrade' | 'Language' | 'EnableAutoUpdates';
+type SubMenu = 'Theme' | 'Model' | 'LocalBackend' | 'TeammateModel' | 'ExternalIncludes' | 'OutputStyle' | 'ChannelDowngrade' | 'Language' | 'EnableAutoUpdates';
 export function Config({
   onClose,
   context,
@@ -834,6 +836,12 @@ export function Config({
     value: mainLoopModel === null ? 'Default (recommended)' : mainLoopModel,
     type: 'managedEnum' as const,
     onChange: onChangeMainModelConfig
+  }, {
+    id: 'localBackend',
+    label: 'Local backend',
+    value: localBackendDisplayString(globalConfig),
+    type: 'managedEnum' as const,
+    onChange: () => {}
   }, ...(isConnectedToIde ? [{
     id: 'diffTool',
     label: 'Diff tool',
@@ -1321,7 +1329,7 @@ export function Config({
       }
       return;
     }
-    if (setting_0.id === 'theme' || setting_0.id === 'model' || setting_0.id === 'teammateDefaultModel' || setting_0.id === 'showExternalIncludesDialog' || setting_0.id === 'outputStyle' || setting_0.id === 'language') {
+    if (setting_0.id === 'theme' || setting_0.id === 'model' || setting_0.id === 'localBackend' || setting_0.id === 'teammateDefaultModel' || setting_0.id === 'showExternalIncludesDialog' || setting_0.id === 'outputStyle' || setting_0.id === 'language') {
       // managedEnum items open a submenu — isDirty is set by the submenu's
       // completion callback, not here (submenu may be cancelled).
       switch (setting_0.id) {
@@ -1331,6 +1339,10 @@ export function Config({
           return;
         case 'model':
           setShowSubmenu('Model');
+          setTabsHidden(true);
+          return;
+        case 'localBackend':
+          setShowSubmenu('LocalBackend');
           setTabsHidden(true);
           return;
         case 'teammateDefaultModel':
@@ -1500,6 +1512,44 @@ export function Config({
         setShowSubmenu(null);
         setTabsHidden(false);
       }} showFastModeNotice={isFastModeEnabled() ? isFastMode && isFastModeSupportedByModel(mainLoopModel) && isFastModeAvailable() : false} />
+          <Text dimColor>
+            <Byline>
+              <KeyboardShortcutHint shortcut="Enter" action="confirm" />
+              <ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="cancel" />
+            </Byline>
+          </Text>
+        </> : showSubmenu === 'LocalBackend' ? <>
+          <LocalBackendSetup initialConfig={{
+        provider: globalConfig.localBackendProvider,
+        baseUrl: globalConfig.localBackendBaseUrl,
+        model: globalConfig.localBackendModel,
+        apiKey: globalConfig.localBackendApiKey
+      }} onComplete={(config: LocalLLMConfig) => {
+        isDirty.current = true;
+        saveGlobalConfig(current_23 => ({
+          ...current_23,
+          localBackendProvider: config.provider,
+          localBackendBaseUrl: config.baseUrl,
+          localBackendModel: config.model,
+          localBackendApiKey: config.apiKey
+        }));
+        setGlobalConfig({
+          ...getGlobalConfig(),
+          localBackendProvider: config.provider,
+          localBackendBaseUrl: config.baseUrl,
+          localBackendModel: config.model,
+          localBackendApiKey: config.apiKey
+        });
+        setChanges(prev_25 => ({
+          ...prev_25,
+          'local backend': localBackendDisplayString(config)
+        }));
+        setShowSubmenu(null);
+        setTabsHidden(false);
+      }} onCancel={() => {
+        setShowSubmenu(null);
+        setTabsHidden(false);
+      }} description="Update the OpenAI-compatible endpoint localClawd uses for chat completions, tools, and multimodal requests." />
           <Text dimColor>
             <Byline>
               <KeyboardShortcutHint shortcut="Enter" action="confirm" />
@@ -1765,6 +1815,15 @@ function teammateModelDisplayString(value: string | null | undefined): string {
   }
   if (value === null) return "Default (leader's model)";
   return modelDisplayString(value);
+}
+function localBackendDisplayString(value: Pick<GlobalConfig, 'localBackendProvider' | 'localBackendBaseUrl' | 'localBackendModel' | 'localBackendApiKey'> | LocalLLMConfig): string {
+  const config = normalizeLocalLLMConfig({
+    provider: value.localBackendProvider ?? value.provider,
+    baseUrl: value.localBackendBaseUrl ?? value.baseUrl,
+    model: value.localBackendModel ?? value.model,
+    apiKey: value.localBackendApiKey ?? value.apiKey
+  });
+  return `${getLocalLLMProviderLabel(config.provider)} · ${config.model} @ ${config.baseUrl}`;
 }
 const THEME_LABELS: Record<string, string> = {
   auto: 'Auto (match terminal)',

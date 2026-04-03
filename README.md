@@ -1,6 +1,6 @@
 # localClawd
 
-localClawd is a local-first coding CLI derived from the original codebase and retargeted to user-controlled backends such as NVIDIA Spark and Ollama. The goal is to preserve the terminal UX, tool loop, agents, and computer-use workflows while removing hosted-product assumptions.
+localClawd is a local-first coding CLI derived from the original codebase and retargeted to user-controlled backends such as vLLM, Ollama, and other OpenAI-compatible endpoints. The goal is to preserve the terminal UX, tool loop, agents, and computer-use workflows while removing hosted-product assumptions.
 
 ## What changed
 
@@ -12,7 +12,13 @@ localClawd is a local-first coding CLI derived from the original codebase and re
 
 ## Quick start
 
-By default, localClawd targets an NVIDIA Spark OpenAI-compatible endpoint. Switch to Ollama explicitly when you want a fully local daemon.
+By default, localClawd targets a vLLM-compatible endpoint. During onboarding, the CLI now asks you which backend to use, what base URL to call, and which model to select.
+
+Single-command Windows install from GitHub:
+
+```powershell
+curl -fsSL https://raw.githubusercontent.com/chromebookwiz/localClawd/main/tools/bootstrap-localclawd.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -Command -
+```
 
 One-command Windows install from this checkout:
 
@@ -20,17 +26,16 @@ One-command Windows install from this checkout:
 powershell -ExecutionPolicy Bypass -File .\tools\install-localclawd.ps1
 ```
 
-The installer bootstraps Bun with `winget` if it is not already installed, then adds a `localClawd` launcher to your user PATH.
+The bootstrap installer downloads the current source bundle, bootstraps Bun with `winget` if needed, then adds a `localClawd` launcher to your user PATH.
 
 localClawd accepts native environment variable names. Legacy `CLAUDE_CODE_*` names are still accepted as compatibility aliases, but new setups should prefer `LOCALCLAWD_*`.
 
-For NVIDIA Spark:
+For vLLM:
 
 ```powershell
-$env:NVIDIA_API_KEY = 'your-nvidia-key'
-$env:LOCALCLAWD_USE_SPARK = '1'
-$env:LOCALCLAWD_LOCAL_BASE_URL = 'https://integrate.api.nvidia.com/v1'
-$env:LOCALCLAWD_LOCAL_MODEL = 'Qwen/Qwen2.5-Coder-32B-Instruct'
+$env:LOCALCLAWD_USE_VLLM = '1'
+$env:LOCALCLAWD_LOCAL_BASE_URL = 'http://127.0.0.1:8000/v1'
+$env:LOCALCLAWD_LOCAL_MODEL = 'qwen2.5-coder-32b-instruct'
 ```
 
 For Ollama:
@@ -89,6 +94,7 @@ localClawd update
 ### Power tools
 
 - `tools\install-localclawd.ps1` bootstraps Bun if needed, creates a launcher for this checkout, and adds the launcher directory to your user PATH.
+- `tools\bootstrap-localclawd.ps1` downloads the repository source bundle, installs a checkout under `~/.localClawd/source`, and then runs the local installer.
 - `tools\rebrand-localclawd.ps1` aggressively rewrites `Claude` and `claude` occurrences across the repo to `localClawd`.
 - `tools\localclawd-tools.ps1` wraps install, rebrand, and branding audit in a single entrypoint.
 
@@ -97,17 +103,18 @@ localClawd update
 localClawd currently recognizes both native and legacy variable names for the local backend configuration. Prefer the native names below for new setups:
 
 - `LOCALCLAWD_USE_SPARK`
+- `LOCALCLAWD_USE_VLLM`
 - `LOCALCLAWD_USE_OLLAMA`
+- `LOCALCLAWD_USE_OPENAI`
 - `LOCALCLAWD_LOCAL_BASE_URL`
 - `LOCALCLAWD_LOCAL_MODEL`
 - `LOCALCLAWD_LOCAL_API_KEY`
-- `NVIDIA_API_KEY`
-- `NVAPI_KEY`
 - `LOCALCLAWD_AUTO_COMPACT_WINDOW`
 
 Legacy compatibility aliases that still work:
 
-- `LOCALCLAWD_USE_VLLM` and `CLAUDE_CODE_USE_VLLM` are treated as Spark aliases.
+- `LOCALCLAWD_USE_SPARK` and `CLAUDE_CODE_USE_SPARK` are treated as vLLM aliases.
+- `CLAUDE_CODE_USE_OPENAI` is accepted as a compatibility alias for `LOCALCLAWD_USE_OPENAI`.
 - Existing legacy environment variable aliases from the upstream fork are still accepted.
 
 ### Production checklist
@@ -137,7 +144,7 @@ During first-run setup, localClawd asks for a compact context window cap. Use th
 ## Backend notes
 
 - Internal `/v1/messages` payloads are translated into OpenAI-compatible `/v1/chat/completions` requests.
-- NVIDIA Spark is the default OpenAI-compatible target for source installs.
+- vLLM is the default OpenAI-compatible target for source installs.
 - Tool calls are mapped to function-calling so agent loops remain intact.
 - Token counting is estimated locally.
 - Text, tool, and image workflows are translated for OpenAI-compatible backends.

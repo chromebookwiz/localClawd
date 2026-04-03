@@ -180,6 +180,8 @@ export type DiffTool = 'terminal' | 'auto'
 
 export type OutputStyle = string
 
+export type LocalBackendProvider = 'vllm' | 'ollama' | 'openai'
+
 export type GlobalConfig = {
   /**
    * @deprecated Use settings.apiKeyHelper instead.
@@ -233,6 +235,10 @@ export type GlobalConfig = {
   hasUsedBackslashReturn?: boolean
   autoCompactEnabled: boolean // Controls whether auto-compact is enabled
   compactContextWindowTokens?: number // Optional cap used for auto-compact decisions
+  localBackendProvider?: LocalBackendProvider
+  localBackendBaseUrl?: string
+  localBackendModel?: string
+  localBackendApiKey?: string
   showTurnDuration: boolean // Controls whether to show turn duration message (e.g., "Cooked for 1m 6s")
   /**
    * @deprecated Use settings.env instead.
@@ -637,6 +643,11 @@ export const GLOBAL_CONFIG_KEYS = [
   'editorMode',
   'hasUsedBackslashReturn',
   'autoCompactEnabled',
+  'compactContextWindowTokens',
+  'localBackendProvider',
+  'localBackendBaseUrl',
+  'localBackendModel',
+  'localBackendApiKey',
   'showTurnDuration',
   'diffTool',
   'env',

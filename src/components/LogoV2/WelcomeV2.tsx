@@ -31,7 +31,7 @@ export function WelcomeV2() {
       <Box marginTop={1}>
         <Clawd />
         <Box marginLeft={2} flexDirection="column">
-          <Text dimColor={true}>Local-first coding, wired for NVIDIA Spark and Ollama.</Text>
+          <Text dimColor={true}>Local-first coding, wired for vLLM, Ollama, and OpenAI-compatible endpoints.</Text>
           <Text dimColor={true}>Vision and browser screenshots flow through when your model supports them.</Text>
         </Box>
       </Box>

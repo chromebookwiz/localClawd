@@ -6,22 +6,24 @@ import { useExitOnCtrlCDWithKeybindings } from '../hooks/useExitOnCtrlCDWithKeyb
 import { Box, Link, Newline, Text, useTheme } from '../ink.js';
 import { useKeybindings } from '../keybindings/useKeybinding.js';
 import { isAnthropicAuthEnabled } from '../utils/auth.js';
-import { saveGlobalConfig } from '../utils/config.js';
+import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js';
 import { normalizeApiKeyForConfig } from '../utils/authPortable.js';
 import { COMPACT_CONTEXT_WINDOW_CHOICES, formatCompactContextWindowOption } from '../utils/context.js';
 import { getCustomApiKeyStatus } from '../utils/config.js';
 import { env } from '../utils/env.js';
 import { isRunningOnHomespace } from '../utils/envUtils.js';
+import type { LocalLLMConfig } from '../utils/model/providers.js';
 import { PreflightStep } from '../utils/preflightChecks.js';
 import type { ThemeSetting } from '../utils/theme.js';
 import { ApproveApiKey } from './ApproveApiKey.js';
 import { ConsoleOAuthFlow } from './ConsoleOAuthFlow.js';
 import { Select } from './CustomSelect/select.js';
+import { LocalBackendSetup } from './LocalBackendSetup.js';
 import { WelcomeV2 } from './LogoV2/WelcomeV2.js';
 import { PressEnterToContinue } from './PressEnterToContinue.js';
 import { ThemePicker } from './ThemePicker.js';
 import { OrderedList } from './ui/OrderedList.js';
-type StepId = 'preflight' | 'theme' | 'compact-context' | 'oauth' | 'api-key' | 'security' | 'terminal-setup';
+type StepId = 'preflight' | 'theme' | 'compact-context' | 'local-backend' | 'oauth' | 'api-key' | 'security' | 'terminal-setup';
 interface OnboardingStep {
   id: StepId;
   component: React.ReactNode;
@@ -86,6 +88,22 @@ export function Onboarding({
     }} onCancel={goToNextStep} />
       <Text dimColor>Change this later in /config under Compact context window.</Text>
     </Box>;
+  function handleLocalBackendSetup(config: LocalLLMConfig) {
+    saveGlobalConfig(current => ({
+      ...current,
+      localBackendProvider: config.provider,
+      localBackendBaseUrl: config.baseUrl,
+      localBackendModel: config.model,
+      localBackendApiKey: config.apiKey
+    }));
+    goToNextStep();
+  }
+  const localBackendStep = <LocalBackendSetup initialConfig={{
+    provider: getGlobalConfig().localBackendProvider,
+    baseUrl: getGlobalConfig().localBackendBaseUrl,
+    model: getGlobalConfig().localBackendModel,
+    apiKey: getGlobalConfig().localBackendApiKey
+  }} onComplete={handleLocalBackendSetup} onCancel={goToNextStep} title="Choose your local backend" description="Set the OpenAI-compatible endpoint and model localClawd should use by default. You can point vLLM at a local server, Spark-backed vLLM, or any other compatible host." />;
   const securityStep = <Box flexDirection="column" gap={1} paddingLeft={1}>
       <Text bold>Security notes:</Text>
       <Box flexDirection="column" width={70}>
@@ -151,6 +169,10 @@ export function Onboarding({
   steps.push({
     id: 'compact-context',
     component: compactContextStep
+  });
+  steps.push({
+    id: 'local-backend',
+    component: localBackendStep
   });
   if (apiKeyNeedingApproval) {
     steps.push({

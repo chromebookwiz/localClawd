@@ -1,27 +1,104 @@
 import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../../services/analytics/index.js'
+import { getGlobalConfig, type LocalBackendProvider } from '../config.js'
 import { isEnvTruthy } from '../envUtils.js'
 
 export type APIProvider = 'firstParty' | 'bedrock' | 'vertex' | 'foundry' | 'local'
 
-export type LocalLLMProvider = 'spark' | 'ollama'
+export type LocalLLMProvider = LocalBackendProvider
+
+export type LocalLLMConfig = {
+  provider: LocalLLMProvider
+  baseUrl: string
+  model: string
+  apiKey: string
+}
+
+const LOCAL_LLM_DEFAULTS: Record<LocalLLMProvider, Omit<LocalLLMConfig, 'provider'>> = {
+  vllm: {
+    baseUrl: 'http://127.0.0.1:8000/v1',
+    model: 'qwen2.5-coder-32b-instruct',
+    apiKey: '',
+  },
+  ollama: {
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    model: 'qwen2.5-coder:32b',
+    apiKey: 'ollama',
+  },
+  openai: {
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-4.1-mini',
+    apiKey: '',
+  },
+}
 
 function getEnvAlias(localKey: string, legacyKey: string): string | undefined {
   return process.env[localKey] ?? process.env[legacyKey]
 }
 
-export function getLocalLLMProvider(): LocalLLMProvider {
+function isLocalLLMProvider(value: string | undefined): value is LocalLLMProvider {
+  return value === 'vllm' || value === 'ollama' || value === 'openai'
+}
+
+function getConfiguredLocalLLMProvider(): LocalLLMProvider | undefined {
+  const configuredProvider = getGlobalConfig().localBackendProvider
+  return isLocalLLMProvider(configuredProvider) ? configuredProvider : undefined
+}
+
+function getLocalLLMProviderFromEnv(): LocalLLMProvider | undefined {
   if (
     isEnvTruthy(getEnvAlias('LOCALCLAWD_USE_OLLAMA', 'CLAUDE_CODE_USE_OLLAMA'))
   ) {
     return 'ollama'
   }
   if (
+    isEnvTruthy(getEnvAlias('LOCALCLAWD_USE_OPENAI', 'CLAUDE_CODE_USE_OPENAI'))
+  ) {
+    return 'openai'
+  }
+  if (
     isEnvTruthy(getEnvAlias('LOCALCLAWD_USE_SPARK', 'LOCALCLAWD_USE_VLLM')) ||
     isEnvTruthy(getEnvAlias('CLAUDE_CODE_USE_SPARK', 'CLAUDE_CODE_USE_VLLM'))
   ) {
-    return 'spark'
+    return 'vllm'
   }
-  return 'spark'
+  return undefined
+}
+
+export function getDefaultLocalLLMConfig(
+  provider: LocalLLMProvider = 'vllm',
+): LocalLLMConfig {
+  return {
+    provider,
+    ...LOCAL_LLM_DEFAULTS[provider],
+  }
+}
+
+export function getLocalLLMProviderLabel(provider: LocalLLMProvider): string {
+  switch (provider) {
+    case 'vllm':
+      return 'vLLM'
+    case 'ollama':
+      return 'Ollama'
+    case 'openai':
+      return 'Other OpenAI-compatible'
+  }
+}
+
+export function normalizeLocalLLMConfig(
+  config?: Partial<LocalLLMConfig>,
+): LocalLLMConfig {
+  const provider = config?.provider ?? 'vllm'
+  const defaults = getDefaultLocalLLMConfig(provider)
+  return {
+    provider,
+    baseUrl: config?.baseUrl?.trim() || defaults.baseUrl,
+    model: config?.model?.trim() || defaults.model,
+    apiKey: config?.apiKey?.trim() || defaults.apiKey,
+  }
+}
+
+export function getLocalLLMProvider(): LocalLLMProvider {
+  return getLocalLLMProviderFromEnv() ?? getConfiguredLocalLLMProvider() ?? 'vllm'
 }
 
 export function isLocalLLMProviderEnabled(): boolean {
@@ -29,28 +106,47 @@ export function isLocalLLMProviderEnabled(): boolean {
 }
 
 export function getLocalLLMBaseUrl(provider = getLocalLLMProvider()): string {
-  const configured = getEnvAlias(
+  const configuredFromEnv = getEnvAlias(
     'LOCALCLAWD_LOCAL_BASE_URL',
     'CLAUDE_CODE_LOCAL_BASE_URL',
   )?.trim()
-  if (configured) {
-    return configured
+  if (configuredFromEnv) {
+    return configuredFromEnv
   }
-  return provider === 'ollama'
-    ? 'http://127.0.0.1:11434/v1'
-    : 'https://integrate.api.nvidia.com/v1'
+
+  const defaults = getDefaultLocalLLMConfig(provider)
+  const globalConfig = getGlobalConfig()
+  const configuredProvider = getConfiguredLocalLLMProvider()
+  if (
+    configuredProvider === provider &&
+    globalConfig.localBackendBaseUrl?.trim()
+  ) {
+    return globalConfig.localBackendBaseUrl.trim()
+  }
+
+  return defaults.baseUrl
 }
 
 export function getLocalLLMApiKey(provider = getLocalLLMProvider()): string {
-  return (
-    getEnvAlias('LOCALCLAWD_LOCAL_API_KEY', 'CLAUDE_CODE_LOCAL_API_KEY')?.trim() ||
-    process.env.NVIDIA_API_KEY?.trim() ||
-    process.env.NVAPI_KEY?.trim() ||
-    (provider === 'ollama' ? 'ollama' : '')
-  )
+  const configuredFromEnv = getEnvAlias(
+    'LOCALCLAWD_LOCAL_API_KEY',
+    'CLAUDE_CODE_LOCAL_API_KEY',
+  )?.trim()
+  if (configuredFromEnv) {
+    return configuredFromEnv
+  }
+
+  const defaults = getDefaultLocalLLMConfig(provider)
+  const globalConfig = getGlobalConfig()
+  const configuredProvider = getConfiguredLocalLLMProvider()
+  if (configuredProvider === provider) {
+    return globalConfig.localBackendApiKey?.trim() || defaults.apiKey
+  }
+
+  return defaults.apiKey
 }
 
-export function getLocalLLMModel(): string | undefined {
+export function getLocalLLMModel(provider = getLocalLLMProvider()): string | undefined {
   const model = getEnvAlias(
     'LOCALCLAWD_LOCAL_MODEL',
     'CLAUDE_CODE_LOCAL_MODEL',
@@ -58,9 +154,15 @@ export function getLocalLLMModel(): string | undefined {
   if (model) {
     return model
   }
-  return getLocalLLMProvider() === 'ollama'
-    ? 'qwen2.5-coder:32b'
-    : 'qwen/qwen2.5-coder-32b-instruct'
+
+  const defaults = getDefaultLocalLLMConfig(provider)
+  const globalConfig = getGlobalConfig()
+  const configuredProvider = getConfiguredLocalLLMProvider()
+  if (configuredProvider === provider && globalConfig.localBackendModel?.trim()) {
+    return globalConfig.localBackendModel.trim()
+  }
+
+  return defaults.model
 }
 
 export function getAPIProvider(): APIProvider {
