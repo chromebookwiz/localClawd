@@ -39,7 +39,12 @@ function Ensure-BinDirOnPath {
         [Environment]::SetEnvironmentVariable('Path', $newUserPath, 'User')
     }
 
-    if (($env:Path.Split(';', [System.StringSplitOptions]::RemoveEmptyEntries)) -notcontains $TargetBinDir) {
+    $sessionPathEntries = @()
+    if ($env:Path) {
+        $sessionPathEntries = $env:Path.Split(';', [System.StringSplitOptions]::RemoveEmptyEntries)
+    }
+
+    if ($sessionPathEntries -notcontains $TargetBinDir) {
         $env:Path = "$TargetBinDir;$env:Path"
     }
 }

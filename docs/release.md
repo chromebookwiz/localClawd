@@ -1,6 +1,16 @@
 # Release Operations
 
-This repository can now publish release metadata and GitHub Release assets for the universal installers, but it still assumes the platform binaries are produced outside this checkout.
+This repository is ready for a source-first `v1.0.0` GitHub release. The universal installers and source fallback path can ship from this checkout today. Native multi-platform binaries are still a separate follow-up because they depend on artifacts that are not produced by this public workspace alone.
+
+## Source-first `v1.0.0` publish
+
+1. Verify the bootstrap installers and Bun-based source launcher from this checkout.
+2. Create and push the `v1.0.0` tag.
+3. Publish GitHub release notes that describe the current distribution model as source-first, with native assets to follow.
+
+## Native asset follow-up
+
+The asset workflow remains available for a later native release once the missing generated/private build inputs are restored.
 
 ## Expected release assets
 
@@ -20,15 +30,14 @@ Each manifest entry must provide:
 - `checksum`: SHA-256 of the asset
 - `url`: direct download URL for the platform binary
 
-## Publishing flow
+## Native asset publishing flow
 
 1. Produce the six platform binaries and place them in `release-assets/`.
 2. Run `tools/release/generate-manifest.ps1` or `tools/release/generate-manifest.sh` to generate `release-manifests/<version>/manifest.json`.
 3. Trigger `.github/workflows/publish-release-assets.yml` or push a `v*` tag.
 4. Verify the GitHub Release contains the assets and the manifest commit lands on `main`.
 
-## Current blockers for a true 1.0 release
+## Current blockers for a native binary release
 
-- The repo still has no full dependency manifest or lockfile.
 - The source tree still references generated or build-time files that are not present in this checkout.
 - Some imports still target private or ant-only packages that cannot be built from this public workspace alone.

@@ -24,8 +24,10 @@ The bootstrap installers use a release-first strategy. They attempt to install a
 One-line install in PowerShell:
 
 ```powershell
-curl.exe -fsSL https://raw.githubusercontent.com/chromebookwiz/localClawd/main/tools/bootstrap-localclawd.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -Command -
+irm https://raw.githubusercontent.com/chromebookwiz/localClawd/main/tools/bootstrap-localclawd.ps1 | iex
 ```
+
+This is the primary Windows install command. It installs Bun automatically when needed, runs `bun install` for the source fallback checkout, and then adds the `localClawd` launcher to your user path.
 
 Do not use the Linux/macOS `bootstrap-localclawd.sh` command from PowerShell. PowerShell aliases `curl` to `Invoke-WebRequest`, so the Unix `curl -fsSL ... | bash` form will fail there.
 
@@ -41,7 +43,7 @@ From an existing checkout:
 powershell -ExecutionPolicy Bypass -File .\tools\install-localclawd.ps1
 ```
 
-The Windows bootstrap installer first looks for a matching GitHub Release binary. If no release asset is available, it downloads the repository source bundle, bootstraps Bun with `winget` if needed, and creates a source-checkout launcher.
+The Windows bootstrap installer first looks for a matching GitHub Release binary. If no release asset is available, it downloads the repository source bundle, installs Bun automatically if needed, runs `bun install`, and creates a source-checkout launcher.
 
 Default Windows paths:
 
@@ -144,7 +146,7 @@ localClawd
 
 ## Release status
 
-The repository contains source code and bootstrap installers, but it does not yet contain the complete release automation needed to publish and verify a full `1.0` native rollout from this checkout alone. The universal bootstrap path is ready to consume GitHub Release assets as soon as they are published. Until then, it falls back to the Bun-based source launcher.
+`v1.0.0` is currently a source-first release. The repository contains the source code, bootstrap installers, and Bun-based fallback launcher needed to publish and run localClawd from GitHub today. Native multi-platform binaries can be added later without changing the install surface.
 
 External native update metadata is now expected under `release-manifests/`, and the asset publication workflow lives in `.github/workflows/publish-release-assets.yml`. See `docs/release.md` for the expected asset set and publish sequence.
 

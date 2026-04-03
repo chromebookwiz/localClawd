@@ -1,0 +1,8 @@
+node_modules/
+release-assets/
+release-manifests/
+*.log
+*.tmp
+*.bak
+build-errors.txt
+localClawd-build-probe.exe

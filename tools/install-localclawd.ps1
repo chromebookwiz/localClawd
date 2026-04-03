@@ -27,6 +27,26 @@ function Get-BunExecutable {
     return $null
 }
 
+function Install-Bun {
+    $bunInstallScriptUrl = 'https://bun.sh/install.ps1'
+
+    try {
+        Write-Host 'Bun was not found. Installing Bun with the official installer...'
+        $installerScript = Invoke-RestMethod -Uri $bunInstallScriptUrl
+        & ([scriptblock]::Create($installerScript))
+        return
+    }
+    catch {
+        Write-Host 'Official Bun installer failed. Trying winget fallback...'
+    }
+
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        throw 'Bun is required for localClawd source mode, and neither the official installer nor winget succeeded. Install Bun manually, then rerun this script.'
+    }
+
+    & winget install --id Oven-sh.Bun -e --silent --accept-package-agreements --accept-source-agreements
+}
+
 function Refresh-SessionPath {
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -38,13 +58,7 @@ function Refresh-SessionPath {
 
 $bunPath = Get-BunExecutable
 if (-not $bunPath) {
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        throw 'Bun is required for this source-checkout installer, and winget is not available to install it automatically. Install Bun first, then rerun this script.'
-    }
-
-    Write-Host 'Bun was not found. Installing Bun with winget...'
-    & winget install --id Oven-sh.Bun -e --silent --accept-package-agreements --accept-source-agreements
-
+    Install-Bun
     Refresh-SessionPath
     $bunPath = Get-BunExecutable
     if (-not $bunPath) {
@@ -52,9 +66,23 @@ if (-not $bunPath) {
     }
 }
 
+$packageJson = Join-Path $RepoRoot 'package.json'
+if (-not (Test-Path $packageJson)) {
+    throw "Could not find package manifest at $packageJson"
+}
+
 $entrypoint = Join-Path $RepoRoot 'src\entrypoints\source-cli.ts'
 if (-not (Test-Path $entrypoint)) {
     throw "Could not find CLI entrypoint at $entrypoint"
+}
+
+Write-Host 'Installing localClawd runtime dependencies with Bun...'
+Push-Location $RepoRoot
+try {
+    & $bunPath install
+}
+finally {
+    Pop-Location
 }
 
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
@@ -102,11 +130,18 @@ if ($pathEntries -notcontains $BinDir) {
     [Environment]::SetEnvironmentVariable('Path', $newUserPath, 'User')
 }
 
-if (($env:Path.Split(';', [System.StringSplitOptions]::RemoveEmptyEntries)) -notcontains $BinDir) {
+$sessionPathEntries = @()
+if ($env:Path) {
+    $sessionPathEntries = $env:Path.Split(';', [System.StringSplitOptions]::RemoveEmptyEntries)
+}
+
+if ($sessionPathEntries -notcontains $BinDir) {
     $env:Path = "$BinDir;$env:Path"
 }
 
 Write-Host "Installed localClawd launcher at $cmdPath"
 Write-Host "Added $BinDir to your user PATH if it was missing."
+Write-Host "Installed Bun runtime: $bunPath"
+Write-Host 'Installed project dependencies with bun install.'
 Write-Host "Launcher runtime: $bunPath --install=auto --bun"
 Write-Host 'Open a new terminal, then run: localClawd'
