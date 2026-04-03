@@ -1,0 +1,78 @@
+name: Publish Release Assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without a leading v
+        required: true
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.event.inputs.version || github.ref_name }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Normalize version
+        shell: bash
+        run: |
+          VERSION="${VERSION#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Validate release asset directory
+        shell: bash
+        run: |
+          test -d release-assets
+          for asset in \
+            localClawd-win32-x64.exe \
+            localClawd-win32-arm64.exe \
+            localClawd-linux-x64 \
+            localClawd-linux-arm64 \
+            localClawd-darwin-x64 \
+            localClawd-darwin-arm64; do
+            test -f "release-assets/$asset"
+          done
+
+      - name: Validate installer scripts
+        shell: bash
+        run: |
+          bash -n tools/bootstrap-localclawd.sh
+          bash -n tools/install-localclawd.sh
+
+      - name: Generate release manifest files
+        shell: bash
+        run: |
+          mkdir -p release-manifests
+          bash tools/release/generate-manifest.sh "$VERSION" release-assets release-manifests chromebookwiz/localClawd https://github.com
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: localClawd v${{ env.VERSION }}
+          files: |
+            release-assets/localClawd-win32-x64.exe
+            release-assets/localClawd-win32-arm64.exe
+            release-assets/localClawd-linux-x64
+            release-assets/localClawd-linux-arm64
+            release-assets/localClawd-darwin-x64
+            release-assets/localClawd-darwin-arm64
+            release-manifests/${{ env.VERSION }}/manifest.json
+
+      - name: Commit release manifests
+        shell: bash
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add release-manifests
+          git commit -m "Publish release metadata for v$VERSION" || exit 0
+          git push origin HEAD:main

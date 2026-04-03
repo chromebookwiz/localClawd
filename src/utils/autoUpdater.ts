@@ -27,8 +27,9 @@ import {
 } from './shellConfig.js'
 import { jsonParse } from './slowOperations.js'
 
-const GCS_BUCKET_URL =
-  'https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases'
+const EXTERNAL_RELEASE_METADATA_URL =
+  process.env.LOCALCLAWD_BINARY_REPO_URL ??
+  'https://raw.githubusercontent.com/chromebookwiz/localClawd/main/release-manifests'
 
 class AutoUpdaterError extends ClaudeError {}
 
@@ -378,26 +379,31 @@ export async function getNpmDistTags(): Promise<NpmDistTags> {
 }
 
 /**
- * Get the latest version from GCS bucket for a given release channel.
- * This is used by installations that don't have npm (e.g. package manager installs).
+ * Get the latest version from the external release metadata repo for a given
+ * release channel. This is used by installations that do not rely on npm.
  */
 export async function getLatestVersionFromGcs(
   channel: ReleaseChannel,
 ): Promise<string | null> {
   try {
-    const response = await axios.get(`${GCS_BUCKET_URL}/${channel}`, {
+    const response = await axios.get(
+      `${EXTERNAL_RELEASE_METADATA_URL}/${channel}`,
+      {
       timeout: 5000,
       responseType: 'text',
-    })
+      },
+    )
     return response.data.trim()
   } catch (error) {
-    logForDebugging(`Failed to fetch ${channel} from GCS: ${error}`)
+    logForDebugging(
+      `Failed to fetch ${channel} from release metadata repo: ${error}`,
+    )
     return null
   }
 }
 
 /**
- * Get available versions from GCS bucket (for native installations).
+ * Get available versions from the external release metadata repo (for native installations).
  * Fetches both latest and stable channel pointers.
  */
 export async function getGcsDistTags(): Promise<NpmDistTags> {

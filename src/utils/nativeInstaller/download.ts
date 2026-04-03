@@ -22,8 +22,9 @@ import { sleep } from '../sleep.js'
 import { jsonStringify, writeFileSync_DEPRECATED } from '../slowOperations.js'
 import { getBinaryName, getPlatform } from './installer.js'
 
-const GCS_BUCKET_URL =
-  'https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases'
+const EXTERNAL_RELEASE_METADATA_URL =
+  process.env.LOCALCLAWD_BINARY_REPO_URL ??
+  'https://raw.githubusercontent.com/chromebookwiz/localClawd/main/release-manifests'
 export const ARTIFACTORY_REGISTRY_URL =
   'https://artifactory.infra.ant.dev/artifactory/api/npm/npm-all/'
 
@@ -144,8 +145,11 @@ export async function getLatestVersion(
     return getLatestVersionFromArtifactory(npmTag)
   }
 
-  // Use GCS for external users
-  return getLatestVersionFromBinaryRepo(channel, GCS_BUCKET_URL)
+  // Use repo-managed release metadata for external users
+  return getLatestVersionFromBinaryRepo(
+    channel,
+    EXTERNAL_RELEASE_METADATA_URL,
+  )
 }
 
 export async function downloadVersionFromArtifactory(
@@ -444,9 +448,11 @@ export async function downloadVersionFromBinaryRepo(
 
   const expectedChecksum = platformInfo.checksum
 
-  // Both GCS and generic bucket use identical layout: ${baseUrl}/${version}/${platform}/${binaryName}
   const binaryName = getBinaryName(platform)
-  const binaryUrl = `${baseUrl}/${version}/${platform}/${binaryName}`
+  const binaryUrl =
+    typeof platformInfo.url === 'string' && platformInfo.url.length > 0
+      ? platformInfo.url
+      : `${baseUrl}/${version}/${platform}/${binaryName}`
 
   // Write to staging
   await fs.mkdir(stagingPath)
@@ -512,8 +518,12 @@ export async function downloadVersion(
     return 'npm'
   }
 
-  // Use GCS for external users
-  await downloadVersionFromBinaryRepo(version, stagingPath, GCS_BUCKET_URL)
+  // Use repo-managed release metadata for external users
+  await downloadVersionFromBinaryRepo(
+    version,
+    stagingPath,
+    EXTERNAL_RELEASE_METADATA_URL,
+  )
   return 'binary'
 }
 

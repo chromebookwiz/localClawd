@@ -146,6 +146,8 @@ localClawd
 
 The repository contains source code and bootstrap installers, but it does not yet contain the complete release automation needed to publish and verify a full `1.0` native rollout from this checkout alone. The universal bootstrap path is ready to consume GitHub Release assets as soon as they are published. Until then, it falls back to the Bun-based source launcher.
 
+External native update metadata is now expected under `release-manifests/`, and the asset publication workflow lives in `.github/workflows/publish-release-assets.yml`. See `docs/release.md` for the expected asset set and publish sequence.
+
 ### Native install
 
 If you already have a runnable `localClawd` executable, install it natively with:
