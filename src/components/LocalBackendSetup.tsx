@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { Box, Text } from '../ink.js'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Box, Text, useInput } from '../ink.js'
 import {
   getDefaultLocalLLMConfig,
   getLocalLLMProviderLabel,
@@ -7,7 +7,12 @@ import {
   type LocalLLMConfig,
   type LocalLLMProvider,
 } from '../utils/model/providers.js'
-import { fetchAvailableModels } from '../utils/model/scanModels.js'
+import {
+  fetchAvailableModels,
+  scanLocalNetworkForVllm,
+  type DiscoveredEndpoint,
+  type NetworkScanProgress,
+} from '../utils/model/scanModels.js'
 import { Select } from './CustomSelect/select.js'
 import TextInput from './TextInput.js'
 
@@ -20,7 +25,27 @@ type Props = {
   showSaveGloballyOption?: boolean
 }
 
-type SetupStep = 'provider' | 'baseUrl' | 'scanningModels' | 'model' | 'apiKey' | 'saveScope'
+// Steps in order — used for "go back" logic
+type SetupStep =
+  | 'provider'
+  | 'networkScan'       // scanning 192.168.1.x (vLLM only)
+  | 'selectEndpoint'    // pick a discovered endpoint or enter manually
+  | 'baseUrl'
+  | 'scanningModels'    // fetching model list from confirmed endpoint
+  | 'model'
+  | 'apiKey'
+  | 'saveScope'
+
+const STEP_ORDER: SetupStep[] = [
+  'provider',
+  'networkScan',
+  'selectEndpoint',
+  'baseUrl',
+  'scanningModels',
+  'model',
+  'apiKey',
+  'saveScope',
+]
 
 const PROVIDER_OPTIONS: Array<{ label: string; value: LocalLLMProvider }> = [
   {
@@ -46,29 +71,29 @@ function getProviderGuidance(provider: LocalLLMProvider): {
     case 'vllm':
       return {
         baseUrl:
-          'Use the URL for your local or remote vLLM server. Press Enter to keep the suggested /v1 endpoint.',
+          'Confirm or edit the vLLM server URL. Press Enter to accept, Esc to go back.',
         model:
-          'Select a model discovered from your vLLM server, or type a name if you want to override.',
+          'Select a model discovered from your vLLM server, or type a name to override.',
         apiKey:
-          'Leave blank for local servers without auth, or paste the gateway token if your deployment requires one.',
+          'Leave blank for local servers without auth, or paste the gateway token if required.',
       }
     case 'ollama':
       return {
         baseUrl:
-          'Use your Ollama OpenAI-compatible endpoint. The default local address works for standard Ollama setups.',
+          'Confirm the Ollama OpenAI-compatible endpoint. The default works for standard local setups.',
         model:
-          'Select a model discovered from your Ollama server, or type a name if you want to override.',
+          'Select a model discovered from your Ollama server, or type a name to override.',
         apiKey:
-          'Press Enter to keep the default local Ollama token, or replace it if your proxy expects a different value.',
+          'Press Enter to keep the default Ollama token, or replace it if your proxy expects a different value.',
       }
     case 'openai':
       return {
         baseUrl:
-          'Use the API base URL for OpenAI or any compatible hosted gateway. Press Enter to keep the suggested default.',
+          'Use the API base URL for OpenAI or any compatible hosted gateway.',
         model:
-          'Enter the exact hosted model ID your provider expects, such as gpt-4.1-mini or a gateway-specific alias.',
+          'Enter the exact model ID your provider expects, such as gpt-4.1-mini.',
         apiKey:
-          'Paste the API key for your hosted provider. Leave blank only if your gateway is intentionally unauthenticated.',
+          'Paste the API key for your hosted provider.',
       }
   }
 }
@@ -85,23 +110,85 @@ export function LocalBackendSetup({
     () => normalizeLocalLLMConfig(initialConfig),
     [initialConfig],
   )
+
   const [step, setStep] = useState<SetupStep>('provider')
-  const [provider, setProvider] = useState<LocalLLMProvider>(
-    normalizedInitial.provider,
-  )
+  const [provider, setProvider] = useState<LocalLLMProvider>(normalizedInitial.provider)
   const [baseUrl, setBaseUrl] = useState(normalizedInitial.baseUrl)
   const [model, setModel] = useState(normalizedInitial.model)
   const [apiKey, setApiKey] = useState(normalizedInitial.apiKey)
   const [cursorOffset, setCursorOffset] = useState(0)
   const [error, setError] = useState<string | null>(null)
+
+  // Model scan state
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [scanError, setScanError] = useState<string | null>(null)
+
+  // Network scan state
+  const [networkProgress, setNetworkProgress] = useState<NetworkScanProgress | null>(null)
+  const [discoveredEndpoints, setDiscoveredEndpoints] = useState<DiscoveredEndpoint[]>([])
+  const [networkScanDone, setNetworkScanDone] = useState(false)
+
+  // Cancellation refs for async operations
+  const networkCancelRef = useRef({ cancelled: false })
+  const modelScanAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     const nextValue =
       step === 'baseUrl' ? baseUrl : step === 'model' ? model : apiKey
     setCursorOffset(nextValue.length)
   }, [step, baseUrl, model, apiKey])
+
+  // Handle Esc during async scanning steps
+  useInput(
+    (_input, key) => {
+      if (!key.escape) return
+      if (step === 'networkScan') {
+        networkCancelRef.current.cancelled = true
+        goBack()
+      } else if (step === 'scanningModels') {
+        modelScanAbortRef.current?.abort()
+        goBack()
+      }
+    },
+    { isActive: step === 'networkScan' || step === 'scanningModels' },
+  )
+
+  function goBack(): void {
+    setError(null)
+    switch (step) {
+      case 'provider':
+        onCancel?.()
+        break
+      case 'networkScan':
+        networkCancelRef.current.cancelled = true
+        setStep('provider')
+        break
+      case 'selectEndpoint':
+        // Re-scan or just go back to provider
+        setStep('provider')
+        break
+      case 'baseUrl':
+        if (provider === 'vllm') {
+          setStep('selectEndpoint')
+        } else {
+          setStep('provider')
+        }
+        break
+      case 'scanningModels':
+        modelScanAbortRef.current?.abort()
+        setStep('baseUrl')
+        break
+      case 'model':
+        setStep('baseUrl')
+        break
+      case 'apiKey':
+        setStep('model')
+        break
+      case 'saveScope':
+        setStep('apiKey')
+        break
+    }
+  }
 
   function applyProvider(nextProvider: LocalLLMProvider): void {
     const defaults = getDefaultLocalLLMConfig(nextProvider)
@@ -112,7 +199,46 @@ export function LocalBackendSetup({
     setError(null)
     setScanError(null)
     setAvailableModels([])
-    setStep('baseUrl')
+
+    if (nextProvider === 'vllm') {
+      // Start local network scan
+      startNetworkScan(nextProvider)
+    } else {
+      setStep('baseUrl')
+    }
+  }
+
+  function startNetworkScan(forProvider: LocalLLMProvider): void {
+    networkCancelRef.current = { cancelled: false }
+    setDiscoveredEndpoints([])
+    setNetworkProgress(null)
+    setNetworkScanDone(false)
+    setStep('networkScan')
+
+    scanLocalNetworkForVllm('192.168.1', networkCancelRef.current, (progress) => {
+      setNetworkProgress(progress)
+    }).then((endpoints) => {
+      if (networkCancelRef.current.cancelled) return
+      setDiscoveredEndpoints(endpoints)
+      setNetworkScanDone(true)
+      setStep('selectEndpoint')
+    }).catch(() => {
+      if (networkCancelRef.current.cancelled) return
+      setDiscoveredEndpoints([])
+      setNetworkScanDone(true)
+      setStep('selectEndpoint')
+    })
+  }
+
+  function selectEndpoint(url: string): void {
+    if (url === '__manual__') {
+      setStep('baseUrl')
+      return
+    }
+    // Use the selected discovered endpoint
+    setBaseUrl(url)
+    setError(null)
+    startModelScan(url)
   }
 
   function submitBaseUrl(value: string): void {
@@ -132,31 +258,38 @@ export function LocalBackendSetup({
     setBaseUrl(trimmed)
     setError(null)
 
-    // For providers that should scan, go to scanning step
     if (provider === 'vllm' || provider === 'ollama') {
-      setStep('scanningModels')
-      setScanError(null)
-      setAvailableModels([])
-
-      fetchAvailableModels(trimmed, provider, apiKey)
-        .then((result) => {
-          if (result.ok) {
-            setAvailableModels(result.models)
-            setScanError(null)
-          } else {
-            setScanError(result.error)
-            setAvailableModels([])
-          }
-          setStep('model')
-        })
-        .catch((err) => {
-          setScanError(`Unexpected error scanning models: ${err instanceof Error ? err.message : String(err)}`)
-          setAvailableModels([])
-          setStep('model')
-        })
+      startModelScan(trimmed)
     } else {
       setStep('model')
     }
+  }
+
+  function startModelScan(url: string): void {
+    const abort = new AbortController()
+    modelScanAbortRef.current = abort
+    setScanError(null)
+    setAvailableModels([])
+    setStep('scanningModels')
+
+    fetchAvailableModels(url, provider, apiKey)
+      .then((result) => {
+        if (abort.signal.aborted) return
+        if (result.ok) {
+          setAvailableModels(result.models)
+          setScanError(null)
+        } else {
+          setScanError(result.error)
+          setAvailableModels([])
+        }
+        setStep('model')
+      })
+      .catch((err) => {
+        if (abort.signal.aborted) return
+        setScanError(`Unexpected error scanning models: ${err instanceof Error ? err.message : String(err)}`)
+        setAvailableModels([])
+        setStep('model')
+      })
   }
 
   function submitModel(value: string): void {
@@ -165,20 +298,13 @@ export function LocalBackendSetup({
       setError('Model name is required.')
       return
     }
-
     setModel(trimmed)
     setError(null)
     setStep('apiKey')
   }
 
   function submitApiKey(value: string): void {
-    const nextConfig = {
-      provider,
-      baseUrl,
-      model,
-      apiKey: value.trim(),
-    }
-
+    const nextConfig = { provider, baseUrl, model, apiKey: value.trim() }
     setApiKey(nextConfig.apiKey)
     setError(null)
 
@@ -187,27 +313,32 @@ export function LocalBackendSetup({
       return
     }
 
-    onComplete(nextConfig, {
-      saveGlobally: true,
-    })
+    onComplete(nextConfig, { saveGlobally: true })
   }
 
   const providerLabel = getLocalLLMProviderLabel(provider)
   const baseUrlPlaceholder = getDefaultLocalLLMConfig(provider).baseUrl
   const apiKeyPlaceholder =
-    provider === 'ollama'
-      ? 'ollama'
-      : 'Leave blank if your endpoint does not require auth'
+    provider === 'ollama' ? 'ollama' : 'Leave blank if your endpoint does not require auth'
   const guidance = getProviderGuidance(provider)
-
   const modelSelectOptions = availableModels.map((m) => ({ label: m, value: m }))
 
+  // Build endpoint select options
+  const endpointSelectOptions = [
+    ...discoveredEndpoints.map((ep) => ({
+      label: `${ep.url}  [${ep.models.slice(0, 2).join(', ')}${ep.models.length > 2 ? ', …' : ''}]`,
+      value: ep.url,
+    })),
+    { label: 'Enter URL manually', value: '__manual__' },
+  ]
+
   return (
-    <Box flexDirection="column" gap={1} paddingLeft={1} width={80}>
+    <Box flexDirection="column" gap={1} paddingLeft={1} width={84}>
       <Text bold>{title}</Text>
       <Text dimColor wrap="wrap">
         {description}
       </Text>
+
       {step === 'provider' ? (
         <>
           <Select
@@ -216,28 +347,69 @@ export function LocalBackendSetup({
             onCancel={onCancel}
           />
           <Text dimColor>
-            Choose a local preset for self-hosted inference, or pick the hosted
-            API option if you want to connect with an API key.
+            Esc exits setup. Choose a local preset for self-hosted inference, or the hosted API option for cloud providers.
           </Text>
         </>
-      ) : (
+      ) : null}
+
+      {step === 'networkScan' ? (
+        <Box flexDirection="column" gap={1}>
+          <Text>
+            Scanning <Text bold>192.168.1.0/24</Text> for vLLM endpoints…
+          </Text>
+          {networkProgress ? (
+            <Text dimColor>
+              {networkProgress.scanned}/{networkProgress.total} probed
+              {networkProgress.found > 0 ? ` — ${networkProgress.found} found so far` : ''}
+            </Text>
+          ) : (
+            <Text dimColor>Starting scan…</Text>
+          )}
+          <Text dimColor>Press Esc to skip network scan and enter URL manually.</Text>
+        </Box>
+      ) : null}
+
+      {step === 'selectEndpoint' ? (
+        <>
+          {discoveredEndpoints.length > 0 ? (
+            <>
+              <Text>
+                Found <Text bold>{discoveredEndpoints.length}</Text> vLLM endpoint{discoveredEndpoints.length !== 1 ? 's' : ''} on your network
+              </Text>
+              <Text dimColor>Select an endpoint to use, or enter the URL manually.</Text>
+            </>
+          ) : (
+            <>
+              <Text>No vLLM endpoints found on 192.168.1.0/24</Text>
+              <Text dimColor>You can still enter the URL manually, or check that your server is running.</Text>
+            </>
+          )}
+          <Select
+            options={endpointSelectOptions}
+            onChange={value => selectEndpoint(value)}
+            onCancel={() => setStep('provider')}
+          />
+          <Text dimColor>Esc goes back to provider selection.</Text>
+        </>
+      ) : null}
+
+      {step !== 'provider' && step !== 'networkScan' && step !== 'selectEndpoint' ? (
         <>
           <Text>
             Backend: <Text bold>{providerLabel}</Text>
           </Text>
+
           {step === 'baseUrl' ? (
             <>
               <Text>Endpoint base URL</Text>
-              <Text dimColor>
-                {guidance.baseUrl}
-              </Text>
+              <Text dimColor>{guidance.baseUrl}</Text>
               <TextInput
                 value={baseUrl}
                 onChange={setBaseUrl}
                 onSubmit={submitBaseUrl}
-                onExit={onCancel}
+                onExit={goBack}
                 placeholder={baseUrlPlaceholder}
-                columns={76}
+                columns={80}
                 cursorOffset={cursorOffset}
                 onChangeCursorOffset={setCursorOffset}
                 focus
@@ -245,14 +417,16 @@ export function LocalBackendSetup({
               />
             </>
           ) : null}
+
           {step === 'scanningModels' ? (
             <Box flexDirection="column" gap={1}>
               <Text>
                 Scanning models at <Text bold>{baseUrl}</Text>…
               </Text>
-              <Text dimColor>Connecting to the endpoint to discover available models.</Text>
+              <Text dimColor>Press Esc to cancel and go back.</Text>
             </Box>
           ) : null}
+
           {step === 'model' ? (
             <>
               <Text>Model</Text>
@@ -267,23 +441,22 @@ export function LocalBackendSetup({
                   <Select
                     options={modelSelectOptions}
                     onChange={value => submitModel(value)}
-                    onCancel={onCancel}
+                    onCancel={goBack}
                   />
+                  <Text dimColor>Esc goes back to the URL step.</Text>
                 </>
               ) : (
                 <>
                   <Text dimColor>
-                    {scanError
-                      ? 'Enter the model name manually.'
-                      : guidance.model}
+                    {scanError ? 'Enter the model name manually.' : guidance.model}
                   </Text>
                   <TextInput
                     value={model}
                     onChange={setModel}
                     onSubmit={submitModel}
-                    onExit={onCancel}
+                    onExit={goBack}
                     placeholder={provider === 'openai' ? getDefaultLocalLLMConfig(provider).model : ''}
-                    columns={76}
+                    columns={80}
                     cursorOffset={cursorOffset}
                     onChangeCursorOffset={setCursorOffset}
                     focus
@@ -293,68 +466,50 @@ export function LocalBackendSetup({
               )}
             </>
           ) : null}
+
           {step === 'apiKey' ? (
             <>
               <Text>API key</Text>
-              <Text dimColor>
-                {guidance.apiKey}
-              </Text>
+              <Text dimColor>{guidance.apiKey}</Text>
               <TextInput
                 value={apiKey}
                 onChange={setApiKey}
                 onSubmit={submitApiKey}
-                onExit={onCancel}
+                onExit={goBack}
                 placeholder={apiKeyPlaceholder}
-                columns={76}
+                columns={80}
                 cursorOffset={cursorOffset}
                 onChangeCursorOffset={setCursorOffset}
                 focus
                 showCursor
               />
+              <Text dimColor>Esc goes back to model selection.</Text>
             </>
           ) : null}
+
           {step === 'saveScope' ? (
             <>
               <Text>How should localclawd use this backend?</Text>
               <Text dimColor wrap="wrap">
-                Save it globally if you want this backend to be the default every time localclawd starts. Choose this launch only if you want a temporary override.
+                Save globally to make this the default every time localclawd starts. Choose "this launch only" for a temporary override.
               </Text>
               <Select
                 options={[
-                  {
-                    label: 'Save as global default (recommended)',
-                    value: 'global',
-                  },
-                  {
-                    label: 'Use only for this launch',
-                    value: 'session',
-                  },
+                  { label: 'Save as global default (recommended)', value: 'global' },
+                  { label: 'Use only for this launch', value: 'session' },
                 ]}
                 onChange={value => {
-                  onComplete(
-                    {
-                      provider,
-                      baseUrl,
-                      model,
-                      apiKey,
-                    },
-                    {
-                      saveGlobally: value === 'global',
-                    },
-                  )
+                  onComplete({ provider, baseUrl, model, apiKey }, { saveGlobally: value === 'global' })
                 }}
-                onCancel={() => setStep('apiKey')}
+                onCancel={goBack}
               />
+              <Text dimColor>Esc goes back to API key.</Text>
             </>
           ) : null}
+
           {error ? <Text color="error">{error}</Text> : null}
-          {step !== 'scanningModels' && step !== 'saveScope' && step !== 'model' ? (
-            <Text dimColor>
-              Enter confirms the current value. Esc cancels this setup step. Environment variables still override saved defaults when present.
-            </Text>
-          ) : null}
         </>
-      )}
+      ) : null}
     </Box>
   )
 }

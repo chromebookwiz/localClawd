@@ -1,8 +1,17 @@
-const SCAN_TIMEOUT_MS = 5000
+const MODEL_SCAN_TIMEOUT_MS = 5000
+const NETWORK_PROBE_TIMEOUT_MS = 600
+const NETWORK_CONCURRENCY = 40
 
-async function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
+// Common vLLM / OpenAI-compat ports
+const VLLM_PORTS = [8000, 8080, 4000, 5000, 1234, 3000, 7860, 8888]
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = MODEL_SCAN_TIMEOUT_MS,
+): Promise<Response> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     return await fetch(url, { ...options, signal: controller.signal })
   } finally {
@@ -19,9 +28,10 @@ function buildHeaders(apiKey: string): Record<string, string> {
 }
 
 function ollamaNativeBase(v1BaseUrl: string): string {
-  // Strip trailing /v1 or /v1/ to get the Ollama root
   return v1BaseUrl.replace(/\/v1\/?$/, '')
 }
+
+// ─── Model list scan ────────────────────────────────────────────────────────
 
 export type ModelScanResult =
   | { ok: true; models: string[] }
@@ -35,7 +45,6 @@ export async function fetchAvailableModels(
   const trimmed = baseUrl.replace(/\/$/, '')
 
   if (provider === 'ollama') {
-    // Try native Ollama /api/tags first
     const nativeBase = ollamaNativeBase(trimmed)
     try {
       const res = await fetchWithTimeout(`${nativeBase}/api/tags`, {
@@ -50,7 +59,6 @@ export async function fetchAvailableModels(
       // fall through to OpenAI-compat attempt
     }
 
-    // Fallback: /v1/models (Ollama also exposes this)
     try {
       const res = await fetchWithTimeout(`${trimmed}/models`, {
         headers: buildHeaders(apiKey),
@@ -96,4 +104,73 @@ export async function fetchAvailableModels(
     }
     return { ok: false, error: `Could not reach ${trimmed}: ${msg}` }
   }
+}
+
+// ─── Local network endpoint scan ────────────────────────────────────────────
+
+export type DiscoveredEndpoint = {
+  url: string
+  models: string[]
+}
+
+export type NetworkScanProgress = {
+  scanned: number
+  total: number
+  found: number
+}
+
+async function probeVllmEndpoint(url: string): Promise<string[] | null> {
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), NETWORK_PROBE_TIMEOUT_MS)
+    let res: Response
+    try {
+      res = await fetch(`${url}/models`, { signal: controller.signal })
+    } finally {
+      clearTimeout(timer)
+    }
+    if (!res.ok) return null
+    const json = await res.json() as { data?: Array<{ id: string }> }
+    const models = (json.data ?? []).map((m) => m.id).filter(Boolean)
+    return models.length > 0 ? models : null
+  } catch {
+    return null
+  }
+}
+
+export async function scanLocalNetworkForVllm(
+  subnet: string = '192.168.1',
+  cancelSignal: { cancelled: boolean },
+  onProgress?: (progress: NetworkScanProgress) => void,
+): Promise<DiscoveredEndpoint[]> {
+  const found: DiscoveredEndpoint[] = []
+  const tasks: Array<{ host: number; port: number }> = []
+
+  for (let host = 1; host <= 254; host++) {
+    for (const port of VLLM_PORTS) {
+      tasks.push({ host, port })
+    }
+  }
+
+  const total = tasks.length
+  let scanned = 0
+  let taskIdx = 0
+
+  async function worker(): Promise<void> {
+    while (taskIdx < tasks.length) {
+      if (cancelSignal.cancelled) return
+      const task = tasks[taskIdx++]
+      const url = `http://${subnet}.${task.host}:${task.port}/v1`
+      const models = await probeVllmEndpoint(url)
+      scanned++
+      if (models) {
+        found.push({ url, models })
+      }
+      onProgress?.({ scanned, total, found: found.length })
+    }
+  }
+
+  const workers = Array.from({ length: NETWORK_CONCURRENCY }, () => worker())
+  await Promise.all(workers)
+  return found
 }
