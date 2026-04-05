@@ -1,8 +1,14 @@
 node_modules/
+dist/
 release-assets/
 release-manifests/
+.tmp-startpage-config/
+tmp-config-home/
+tmp-published-repro/
 *.log
+*.tgz
 *.tmp
 *.bak
 build-errors.txt
 localclawd-build-probe.exe
+localclawd.exe
