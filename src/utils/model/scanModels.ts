@@ -1,6 +1,6 @@
 const MODEL_SCAN_TIMEOUT_MS = 5000
 const NETWORK_PROBE_TIMEOUT_MS = 600
-const NETWORK_CONCURRENCY = 40
+const NETWORK_CONCURRENCY = 30
 
 // Common vLLM / OpenAI-compat ports
 const VLLM_PORTS = [8000, 8080, 4000, 5000, 1234, 3000, 7860, 8888]
@@ -12,6 +12,11 @@ async function fetchWithTimeout(
 ): Promise<Response> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
+  // Merge caller's signal with our timeout signal
+  const callerSignal = options.signal as AbortSignal | undefined
+  if (callerSignal) {
+    callerSignal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
   try {
     return await fetch(url, { ...options, signal: controller.signal })
   } finally {
@@ -41,6 +46,7 @@ export async function fetchAvailableModels(
   baseUrl: string,
   provider: string,
   apiKey: string,
+  signal?: AbortSignal,
 ): Promise<ModelScanResult> {
   const trimmed = baseUrl.replace(/\/$/, '')
 
@@ -49,19 +55,22 @@ export async function fetchAvailableModels(
     try {
       const res = await fetchWithTimeout(`${nativeBase}/api/tags`, {
         headers: buildHeaders(apiKey),
+        signal,
       })
       if (res.ok) {
         const json = await res.json() as { models?: Array<{ name: string }> }
         const models = (json.models ?? []).map((m) => m.name).filter(Boolean)
         if (models.length > 0) return { ok: true, models }
       }
-    } catch {
+    } catch (err) {
+      if (signal?.aborted) return { ok: false, error: 'Cancelled.' }
       // fall through to OpenAI-compat attempt
     }
 
     try {
       const res = await fetchWithTimeout(`${trimmed}/models`, {
         headers: buildHeaders(apiKey),
+        signal,
       })
       if (res.ok) {
         const json = await res.json() as { data?: Array<{ id: string }> }
@@ -69,6 +78,7 @@ export async function fetchAvailableModels(
         if (models.length > 0) return { ok: true, models }
       }
     } catch (err) {
+      if (signal?.aborted) return { ok: false, error: 'Cancelled.' }
       const msg = err instanceof Error ? err.message : String(err)
       if (msg.includes('abort') || msg.includes('timeout')) {
         return { ok: false, error: `Timed out connecting to Ollama at ${nativeBase}. Is Ollama running?` }
@@ -83,6 +93,7 @@ export async function fetchAvailableModels(
   try {
     const res = await fetchWithTimeout(`${trimmed}/models`, {
       headers: buildHeaders(apiKey),
+      signal,
     })
     if (!res.ok) {
       const body = await res.text().catch(() => '')
@@ -98,6 +109,7 @@ export async function fetchAvailableModels(
     }
     return { ok: true, models }
   } catch (err) {
+    if (signal?.aborted) return { ok: false, error: 'Cancelled.' }
     const msg = err instanceof Error ? err.message : String(err)
     if (msg.includes('abort') || msg.includes('timeout')) {
       return { ok: false, error: `Timed out connecting to ${trimmed}. Is the server running?` }
@@ -119,15 +131,23 @@ export type NetworkScanProgress = {
   found: number
 }
 
-async function probeVllmEndpoint(url: string): Promise<string[] | null> {
+async function probeVllmEndpoint(
+  url: string,
+  parentSignal: AbortSignal,
+): Promise<string[] | null> {
+  if (parentSignal.aborted) return null
   try {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), NETWORK_PROBE_TIMEOUT_MS)
+    // If parent aborts, abort this probe immediately
+    const onParentAbort = () => controller.abort()
+    parentSignal.addEventListener('abort', onParentAbort, { once: true })
     let res: Response
     try {
       res = await fetch(`${url}/models`, { signal: controller.signal })
     } finally {
       clearTimeout(timer)
+      parentSignal.removeEventListener('abort', onParentAbort)
     }
     if (!res.ok) return null
     const json = await res.json() as { data?: Array<{ id: string }> }
@@ -140,7 +160,7 @@ async function probeVllmEndpoint(url: string): Promise<string[] | null> {
 
 export async function scanLocalNetworkForVllm(
   subnet: string = '192.168.1',
-  cancelSignal: { cancelled: boolean },
+  abortSignal: AbortSignal,
   onProgress?: (progress: NetworkScanProgress) => void,
 ): Promise<DiscoveredEndpoint[]> {
   const found: DiscoveredEndpoint[] = []
@@ -158,10 +178,11 @@ export async function scanLocalNetworkForVllm(
 
   async function worker(): Promise<void> {
     while (taskIdx < tasks.length) {
-      if (cancelSignal.cancelled) return
+      if (abortSignal.aborted) return
       const task = tasks[taskIdx++]
       const url = `http://${subnet}.${task.host}:${task.port}/v1`
-      const models = await probeVllmEndpoint(url)
+      const models = await probeVllmEndpoint(url, abortSignal)
+      if (abortSignal.aborted) return
       scanned++
       if (models) {
         found.push({ url, models })

@@ -159,24 +159,32 @@ export function TrustDialog(t0) {
         gracefulShutdownSync(1);
         return;
       }
-      const isHomeDir_0 = homedir() === getCwd();
-      logEvent("tengu_trust_dialog_accept", {
-        isHomeDir: isHomeDir_0,
-        hasMcpServers,
-        hasHooks,
-        hasBashExecution: hasAnyBashExecution,
-        hasApiKeyHelper,
-        hasAwsCommands,
-        hasGcpCommands,
-        hasOtelHeadersHelper,
-        hasDangerousEnvVars
-      });
-      if (isHomeDir_0) {
-        setSessionTrustAccepted(true);
-      } else {
-        saveCurrentProjectConfig(_temp5);
+      // Wrap in try/finally so onDone() is always called even if config
+      // persistence or analytics throws (e.g. lock file contention).
+      try {
+        const isHomeDir_0 = homedir() === getCwd();
+        try {
+          logEvent("tengu_trust_dialog_accept", {
+            isHomeDir: isHomeDir_0,
+            hasMcpServers,
+            hasHooks,
+            hasBashExecution: hasAnyBashExecution,
+            hasApiKeyHelper,
+            hasAwsCommands,
+            hasGcpCommands,
+            hasOtelHeadersHelper,
+            hasDangerousEnvVars
+          });
+        } catch { /* analytics errors must not block trust acceptance */ }
+        if (isHomeDir_0) {
+          setSessionTrustAccepted(true);
+        } else {
+          try { saveCurrentProjectConfig(_temp5); } catch { /* config write error; trust is accepted for this session anyway */ }
+          setSessionTrustAccepted(true);
+        }
+      } finally {
+        onDone();
       }
-      onDone();
     };
     $[16] = hasAnyBashExecution;
     $[17] = onDone;
