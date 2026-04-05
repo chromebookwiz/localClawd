@@ -115,7 +115,7 @@ export type ThemeSetting = (typeof THEME_SETTINGS)[number]
 const lightTheme: Theme = {
   autoAccept: 'rgb(79,70,229)', // Indigo
   bashBorder: 'rgb(59,130,246)', // Blue
-  claude: 'rgb(79,70,229)', // localClawd indigo
+  claude: 'rgb(79,70,229)', // localclawd indigo
   claudeShimmer: 'rgb(129,140,248)', // Lighter indigo for shimmer effect
   claudeBlue_FOR_SYSTEM_SPINNER: 'rgb(87,105,247)', // Medium blue for system spinner
   claudeBlueShimmer_FOR_SYSTEM_SPINNER: 'rgb(117,135,255)', // Lighter blue for system spinner shimmer
@@ -157,8 +157,8 @@ const lightTheme: Theme = {
   professionalBlue: 'rgb(106,155,204)',
   // Chrome colors
   chromeYellow: 'rgb(251,188,4)', // Chrome yellow
-  // TUI V2 colors
-  clawd_body: 'rgb(59,130,246)',
+  // TUI V2 colors — indigo/violet brand palette
+  clawd_body: 'rgb(99,102,241)', // Indigo-500 (matches brand identity)
   clawd_background: 'rgb(0,0,0)',
   userMessageBackground: 'rgb(240, 240, 240)', // Slightly darker grey for optimal contrast
   userMessageBackgroundHover: 'rgb(252, 252, 252)', // ≥250 to quantize distinct from base at 256-color level
@@ -402,7 +402,7 @@ const lightDaltonizedTheme: Theme = {
   // Chrome colors
   chromeYellow: 'rgb(251,188,4)', // Chrome yellow
   // TUI V2 colors
-  clawd_body: 'rgb(59,130,246)',
+  clawd_body: 'rgb(67,97,238)', // Indigo adjusted for deuteranopia
   clawd_background: 'rgb(0,0,0)',
   userMessageBackground: 'rgb(220, 220, 220)', // Slightly darker grey for optimal contrast
   userMessageBackgroundHover: 'rgb(232, 232, 232)', // ≥230 to quantize distinct from base at 256-color level
@@ -440,7 +440,7 @@ const lightDaltonizedTheme: Theme = {
 const darkTheme: Theme = {
   autoAccept: 'rgb(129,140,248)', // Indigo
   bashBorder: 'rgb(96,165,250)', // Bright blue
-  claude: 'rgb(99,102,241)', // localClawd indigo
+  claude: 'rgb(99,102,241)', // localclawd indigo
   claudeShimmer: 'rgb(165,180,252)', // Lighter indigo for shimmer effect
   claudeBlue_FOR_SYSTEM_SPINNER: 'rgb(147,165,255)', // Blue for system spinner
   claudeBlueShimmer_FOR_SYSTEM_SPINNER: 'rgb(177,195,255)', // Lighter blue for system spinner shimmer
@@ -482,8 +482,8 @@ const darkTheme: Theme = {
   professionalBlue: 'rgb(106,155,204)',
   // Chrome colors
   chromeYellow: 'rgb(251,188,4)', // Chrome yellow
-  // TUI V2 colors
-  clawd_body: 'rgb(96,165,250)',
+  // TUI V2 colors — indigo/violet brand palette
+  clawd_body: 'rgb(129,140,248)', // Indigo-400 (bright on dark backgrounds)
   clawd_background: 'rgb(0,0,0)',
   userMessageBackground: 'rgb(55, 55, 55)', // Lighter grey for better visual contrast
   userMessageBackgroundHover: 'rgb(70, 70, 70)',

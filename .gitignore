@@ -5,4 +5,4 @@ release-manifests/
 *.tmp
 *.bak
 build-errors.txt
-localClawd-build-probe.exe
+localclawd-build-probe.exe

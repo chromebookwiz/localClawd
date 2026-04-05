@@ -10,16 +10,16 @@ fi
 VERSION="$1"
 ASSETS_DIR="$2"
 OUTPUT_DIR="$3"
-REPOSITORY="${4:-chromebookwiz/localClawd}"
+REPOSITORY="${4:-chromebookwiz/localclawd}"
 RELEASE_DOWNLOAD_BASE_URL="${5:-https://github.com}"
 
 declare -A PLATFORM_MAP=(
-  [win32-x64]='localClawd-win32-x64.exe'
-  [win32-arm64]='localClawd-win32-arm64.exe'
-  [linux-x64]='localClawd-linux-x64'
-  [linux-arm64]='localClawd-linux-arm64'
-  [darwin-x64]='localClawd-darwin-x64'
-  [darwin-arm64]='localClawd-darwin-arm64'
+  [win32-x64]='localclawd-win32-x64.exe'
+  [win32-arm64]='localclawd-win32-arm64.exe'
+  [linux-x64]='localclawd-linux-x64'
+  [linux-arm64]='localclawd-linux-arm64'
+  [darwin-x64]='localclawd-darwin-x64'
+  [darwin-arm64]='localclawd-darwin-arm64'
 )
 
 VERSION_DIR="$OUTPUT_DIR/$VERSION"

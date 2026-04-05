@@ -22,25 +22,61 @@ type SetupStep = 'provider' | 'baseUrl' | 'model' | 'apiKey'
 
 const PROVIDER_OPTIONS: Array<{ label: string; value: LocalLLMProvider }> = [
   {
-    label: 'vLLM (recommended for self-hosted OpenAI-compatible servers)',
+    label: 'Local vLLM server (recommended for self-hosted inference)',
     value: 'vllm',
   },
   {
-    label: 'Ollama',
+    label: 'Local Ollama server',
     value: 'ollama',
   },
   {
-    label: 'Other OpenAI-compatible endpoint',
+    label: 'Hosted OpenAI-compatible API or gateway',
     value: 'openai',
   },
 ]
+
+function getProviderGuidance(provider: LocalLLMProvider): {
+  baseUrl: string
+  model: string
+  apiKey: string
+} {
+  switch (provider) {
+    case 'vllm':
+      return {
+        baseUrl:
+          'Use the URL for your local or remote vLLM server. Press Enter to keep the suggested /v1 endpoint.',
+        model:
+          'Enter the exact served model name from vLLM, such as qwen2.5-coder-32b-instruct.',
+        apiKey:
+          'Leave blank for local servers without auth, or paste the gateway token if your deployment requires one.',
+      }
+    case 'ollama':
+      return {
+        baseUrl:
+          'Use your Ollama OpenAI-compatible endpoint. The default local address works for standard Ollama setups.',
+        model:
+          'Enter the exact Ollama model tag, such as qwen2.5-coder:32b.',
+        apiKey:
+          'Press Enter to keep the default local Ollama token, or replace it if your proxy expects a different value.',
+      }
+    case 'openai':
+      return {
+        baseUrl:
+          'Use the API base URL for OpenAI or any compatible hosted gateway. Press Enter to keep the suggested default.',
+        model:
+          'Enter the exact hosted model ID your provider expects, such as gpt-4.1-mini or a gateway-specific alias.',
+        apiKey:
+          'Paste the API key for your hosted provider. Leave blank only if your gateway is intentionally unauthenticated.',
+      }
+  }
+}
 
 export function LocalBackendSetup({
   initialConfig,
   onComplete,
   onCancel,
   title = 'Configure your model backend',
-  description = 'localClawd speaks to OpenAI-compatible chat completion APIs. Pick a backend, then confirm the endpoint and model to use.',
+  description = 'localclawd speaks to OpenAI-compatible chat completion APIs. Pick a backend, then confirm the endpoint and model to use.',
 }: Props): React.ReactNode {
   const normalizedInitial = useMemo(
     () => normalizeLocalLLMConfig(initialConfig),
@@ -119,6 +155,7 @@ export function LocalBackendSetup({
     provider === 'ollama'
       ? 'ollama'
       : 'Leave blank if your endpoint does not require auth'
+  const guidance = getProviderGuidance(provider)
 
   return (
     <Box flexDirection="column" gap={1} paddingLeft={1} width={80}>
@@ -134,8 +171,8 @@ export function LocalBackendSetup({
             onCancel={onCancel}
           />
           <Text dimColor>
-            vLLM is the default path. Use it for self-hosted vLLM, Spark-backed
-            vLLM, or any similar OpenAI-compatible server.
+            Choose a local preset for self-hosted inference, or pick the hosted
+            API option if you want to connect with an API key.
           </Text>
         </>
       ) : (
@@ -147,8 +184,7 @@ export function LocalBackendSetup({
             <>
               <Text>Endpoint base URL</Text>
               <Text dimColor>
-                Include the /v1 path if your server exposes OpenAI-compatible
-                routes there.
+                {guidance.baseUrl}
               </Text>
               <TextInput
                 value={baseUrl}
@@ -168,7 +204,7 @@ export function LocalBackendSetup({
             <>
               <Text>Model name</Text>
               <Text dimColor>
-                Enter the exact model identifier served by {providerLabel}.
+                {guidance.model}
               </Text>
               <TextInput
                 value={model}
@@ -188,8 +224,7 @@ export function LocalBackendSetup({
             <>
               <Text>API key</Text>
               <Text dimColor>
-                Press Enter on an empty field to skip auth for local or trusted
-                endpoints.
+                {guidance.apiKey}
               </Text>
               <TextInput
                 value={apiKey}
@@ -207,7 +242,7 @@ export function LocalBackendSetup({
           ) : null}
           {error ? <Text color="error">{error}</Text> : null}
           <Text dimColor>
-            Enter confirms the current value. Esc cancels this setup step.
+            Enter confirms the current value. Esc cancels this setup step. Environment variables still override saved defaults when present.
           </Text>
         </>
       )}

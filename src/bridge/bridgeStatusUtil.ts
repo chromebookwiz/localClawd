@@ -142,12 +142,12 @@ export function getBridgeStatus({
 
 /** Footer text shown when bridge is idle (Ready state). */
 export function buildIdleFooterText(url: string): string {
-  return `Code everywhere with localClawd or ${url}`
+  return `Code everywhere with localclawd or ${url}`
 }
 
 /** Footer text shown when a session is active (Connected state). */
 export function buildActiveFooterText(url: string): string {
-  return `Continue coding in localClawd or ${url}`
+  return `Continue coding in localclawd or ${url}`
 }
 
 /** Footer text shown when the bridge has failed. */

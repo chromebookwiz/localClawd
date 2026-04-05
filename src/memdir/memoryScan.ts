@@ -8,6 +8,7 @@ import { readdir } from 'fs/promises'
 import { basename, join } from 'path'
 import { parseFrontmatter } from '../utils/frontmatterParser.js'
 import { readFileInRange } from '../utils/readFileInRange.js'
+import { parseTags } from './lattice.js'
 import { type MemoryType, parseMemoryType } from './memoryTypes.js'
 
 export type MemoryHeader = {
@@ -16,6 +17,8 @@ export type MemoryHeader = {
   mtimeMs: number
   description: string | null
   type: MemoryType | undefined
+  /** Lattice tags parsed from frontmatter `tags:` field (may be empty). */
+  tags: readonly string[]
 }
 
 const MAX_MEMORY_FILES = 200
@@ -59,6 +62,7 @@ export async function scanMemoryFiles(
           mtimeMs,
           description: frontmatter.description || null,
           type: parseMemoryType(frontmatter.type),
+          tags: parseTags((frontmatter as Record<string, unknown>).tags),
         }
       }),
     )

@@ -34,7 +34,7 @@ export function RemoteCallout({
   }, []);
   const options: OptionWithDescription<RemoteCalloutSelection>[] = [{
     label: 'Enable Remote Control for this session',
-    description: 'Opens a secure connection to your localClawd paired client.',
+    description: 'Opens a secure connection to your localclawd paired client.',
     value: 'enable'
   }, {
     label: 'Never mind',
@@ -46,7 +46,7 @@ export function RemoteCallout({
         <Box marginBottom={1} flexDirection="column">
           <Text>
             Remote Control lets you access this CLI session from a paired
-            localClawd client, so you can pick up where you
+            localclawd client, so you can pick up where you
             left off on any device.
           </Text>
           <Text> </Text>

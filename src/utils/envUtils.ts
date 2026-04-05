@@ -9,7 +9,7 @@ export const getClaudeConfigHomeDir = memoize(
     return (
       process.env.LOCALCLAWD_CONFIG_DIR ??
       process.env.CLAUDE_CONFIG_DIR ??
-      join(homedir(), '.localClawd')
+      join(homedir(), '.localclawd')
     ).normalize('NFC')
   },
   () => process.env.LOCALCLAWD_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR,

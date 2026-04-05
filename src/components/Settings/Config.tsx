@@ -1549,7 +1549,7 @@ export function Config({
       }} onCancel={() => {
         setShowSubmenu(null);
         setTabsHidden(false);
-      }} description="Update the OpenAI-compatible endpoint localClawd uses for chat completions, tools, and multimodal requests." />
+      }} description="Update the OpenAI-compatible endpoint localclawd uses for chat completions, tools, and multimodal requests." />
           <Text dimColor>
             <Byline>
               <KeyboardShortcutHint shortcut="Enter" action="confirm" />

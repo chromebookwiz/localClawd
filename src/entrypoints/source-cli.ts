@@ -9,9 +9,9 @@ const macroDefaults = {
     process.env.LOCALCLAWD_NATIVE_PACKAGE_URL ?? 'localclawd-native',
   ISSUES_EXPLAINER:
     process.env.LOCALCLAWD_ISSUES_EXPLAINER ??
-    'open an issue in the localClawd repository',
+    'open an issue in the localclawd repository',
   FEEDBACK_CHANNEL:
-    process.env.LOCALCLAWD_FEEDBACK_CHANNEL ?? 'the localClawd issue tracker',
+    process.env.LOCALCLAWD_FEEDBACK_CHANNEL ?? 'the localclawd issue tracker',
   VERSION_CHANGELOG: process.env.LOCALCLAWD_VERSION_CHANGELOG ?? '',
 }
 
@@ -37,14 +37,14 @@ globalWithMacro.MACRO ??= macroDefaults
 const args = process.argv.slice(2)
 
 if (args[0] === 'install') {
-  console.log('localClawd is already installed from this source checkout.')
+  console.log('localclawd is already installed from this source checkout.')
   console.log(
     process.platform === 'win32'
       ? 'To rebuild the launcher, rerun tools\\install-localclawd.ps1 from the repository root.'
       : 'To rebuild the launcher, rerun ./tools/install-localclawd.sh from the repository root.',
   )
   console.log(
-    'The native `localClawd install` command is intended for packaged builds, not source-checkout launchers.',
+    'The native `localclawd install` command is intended for packaged builds, not source-checkout launchers.',
   )
   process.exit(0)
 }
@@ -64,13 +64,13 @@ if (
   args[0] === '-h' ||
   args[0] === 'help'
 ) {
-  console.log('localClawd source launcher')
+  console.log('localclawd source launcher')
   console.log('')
   console.log('Available source-checkout commands:')
-  console.log('  localClawd             Show this help summary')
-  console.log('  localClawd --version   Show the source launcher version')
-  console.log('  localClawd install     Rebuild the source-checkout launcher')
-  console.log('  localClawd update      Explain how to refresh this checkout')
+  console.log('  localclawd             Show this help summary')
+  console.log('  localclawd --version   Show the source launcher version')
+  console.log('  localclawd install     Rebuild the source-checkout launcher')
+  console.log('  localclawd update      Explain how to refresh this checkout')
   console.log('')
   console.log(
     'This launcher runs directly from a source checkout and does not behave like a packaged release build.',

@@ -41,7 +41,7 @@ function Install-Bun {
     }
 
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        throw 'Bun is required for localClawd source mode, and neither the official installer nor winget succeeded. Install Bun manually, then rerun this script.'
+        throw 'Bun is required for localclawd source mode, and neither the official installer nor winget succeeded. Install Bun manually, then rerun this script.'
     }
 
     & winget install --id Oven-sh.Bun -e --silent --accept-package-agreements --accept-source-agreements
@@ -76,7 +76,7 @@ if (-not (Test-Path $entrypoint)) {
     throw "Could not find CLI entrypoint at $entrypoint"
 }
 
-Write-Host 'Installing localClawd runtime dependencies with Bun...'
+Write-Host 'Installing localclawd runtime dependencies with Bun...'
 Push-Location $RepoRoot
 try {
     & $bunPath install
@@ -87,8 +87,8 @@ finally {
 
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 
-$cmdPath = Join-Path $BinDir 'localClawd.cmd'
-$ps1Path = Join-Path $BinDir 'localClawd.ps1'
+$cmdPath = Join-Path $BinDir 'localclawd.cmd'
+$ps1Path = Join-Path $BinDir 'localclawd.ps1'
 
 $cmdContent = @"
 @echo off
@@ -139,9 +139,9 @@ if ($sessionPathEntries -notcontains $BinDir) {
     $env:Path = "$BinDir;$env:Path"
 }
 
-Write-Host "Installed localClawd launcher at $cmdPath"
+Write-Host "Installed localclawd launcher at $cmdPath"
 Write-Host "Added $BinDir to your user PATH if it was missing."
 Write-Host "Installed Bun runtime: $bunPath"
 Write-Host 'Installed project dependencies with bun install.'
 Write-Host "Launcher runtime: $bunPath --install=auto --bun"
-Write-Host 'Open a new terminal, then run: localClawd'
+Write-Host 'Open a new terminal, then run: localclawd'

@@ -5,7 +5,7 @@ param(
     [string]$AssetsDir,
     [Parameter(Mandatory = $true)]
     [string]$OutputDir,
-    [string]$Repository = 'chromebookwiz/localClawd',
+    [string]$Repository = 'chromebookwiz/localclawd',
     [string]$ReleaseDownloadBaseUrl = 'https://github.com',
     [ValidateSet('stable', 'latest')]
     [string[]]$Channels = @('latest', 'stable')
@@ -14,12 +14,12 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $platformMap = @{
-    'win32-x64'   = 'localClawd-win32-x64.exe'
-    'win32-arm64' = 'localClawd-win32-arm64.exe'
-    'linux-x64'   = 'localClawd-linux-x64'
-    'linux-arm64' = 'localClawd-linux-arm64'
-    'darwin-x64'  = 'localClawd-darwin-x64'
-    'darwin-arm64' = 'localClawd-darwin-arm64'
+    'win32-x64'   = 'localclawd-win32-x64.exe'
+    'win32-arm64' = 'localclawd-win32-arm64.exe'
+    'linux-x64'   = 'localclawd-linux-x64'
+    'linux-arm64' = 'localclawd-linux-arm64'
+    'darwin-x64'  = 'localclawd-darwin-x64'
+    'darwin-arm64' = 'localclawd-darwin-arm64'
 }
 
 $versionDir = Join-Path $OutputDir $Version

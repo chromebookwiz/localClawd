@@ -4,22 +4,23 @@ This repository is ready for a source-first `v1.0.0` GitHub release. The univers
 
 ## Source-first `v1.0.0` publish
 
-1. Verify the bootstrap installers and Bun-based source launcher from this checkout.
-2. Create and push the `v1.0.0` tag.
-3. Publish GitHub release notes that describe the current distribution model as source-first, with native assets to follow.
+1. Wait for `.github/workflows/ci.yml` to pass `audit:branding`, `bun run build`, and `verify:npm-install` on the commit you want to release.
+2. Verify the bootstrap installers and Bun-based source launcher from this checkout if you changed installer code.
+3. Create and push the `v1.0.0` tag.
+4. Publish GitHub release notes that describe the current distribution model as source-first, with native assets to follow.
 
 ## Native asset follow-up
 
-The asset workflow remains available for a later native release once the missing generated/private build inputs are restored.
+The asset workflow remains available for a later native release once the missing generated/private build inputs are restored. `.github/workflows/publish-release-assets.yml` now re-runs the same branding, build, and npm-install verification checks before it publishes any assets.
 
 ## Expected release assets
 
-- localClawd-win32-x64.exe
-- localClawd-win32-arm64.exe
-- localClawd-linux-x64
-- localClawd-linux-arm64
-- localClawd-darwin-x64
-- localClawd-darwin-arm64
+- localclawd-win32-x64.exe
+- localclawd-win32-arm64.exe
+- localclawd-linux-x64
+- localclawd-linux-arm64
+- localclawd-darwin-x64
+- localclawd-darwin-arm64
 
 ## Manifest format
 
@@ -35,7 +36,8 @@ Each manifest entry must provide:
 1. Produce the six platform binaries and place them in `release-assets/`.
 2. Run `tools/release/generate-manifest.ps1` or `tools/release/generate-manifest.sh` to generate `release-manifests/<version>/manifest.json`.
 3. Trigger `.github/workflows/publish-release-assets.yml` or push a `v*` tag.
-4. Verify the GitHub Release contains the assets and the manifest commit lands on `main`.
+4. Let the workflow re-run `audit:branding`, `bun run build`, and `verify:npm-install` before publishing.
+5. Verify the GitHub Release contains the assets and the manifest commit lands on `main`.
 
 ## Current blockers for a native binary release
 

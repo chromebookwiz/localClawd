@@ -69,14 +69,14 @@ BUN_PATH="$(ensure_bun)"
 
 mkdir -p "$BIN_DIR"
 
-cat > "$BIN_DIR/localClawd" <<EOF
+cat > "$BIN_DIR/localclawd" <<EOF
 #!/usr/bin/env bash
 export NODE_PATH="$REPO_ROOT\${NODE_PATH:+:$NODE_PATH}"
 export USER_TYPE="\${USER_TYPE:-external}"
 exec "$BUN_PATH" --install=auto --bun "$ENTRYPOINT" "\$@"
 EOF
 
-chmod +x "$BIN_DIR/localClawd"
+chmod +x "$BIN_DIR/localclawd"
 
 for shell_file in "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc"; do
   ensure_path_entry "$shell_file"
@@ -84,7 +84,7 @@ done
 
 export PATH="$BIN_DIR:$PATH"
 
-echo "Installed localClawd launcher at $BIN_DIR/localClawd"
+echo "Installed localclawd launcher at $BIN_DIR/localclawd"
 echo "Ensured $BIN_DIR is present in common shell startup files."
 echo "Launcher runtime: $BUN_PATH --install=auto --bun"
-echo 'Open a new shell, then run: localClawd'
+echo 'Open a new shell, then run: localclawd'

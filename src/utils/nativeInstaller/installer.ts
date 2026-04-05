@@ -109,7 +109,7 @@ export function getPlatform(): string {
 }
 
 export function getBinaryName(platform: string): string {
-  return platform.startsWith('win32') ? 'localClawd.exe' : 'localClawd'
+  return platform.startsWith('win32') ? 'localclawd.exe' : 'localclawd'
 }
 
 function getBaseDirectories() {
@@ -118,13 +118,13 @@ function getBaseDirectories() {
 
   return {
     // Data directories (permanent storage)
-    versions: join(getXDGDataHome(), 'localClawd', 'versions'),
+    versions: join(getXDGDataHome(), 'localclawd', 'versions'),
 
     // Cache directories (can be deleted)
-    staging: join(getXDGCacheHome(), 'localClawd', 'staging'),
+    staging: join(getXDGCacheHome(), 'localclawd', 'staging'),
 
     // State directories
-    locks: join(getXDGStateHome(), 'localClawd', 'locks'),
+    locks: join(getXDGStateHome(), 'localclawd', 'locks'),
 
     // User bin
     executable: join(getUserBinDir(), executableName),
@@ -465,7 +465,7 @@ async function performVersionUpdate(
     logForDebugging(`Version ${version} already installed, updating symlink`)
   }
 
-  // Create direct symlink from ~/.local/bin/localClawd to the version binary
+  // Create direct symlink from ~/.local/bin/localclawd to the version binary
   await removeDirectoryIfEmpty(executablePath)
   await updateSymlink(executablePath, installPath)
 
@@ -845,7 +845,7 @@ export async function checkInstall(
     })
   }
 
-  // Check if the localClawd executable exists and is valid.
+  // Check if the localclawd executable exists and is valid.
   // On non-Windows, call readlink directly and route errno — ENOENT means
   // the executable is missing, EINVAL means it exists but isn't a symlink.
   // This avoids an access()→readlink() TOCTOU where deletion between the

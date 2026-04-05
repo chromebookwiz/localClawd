@@ -1921,7 +1921,7 @@ async function printHelp(): Promise<void> {
 Remote Control - Connect your local environment to your remote session
 
 USAGE
-  localClawd remote-control [options]
+  localclawd remote-control [options]
 OPTIONS
   --name <name>                    Name for the session
 ${
@@ -1944,7 +1944,7 @@ DESCRIPTION
 ${serverDescription}
 NOTES
   - Remote Control requires a compatible hosted account
-  - Run \`localClawd\` first in the directory to accept the workspace trust dialog
+  - Run \`localclawd\` first in the directory to accept the workspace trust dialog
 ${serverNote}`
   // biome-ignore lint/suspicious/noConsole: intentional help output
   console.log(help)
@@ -2082,11 +2082,11 @@ export async function bridgeMain(args: string[]): Promise<void> {
   setCwdState(dir)
 
   // The bridge bypasses main.tsx (which renders the interactive TrustDialog via showSetupScreens),
-  // so we must verify trust was previously established by a normal localClawd session.
+  // so we must verify trust was previously established by a normal localclawd session.
   if (!checkHasTrustDialogAccepted()) {
     // biome-ignore lint/suspicious/noConsole:: intentional console output
     console.error(
-      `Error: Workspace not trusted. Please run \`localClawd\` in ${dir} first to review and accept the workspace trust dialog.`,
+      `Error: Workspace not trusted. Please run \`localclawd\` in ${dir} first to review and accept the workspace trust dialog.`,
     )
     // eslint-disable-next-line custom-rules/no-process-exit
     process.exit(1)
@@ -2154,7 +2154,7 @@ export async function bridgeMain(args: string[]): Promise<void> {
     if (!found) {
       // biome-ignore lint/suspicious/noConsole: intentional error output
       console.error(
-        `Error: No recent session found in this directory or its worktrees. Run \`localClawd remote-control\` to start a new one.`,
+        `Error: No recent session found in this directory or its worktrees. Run \`localclawd remote-control\` to start a new one.`,
       )
       // eslint-disable-next-line custom-rules/no-process-exit
       process.exit(1)
@@ -2252,7 +2252,7 @@ export async function bridgeMain(args: string[]): Promise<void> {
     })
     // biome-ignore lint/suspicious/noConsole: intentional dialog output
     console.log(
-      `\nlocalClawd Remote Control is launching in spawn mode, which lets you create new sessions in this project from a connected client.\n\n` +
+      `\nlocalclawd Remote Control is launching in spawn mode, which lets you create new sessions in this project from a connected client.\n\n` +
         `Spawn mode for this project:\n` +
         `  [1] same-dir \u2014 sessions share the current directory (default)\n` +
         `  [2] worktree \u2014 each session gets an isolated git worktree\n\n` +
@@ -2392,7 +2392,7 @@ export async function bridgeMain(args: string[]): Promise<void> {
       }
       // biome-ignore lint/suspicious/noConsole: intentional error output
       console.error(
-        `Error: Session ${resumeSessionId} not found. It may have been archived or expired, or your login may have lapsed (run \`localClawd /login\`).`,
+        `Error: Session ${resumeSessionId} not found. It may have been archived or expired, or your login may have lapsed (run \`localclawd /login\`).`,
       )
       // eslint-disable-next-line custom-rules/no-process-exit
       process.exit(1)
@@ -2830,7 +2830,7 @@ export async function runBridgeHeadless(
 
   if (!checkHasTrustDialogAccepted()) {
     throw new BridgeHeadlessPermanentError(
-      `Workspace not trusted: ${dir}. Run \`localClawd\` in that directory first to accept the trust dialog.`,
+      `Workspace not trusted: ${dir}. Run \`localclawd\` in that directory first to accept the trust dialog.`,
     )
   }
 

@@ -1,7 +1,7 @@
 param(
-    [string]$Repository = 'chromebookwiz/localClawd',
+    [string]$Repository = 'chromebookwiz/localclawd',
     [string]$Branch = 'main',
-    [string]$InstallRoot = (Join-Path $HOME '.localClawd\source'),
+    [string]$InstallRoot = (Join-Path $HOME '.localclawd\source'),
     [string]$BinDir = (Join-Path $HOME '.local\bin'),
     [string]$Version,
     [ValidateSet('stable', 'latest')]
@@ -20,7 +20,7 @@ function Get-PlatformAssetName {
         default { throw "Unsupported architecture for release install: $arch" }
     }
 
-    return "localClawd-win32-$normalizedArch.exe"
+    return "localclawd-win32-$normalizedArch.exe"
 }
 
 function Ensure-BinDirOnPath {
@@ -79,10 +79,10 @@ function Install-ReleaseAsset {
 
             Ensure-BinDirOnPath -TargetBinDir $TargetBinDir
 
-            $installedBinary = Join-Path $TargetBinDir 'localClawd.exe'
+            $installedBinary = Join-Path $TargetBinDir 'localclawd.exe'
             Move-Item -Path $assetPath -Destination $installedBinary -Force
 
-            Write-Host "Installed localClawd release binary to $installedBinary"
+            Write-Host "Installed localclawd release binary to $installedBinary"
             if ($TargetVersion) {
                 Write-Host "Installed requested release version: $TargetVersion"
             }
@@ -125,7 +125,7 @@ try {
 
     $checkout = Get-ChildItem -Path $extractRoot -Directory | Select-Object -First 1
     if (-not $checkout) {
-        throw 'Could not locate extracted localClawd source.'
+        throw 'Could not locate extracted localclawd source.'
     }
 
     if (Test-Path $InstallRoot) {
@@ -140,7 +140,7 @@ try {
         throw "Installer script not found at $installer"
     }
 
-    Write-Host 'Running localClawd installer...'
+    Write-Host 'Running localclawd installer...'
     & powershell -NoProfile -ExecutionPolicy Bypass -File $installer -RepoRoot $InstallRoot -BinDir $BinDir
 }
 finally {

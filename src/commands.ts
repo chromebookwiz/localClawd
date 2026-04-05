@@ -19,20 +19,22 @@ import cost from './commands/cost/index.js'
 import diff from './commands/diff/index.js'
 import ctx_viz from './commands/ctx_viz/index.js'
 import doctor from './commands/doctor/index.js'
+import keepgoing from './commands/keepgoing/index.js'
+import buddy from './commands/buddy/index.js'
+import thinkharder from './commands/thinkharder/index.js'
+import thinknormal from './commands/thinkharder/thinknormal-index.js'
 import memory from './commands/memory/index.js'
 import help from './commands/help/index.js'
 import ide from './commands/ide/index.js'
 import init from './commands/init.js'
 import initVerifiers from './commands/init-verifiers.js'
 import keybindings from './commands/keybindings/index.js'
-import login from './commands/login/index.js'
 import logout from './commands/logout/index.js'
 import installGitHubApp from './commands/install-github-app/index.js'
 import installSlackApp from './commands/install-slack-app/index.js'
 import breakCache from './commands/break-cache/index.js'
 import mcp from './commands/mcp/index.js'
 import mobile from './commands/mobile/index.js'
-import onboarding from './commands/onboarding/index.js'
 import pr_comments from './commands/pr_comments/index.js'
 import releaseNotes from './commands/release-notes/index.js'
 import rename from './commands/rename/index.js'
@@ -175,6 +177,7 @@ import exportCommand from './commands/export/index.js'
 import model from './commands/model/index.js'
 import tag from './commands/tag/index.js'
 import outputStyle from './commands/output-style/index.js'
+import provider from './commands/provider/index.js'
 import remoteEnv from './commands/remote-env/index.js'
 import upgrade from './commands/upgrade/index.js'
 import {
@@ -190,7 +193,7 @@ import stats from './commands/stats/index.js'
 const usageReport: Command = {
   type: 'prompt',
   name: 'insights',
-  description: 'Generate a report analyzing your localClawd sessions',
+  description: 'Generate a report analyzing your localclawd sessions',
   contentLength: 0,
   progressMessage: 'analyzing your sessions',
   source: 'builtin',
@@ -240,7 +243,6 @@ export const INTERNAL_ONLY_COMMANDS = [
   ...(subscribePr ? [subscribePr] : []),
   resetLimits,
   resetLimitsNonInteractive,
-  onboarding,
   share,
   summary,
   teleport,
@@ -260,6 +262,7 @@ const COMMANDS = memoize((): Command[] => [
   advisor,
   agents,
   branch,
+  buddy,
   btw,
   chrome,
   clear,
@@ -281,7 +284,10 @@ const COMMANDS = memoize((): Command[] => [
   help,
   ide,
   init,
+  keepgoing,
   keybindings,
+  thinkharder,
+  thinknormal,
   installGitHubApp,
   installSlackApp,
   mcp,
@@ -289,6 +295,7 @@ const COMMANDS = memoize((): Command[] => [
   mobile,
   model,
   outputStyle,
+  provider,
   remoteEnv,
   plugin,
   pr_comments,
@@ -334,7 +341,7 @@ const COMMANDS = memoize((): Command[] => [
   hooks,
   exportCommand,
   sandboxToggle,
-  ...(!isUsing3PServices() ? [logout, login()] : []),
+  ...(!isUsing3PServices() ? [logout] : []),
   passes,
   ...(peersCmd ? [peersCmd] : []),
   tasks,

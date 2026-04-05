@@ -3,7 +3,7 @@ import { isEnvTruthy } from '../../utils/envUtils.js'
 
 const doctor: Command = {
   name: 'doctor',
-  description: 'Diagnose and verify your localClawd installation and settings',
+  description: 'Diagnose and verify your localclawd installation and settings',
   isEnabled: () => !isEnvTruthy(process.env.DISABLE_DOCTOR_COMMAND),
   type: 'local-jsx',
   load: () => import('./doctor.js'),

@@ -1,13 +1,4 @@
-import { feature } from 'bun:bundle'
-import { isBridgeEnabled } from '../../bridge/bridgeEnabled.js'
 import type { Command } from '../../commands.js'
-
-function isEnabled(): boolean {
-  if (!feature('BRIDGE_MODE')) {
-    return false
-  }
-  return isBridgeEnabled()
-}
 
 const bridge = {
   type: 'local-jsx',
@@ -15,9 +6,9 @@ const bridge = {
   aliases: ['rc'],
   description: 'Connect this terminal for remote-control sessions',
   argumentHint: '[name]',
-  isEnabled,
+  isEnabled: () => false,
   get isHidden() {
-    return !isEnabled()
+    return true
   },
   immediate: true,
   load: () => import('./bridge.js'),

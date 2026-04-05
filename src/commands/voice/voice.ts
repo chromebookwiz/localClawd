@@ -22,7 +22,7 @@ export const call: LocalCommandCall = async () => {
       return {
         type: 'text' as const,
         value:
-          'Voice mode requires a Claude.ai account. Please run /login to sign in.',
+          'Voice mode is disabled in this local-first build. Use /provider to configure a local or OpenAI-compatible backend instead.',
       }
     }
     return {
@@ -75,7 +75,7 @@ export const call: LocalCommandCall = async () => {
     return {
       type: 'text' as const,
       value:
-        'Voice mode requires a Claude.ai account. Please run /login to sign in.',
+        'Voice mode is disabled in this local-first build. Use /provider to configure a local or OpenAI-compatible backend instead.',
     }
   }
 

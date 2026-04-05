@@ -3,7 +3,7 @@ const plugin = {
   type: 'local-jsx',
   name: 'plugin',
   aliases: ['plugins', 'marketplace'],
-  description: 'Manage localClawd plugins',
+  description: 'Manage localclawd plugins',
   immediate: true,
   load: () => import('./plugin.js')
 } satisfies Command;

@@ -988,7 +988,7 @@ export function useVoice({
             '[voice] Failed to connect to voice_stream (no OAuth token?)',
           )
           onErrorRef.current?.(
-            'Voice mode requires a Claude.ai account. Please run /login to sign in.',
+            'Voice mode is disabled in this local-first build. Use /provider to configure a local or OpenAI-compatible backend instead.',
           )
           // Clear the audio buffer on failure
           audioBuffer.length = 0

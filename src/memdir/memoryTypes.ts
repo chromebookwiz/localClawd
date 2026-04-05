@@ -264,6 +264,7 @@ export const MEMORY_FRONTMATTER_EXAMPLE: readonly string[] = [
   'name: {{memory name}}',
   'description: {{one-line description — used to decide relevance in future conversations, so be specific}}',
   `type: {{${MEMORY_TYPES.join(', ')}}}`,
+  'tags: {{optional comma-separated topic tags, e.g. "database, migrations, postgres" — used by lattice scoring for local-model recall}}',
   '---',
   '',
   '{{memory content — for feedback/project types, structure as: rule/fact, then **Why:** and **How to apply:** lines}}',

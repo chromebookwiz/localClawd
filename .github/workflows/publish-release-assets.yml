@@ -14,7 +14,42 @@ permissions:
   contents: write
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.11'
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if [ -f bun.lock ] || [ -f bun.lockb ]; then
+            bun install --frozen-lockfile
+          else
+            bun install
+          fi
+
+      - name: Audit branding
+        run: bun run audit:branding
+
+      - name: Build CLI
+        run: bun run build
+
+      - name: Verify npm install flow
+        run: bun run verify:npm-install
+
   publish:
+    needs: verify
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ github.event.inputs.version || github.ref_name }}
@@ -33,12 +68,12 @@ jobs:
         run: |
           test -d release-assets
           for asset in \
-            localClawd-win32-x64.exe \
-            localClawd-win32-arm64.exe \
-            localClawd-linux-x64 \
-            localClawd-linux-arm64 \
-            localClawd-darwin-x64 \
-            localClawd-darwin-arm64; do
+            localclawd-win32-x64.exe \
+            localclawd-win32-arm64.exe \
+            localclawd-linux-x64 \
+            localclawd-linux-arm64 \
+            localclawd-darwin-x64 \
+            localclawd-darwin-arm64; do
             test -f "release-assets/$asset"
           done
 
@@ -52,20 +87,20 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-manifests
-          bash tools/release/generate-manifest.sh "$VERSION" release-assets release-manifests chromebookwiz/localClawd https://github.com
+          bash tools/release/generate-manifest.sh "$VERSION" release-assets release-manifests chromebookwiz/localclawd https://github.com
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}
-          name: localClawd v${{ env.VERSION }}
+          name: localclawd v${{ env.VERSION }}
           files: |
-            release-assets/localClawd-win32-x64.exe
-            release-assets/localClawd-win32-arm64.exe
-            release-assets/localClawd-linux-x64
-            release-assets/localClawd-linux-arm64
-            release-assets/localClawd-darwin-x64
-            release-assets/localClawd-darwin-arm64
+            release-assets/localclawd-win32-x64.exe
+            release-assets/localclawd-win32-arm64.exe
+            release-assets/localclawd-linux-x64
+            release-assets/localclawd-linux-arm64
+            release-assets/localclawd-darwin-x64
+            release-assets/localclawd-darwin-arm64
             release-manifests/${{ env.VERSION }}/manifest.json
 
       - name: Commit release manifests

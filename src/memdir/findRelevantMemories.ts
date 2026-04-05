@@ -4,6 +4,7 @@ import { errorMessage } from '../utils/errors.js'
 import { getDefaultSonnetModel } from '../utils/model/model.js'
 import { sideQuery } from '../utils/sideQuery.js'
 import { jsonParse } from '../utils/slowOperations.js'
+import { topLatticeMemories } from './lattice.js'
 import {
   formatMemoryManifest,
   type MemoryHeader,
@@ -133,9 +134,19 @@ async function selectRelevantMemories(
       return []
     }
     logForDebugging(
-      `[memdir] selectRelevantMemories failed: ${errorMessage(e)}`,
+      `[memdir] selectRelevantMemories sideQuery failed, falling back to lattice scoring: ${errorMessage(e)}`,
       { level: 'warn' },
     )
+    // Lattice fallback: when sideQuery is unavailable (local-only backend,
+    // network error, rate limit), rank memories using tag-based lattice
+    // scoring. This keeps memory recall functional without a hosted model.
+    const latticeResults = topLatticeMemories(query, memories)
+    if (latticeResults.length > 0) {
+      logForDebugging(
+        `[memdir] lattice fallback selected ${latticeResults.length} memories`,
+      )
+      return latticeResults.map(m => m.filename)
+    }
     return []
   }
 }

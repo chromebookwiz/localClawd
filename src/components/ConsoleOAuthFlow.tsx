@@ -241,7 +241,7 @@ export function ConsoleOAuthFlow({
           state: 'success'
         });
         void sendNotification({
-          message: 'Claude Code login successful',
+          message: 'localclawd login successful',
           notificationType: 'auth_success'
         }, terminal);
       }
@@ -364,7 +364,7 @@ function OAuthStatusMessage(t0) {
   switch (oauthStatus.state) {
     case "idle":
       {
-        const t1 = startingMessage ? startingMessage : "localClawd can be used with your subscription or billed based on API usage through your console account.";
+        const t1 = startingMessage ? startingMessage : "localclawd can be used with your subscription or billed based on API usage through your console account.";
         let t2;
         if ($[0] !== t1) {
           t2 = <Text bold={true}>{t1}</Text>;
@@ -460,7 +460,7 @@ function OAuthStatusMessage(t0) {
         let t2;
         let t3;
         if ($[13] === Symbol.for("react.memo_cache_sentinel")) {
-          t2 = <Text>localClawd supports Amazon Bedrock, Microsoft Foundry, and Vertex AI. Set the required environment variables, then restart localClawd.</Text>;
+          t2 = <Text>localclawd supports Amazon Bedrock, Microsoft Foundry, and Vertex AI. Set the required environment variables, then restart localclawd.</Text>;
           t3 = <Text>If you are part of an enterprise organization, contact your administrator for setup instructions.</Text>;
           $[13] = t2;
           $[14] = t3;
@@ -477,21 +477,21 @@ function OAuthStatusMessage(t0) {
         }
         let t5;
         if ($[16] === Symbol.for("react.memo_cache_sentinel")) {
-          t5 = <Text>· Amazon Bedrock:{" "}<Link url="https://github.com/chromebookwiz/localClawd">https://github.com/chromebookwiz/localClawd</Link></Text>;
+          t5 = <Text>· Amazon Bedrock:{" "}<Link url="https://github.com/chromebookwiz/localclawd">https://github.com/chromebookwiz/localclawd</Link></Text>;
           $[16] = t5;
         } else {
           t5 = $[16];
         }
         let t6;
         if ($[17] === Symbol.for("react.memo_cache_sentinel")) {
-          t6 = <Text>· Microsoft Foundry:{" "}<Link url="https://github.com/chromebookwiz/localClawd">https://github.com/chromebookwiz/localClawd</Link></Text>;
+          t6 = <Text>· Microsoft Foundry:{" "}<Link url="https://github.com/chromebookwiz/localclawd">https://github.com/chromebookwiz/localclawd</Link></Text>;
           $[17] = t6;
         } else {
           t6 = $[17];
         }
         let t7;
         if ($[18] === Symbol.for("react.memo_cache_sentinel")) {
-          t7 = <Box flexDirection="column" marginTop={1}>{t4}{t5}{t6}<Text>· Vertex AI:{" "}<Link url="https://github.com/chromebookwiz/localClawd">https://github.com/chromebookwiz/localClawd</Link></Text></Box>;
+          t7 = <Box flexDirection="column" marginTop={1}>{t4}{t5}{t6}<Text>· Vertex AI:{" "}<Link url="https://github.com/chromebookwiz/localclawd">https://github.com/chromebookwiz/localclawd</Link></Text></Box>;
           $[18] = t7;
         } else {
           t7 = $[18];
@@ -554,7 +554,7 @@ function OAuthStatusMessage(t0) {
       {
         let t1;
         if ($[37] === Symbol.for("react.memo_cache_sentinel")) {
-          t1 = <Box flexDirection="column" gap={1}><Box><Spinner /><Text>Creating API key for localClawd…</Text></Box></Box>;
+          t1 = <Box flexDirection="column" gap={1}><Box><Spinner /><Text>Creating API key for localclawd…</Text></Box></Box>;
           $[37] = t1;
         } else {
           t1 = $[37];

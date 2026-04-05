@@ -18,10 +18,10 @@ type Props = {
 };
 const WORKFLOWS: WorkflowOption[] = [{
   value: 'claude' as const,
-  label: '@localClawd - Tag @localclawd in issues and PR comments'
+  label: '@localclawd - Tag @localclawd in issues and PR comments'
 }, {
   value: 'claude-review' as const,
-  label: 'localClawd Review - Automated code review on new PRs'
+  label: 'localclawd Review - Automated code review on new PRs'
 }];
 function renderInputGuide(exitState: ExitState): React.ReactNode {
   if (exitState.pending) {

@@ -2,9 +2,9 @@
 
 set -euo pipefail
 
-REPOSITORY="${LOCALCLAWD_REPOSITORY:-chromebookwiz/localClawd}"
+REPOSITORY="${LOCALCLAWD_REPOSITORY:-chromebookwiz/localclawd}"
 BRANCH="${LOCALCLAWD_BRANCH:-main}"
-INSTALL_ROOT="${LOCALCLAWD_INSTALL_ROOT:-$HOME/.localClawd/source}"
+INSTALL_ROOT="${LOCALCLAWD_INSTALL_ROOT:-$HOME/.localclawd/source}"
 BIN_DIR="${LOCALCLAWD_BIN_DIR:-$HOME/.local/bin}"
 VERSION="${LOCALCLAWD_VERSION:-}"
 CHANNEL="${LOCALCLAWD_CHANNEL:-latest}"
@@ -61,14 +61,14 @@ get_platform_asset_name() {
       ;;
   esac
 
-  printf 'localClawd-%s-%s\n' "$os" "$arch"
+  printf 'localclawd-%s-%s\n' "$os" "$arch"
 }
 
 install_release_asset() {
   local asset_name
   asset_name="$(get_platform_asset_name)" || return 1
 
-  local installed_binary="$BIN_DIR/localClawd"
+  local installed_binary="$BIN_DIR/localclawd"
   local downloaded_asset="$TEMP_ROOT/$asset_name"
   local urls=()
 
@@ -91,7 +91,7 @@ install_release_asset() {
         ensure_path_entry "$shell_file"
       done
       export PATH="$BIN_DIR:$PATH"
-      echo "Installed localClawd release binary to $installed_binary"
+      echo "Installed localclawd release binary to $installed_binary"
       if [[ -n "$VERSION" ]]; then
         echo "Installed requested release version: $VERSION"
       else
@@ -124,7 +124,7 @@ tar -xzf "$ARCHIVE_PATH" -C "$EXTRACT_ROOT"
 
 CHECKOUT="$(find "$EXTRACT_ROOT" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 if [[ -z "$CHECKOUT" ]]; then
-  echo 'Could not locate extracted localClawd source.' >&2
+  echo 'Could not locate extracted localclawd source.' >&2
   exit 1
 fi
 
@@ -138,5 +138,5 @@ if [[ ! -f "$INSTALLER" ]]; then
   exit 1
 fi
 
-echo 'Running localClawd installer...'
+echo 'Running localclawd installer...'
 bash "$INSTALLER" "$INSTALL_ROOT"

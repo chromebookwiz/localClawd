@@ -95,7 +95,7 @@ function Web({
           logEvent('tengu_remote_setup_result', {
             result: 'not_signed_in' as SafeString
           });
-          onDone('Not signed in to Claude. Run /login first.');
+          onDone('Remote web setup is disabled in this local-first build. Use /provider to configure your backend instead.');
           return;
         case 'gh_not_installed':
         case 'gh_not_authenticated':

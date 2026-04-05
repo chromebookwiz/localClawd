@@ -18,7 +18,7 @@ function getPlanV2SystemPrompt(): string {
     ? `\`find\`, \`grep\`, and ${FILE_READ_TOOL_NAME}`
     : `${GLOB_TOOL_NAME}, ${GREP_TOOL_NAME}, and ${FILE_READ_TOOL_NAME}`
 
-  return `You are Mimir, the planning specialist for localClawd. Your role is to explore the codebase and design implementation plans.
+  return `You are Mimir, the planning specialist for localclawd. Your role is to explore the codebase and design implementation plans.
 
 === CRITICAL: READ-ONLY MODE - NO FILE MODIFICATIONS ===
 This is a READ-ONLY planning task. You are STRICTLY PROHIBITED from:

@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"description.*Claude Code\\\\|Claude Code.*description\" src/commands/*.ts src/commands/*.tsx)",
+      "Bash(grep -n -i \"claude\" src/components/memory/*.tsx)",
+      "Bash(node scripts/audit-branding.mjs)",
+      "Bash(bun run:*)",
+      "Bash(node:*)",
+      "Bash(npm pack:*)",
+      "Bash(npm whoami:*)",
+      "Read(//c/Users/natha/.claude/projects/C--code-vllmClawd/**)",
+      "Read(//c/Users/natha/.claude/projects/C--code-vllmClawd/memory/**)",
+      "Bash(npm show:*)",
+      "Bash(bun install:*)",
+      "Bash(find node_modules:*)",
+      "Bash(xargs grep:*)",
+      "Bash(npm publish:*)",
+      "Bash(npm view:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

@@ -261,7 +261,7 @@ async function getInstallationPath(): Promise<string> {
     }
 
     try {
-      const path = await which('localClawd')
+      const path = await which('localclawd')
       if (path) {
         return path
       }
@@ -271,8 +271,8 @@ async function getInstallationPath(): Promise<string> {
 
     // If we can't find it, check common locations
     try {
-      await getFsImplementation().stat(join(homedir(), '.local/bin/localClawd'))
-      return join(homedir(), '.local/bin/localClawd')
+      await getFsImplementation().stat(join(homedir(), '.local/bin/localclawd'))
+      return join(homedir(), '.local/bin/localclawd')
     } catch {
       // Not found
     }
@@ -308,7 +308,7 @@ async function detectMultipleInstallations(): Promise<
   const installations: Array<{ type: string; path: string }> = []
 
   // Check for local installation
-  const localPath = join(homedir(), '.localClawd', 'local')
+  const localPath = join(homedir(), '.localclawd', 'local')
   if (await localInstallationExists()) {
     installations.push({ type: 'npm-local', path: localPath })
   }
@@ -332,8 +332,8 @@ async function detectMultipleInstallations(): Promise<
     // Linux / macOS have prefix/bin/claude and prefix/lib/node_modules
     // Windows has prefix/claude and prefix/node_modules
     const globalBinPath = isWindows
-      ? join(npmPrefix, 'localClawd')
-      : join(npmPrefix, 'bin', 'localClawd')
+      ? join(npmPrefix, 'localclawd')
+      : join(npmPrefix, 'bin', 'localclawd')
 
     let globalBinExists = false
     try {
@@ -388,7 +388,7 @@ async function detectMultipleInstallations(): Promise<
   // Check for native installation
 
   // Check common native installation paths
-  const nativeBinPath = join(homedir(), '.local', 'bin', 'localClawd')
+  const nativeBinPath = join(homedir(), '.local', 'bin', 'localclawd')
   try {
     await fs.stat(nativeBinPath)
     installations.push({ type: 'native', path: nativeBinPath })
@@ -399,7 +399,7 @@ async function detectMultipleInstallations(): Promise<
   // Also check if config indicates native installation
   const config = getGlobalConfig()
   if (config.installMethod === 'native') {
-    const nativeDataPath = join(homedir(), '.local', 'share', 'localClawd')
+    const nativeDataPath = join(homedir(), '.local', 'share', 'localclawd')
     try {
       await fs.stat(nativeDataPath)
       if (!installations.some(i => i.type === 'native')) {
@@ -534,14 +534,14 @@ async function detectConfigurationIssues(
     if (type === 'npm-local' && config.installMethod !== 'local') {
       warnings.push({
         issue: `Running from local installation but config install method is '${config.installMethod}'`,
-        fix: 'Consider using native installation: localClawd install',
+        fix: 'Consider using native installation: localclawd install',
       })
     }
 
     if (type === 'native' && config.installMethod !== 'native') {
       warnings.push({
         issue: `Running native installation but config install method is '${config.installMethod}'`,
-        fix: 'Run localClawd install to update configuration',
+        fix: 'Run localclawd install to update configuration',
       })
     }
   }
@@ -549,7 +549,7 @@ async function detectConfigurationIssues(
   if (type === 'npm-global' && (await localInstallationExists())) {
     warnings.push({
       issue: 'Local installation exists but not being used',
-      fix: 'Consider using native installation: localClawd install',
+      fix: 'Consider using native installation: localclawd install',
     })
   }
 
@@ -558,23 +558,23 @@ async function detectConfigurationIssues(
 
   // Check if running local installation but it's not in PATH
   if (type === 'npm-local') {
-    // Check if localClawd is already accessible via PATH
-    const whichResult = await which('localClawd')
+    // Check if localclawd is already accessible via PATH
+    const whichResult = await which('localclawd')
     const localClawdInPath = !!whichResult
 
-    // Only show warning if localClawd is NOT in PATH AND no valid alias exists
+    // Only show warning if localclawd is NOT in PATH AND no valid alias exists
     if (!localClawdInPath && !validAlias) {
       if (existingAlias) {
         // Alias exists but points to invalid target
         warnings.push({
           issue: 'Local installation not accessible',
-          fix: `Alias exists but points to invalid target: ${existingAlias}. Update alias: alias localClawd="~/.localClawd/local/localClawd"`,
+          fix: `Alias exists but points to invalid target: ${existingAlias}. Update alias: alias localclawd="~/.localclawd/local/localclawd"`,
         })
       } else {
         // No alias exists and not in PATH
         warnings.push({
           issue: 'Local installation not accessible',
-            fix: 'Create alias: alias localClawd="~/.localClawd/local/localClawd"',
+            fix: 'Create alias: alias localclawd="~/.localclawd/local/localclawd"',
         })
       }
     }
@@ -679,7 +679,7 @@ export async function getDoctorDiagnostic(): Promise<DiagnosticInfo> {
     if (!hasUpdatePermissions && !getAutoUpdaterDisabledReason()) {
       warnings.push({
         issue: 'Insufficient permissions for auto-updates',
-        fix: 'Do one of: (1) Re-install node without sudo, or (2) Use `localClawd install` for native installation',
+        fix: 'Do one of: (1) Re-install node without sudo, or (2) Use `localclawd install` for native installation',
       })
     }
   }

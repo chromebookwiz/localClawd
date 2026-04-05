@@ -12,16 +12,12 @@ $skipExtensions = @(
 )
 
 $replacementTable = @(
-    @{ From = 'Claude Code'; To = 'localClawd' },
-    @{ From = 'Claude Desktop'; To = 'localClawd Desktop' },
-    @{ From = 'Claude in Chrome'; To = 'localClawd in Chrome' },
-    @{ From = 'Claude app'; To = 'localClawd app' },
-    @{ From = 'claude.ai/code'; To = 'localClawd' },
-    @{ From = 'claude.ai'; To = 'localClawd' },
-    @{ From = 'claude-code'; To = 'localClawd' },
-    @{ From = 'claude_code'; To = 'localClawd' },
-    @{ From = 'Claude'; To = 'localClawd' },
-    @{ From = 'claude'; To = 'localClawd' }
+    @{ From = 'localClawd'; To = 'localclawd' },
+    @{ From = '.localClawd'; To = '.localclawd' },
+    @{ From = 'Claude Code'; To = 'localclawd' },
+    @{ From = 'Claude Desktop'; To = 'localclawd Desktop' },
+    @{ From = 'Claude in Chrome'; To = 'localclawd in Chrome' },
+    @{ From = 'Claude app'; To = 'localclawd app' }
 )
 
 function Test-TextFile {

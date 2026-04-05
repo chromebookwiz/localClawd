@@ -20,7 +20,7 @@ function getLocalInstallDir(): string {
   return join(getClaudeConfigHomeDir(), 'local')
 }
 export function getLocalClaudePath(): string {
-  return join(getLocalInstallDir(), 'localClawd')
+  return join(getLocalInstallDir(), 'localclawd')
 }
 
 /**
@@ -28,7 +28,7 @@ export function getLocalClaudePath(): string {
  */
 export function isRunningFromLocalInstallation(): boolean {
   const execPath = process.argv[1] || ''
-  return execPath.includes('/.localClawd/local/node_modules/')
+  return execPath.includes('/.localclawd/local/node_modules/')
 }
 
 /**
@@ -71,10 +71,10 @@ export async function ensureLocalPackageEnvironment(): Promise<boolean> {
     )
 
     // Create the wrapper script if it doesn't exist
-    const wrapperPath = join(localInstallDir, 'localClawd')
+    const wrapperPath = join(localInstallDir, 'localclawd')
     const created = await writeIfMissing(
       wrapperPath,
-      `#!/bin/sh\nexec "${localInstallDir}/node_modules/.bin/localClawd" "$@"`,
+      `#!/bin/sh\nexec "${localInstallDir}/node_modules/.bin/localclawd" "$@"`,
       0o755,
     )
     if (created) {
@@ -90,7 +90,7 @@ export async function ensureLocalPackageEnvironment(): Promise<boolean> {
 }
 
 /**
- * Install or update the localClawd CLI package in the local directory
+ * Install or update the localclawd CLI package in the local directory
  * @param channel - Release channel to use (latest or stable)
  * @param specificVersion - Optional specific version to install (overrides channel)
  */
@@ -118,7 +118,7 @@ export async function installOrUpdateClaudePackage(
 
     if (result.code !== 0) {
       const error = new Error(
-        `Failed to install localClawd CLI package: ${result.stderr}`,
+        `Failed to install localclawd CLI package: ${result.stderr}`,
       )
       logError(error)
       return result.code === 190 ? 'in_progress' : 'install_failed'
@@ -143,7 +143,7 @@ export async function installOrUpdateClaudePackage(
  */
 export async function localInstallationExists(): Promise<boolean> {
   try {
-    await access(join(getLocalInstallDir(), 'node_modules', '.bin', 'localClawd'))
+    await access(join(getLocalInstallDir(), 'node_modules', '.bin', 'localclawd'))
     return true
   } catch {
     return false

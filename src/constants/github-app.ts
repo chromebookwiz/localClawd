@@ -1,9 +1,9 @@
-export const PR_TITLE = 'Add localClawd GitHub Workflow'
+export const PR_TITLE = 'Add localclawd GitHub Workflow'
 
 export const GITHUB_ACTION_SETUP_DOCS_URL =
   'https://github.com/anthropics/claude-code-action/blob/main/docs/setup.md'
 
-export const WORKFLOW_CONTENT = `name: localClawd
+export const WORKFLOW_CONTENT = `name: localclawd
 
 on:
   issue_comment:
@@ -35,7 +35,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Run localClawd workflow
+      - name: Run localclawd workflow
         id: claude
         uses: anthropics/claude-code-action@v1
         with:
@@ -55,9 +55,9 @@ jobs:
 
 `
 
-export const PR_BODY = `## Installing localClawd GitHub workflow
+export const PR_BODY = `## Installing localclawd GitHub workflow
 
-This PR adds a GitHub Actions workflow scaffold for repository automation based on the localClawd fork.
+This PR adds a GitHub Actions workflow scaffold for repository automation based on the localclawd fork.
 
 ### What it does
 
@@ -97,7 +97,7 @@ There's more information in the [Claude Code action repo](https://github.com/ant
 
 After merging this PR, let's try mentioning @claude in a comment on any PR to get started!`
 
-export const CODE_REVIEW_PLUGIN_WORKFLOW_CONTENT = `name: localClawd Review
+export const CODE_REVIEW_PLUGIN_WORKFLOW_CONTENT = `name: localclawd Review
 
 on:
   pull_request:
@@ -130,7 +130,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Run localClawd Review
+      - name: Run localclawd Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
         with:

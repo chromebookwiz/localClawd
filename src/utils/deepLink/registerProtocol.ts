@@ -233,13 +233,13 @@ export async function registerProtocolHandler(
 }
 
 /**
- * Resolve the localClawd binary path for protocol registration. Prefers the
- * native installer's stable symlink (~/.local/bin/localClawd) which survives
+ * Resolve the localclawd binary path for protocol registration. Prefers the
+ * native installer's stable symlink (~/.local/bin/localclawd) which survives
  * auto-updates; falls back to process.execPath when the symlink is absent
  * (dev builds, non-native installs).
  */
 async function resolveClaudePath(): Promise<string> {
-  const binaryName = process.platform === 'win32' ? 'localClawd.exe' : 'localClawd'
+  const binaryName = process.platform === 'win32' ? 'localclawd.exe' : 'localclawd'
   const stablePath = path.join(getUserBinDir(), binaryName)
   try {
     await fs.realpath(stablePath)
@@ -251,7 +251,7 @@ async function resolveClaudePath(): Promise<string> {
 
 /**
  * Check whether the OS-level protocol handler is already registered AND
- * points at the expected `localClawd` binary. Reads the registration artifact
+ * points at the expected `localclawd` binary. Reads the registration artifact
  * directly (symlink target, .desktop Exec line, registry value) rather than
  * a cached flag in ~/.claude.json, so:
  *   - the check is per-machine (config can sync across machines; OS state can't)

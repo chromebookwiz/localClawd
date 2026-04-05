@@ -29,7 +29,7 @@ import { jsonParse } from './slowOperations.js'
 
 const EXTERNAL_RELEASE_METADATA_URL =
   process.env.LOCALCLAWD_BINARY_REPO_URL ??
-  'https://raw.githubusercontent.com/chromebookwiz/localClawd/main/release-manifests'
+  'https://raw.githubusercontent.com/chromebookwiz/localclawd/main/release-manifests'
 
 class AutoUpdaterError extends ClaudeError {}
 
@@ -84,11 +84,11 @@ export async function assertMinVersion(): Promise<void> {
     ) {
       // biome-ignore lint/suspicious/noConsole:: intentional console output
       console.error(`
-    It looks like your version of localClawd (${MACRO.VERSION}) needs an update.
+    It looks like your version of localclawd (${MACRO.VERSION}) needs an update.
 A newer version (${versionConfig.minVersion} or higher) is required to continue.
 
 To update, please run:
-      localClawd update
+  localclawd update
 
 This will ensure you have access to the latest features and improvements.
 `)

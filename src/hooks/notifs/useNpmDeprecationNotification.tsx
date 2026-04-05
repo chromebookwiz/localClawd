@@ -2,7 +2,7 @@ import { isInBundledMode } from 'src/utils/bundledMode.js';
 import { getCurrentInstallationType } from 'src/utils/doctorDiagnostic.js';
 import { isEnvTruthy } from 'src/utils/envUtils.js';
 import { useStartupNotification } from './useStartupNotification.js';
-const NPM_DEPRECATION_MESSAGE = 'localClawd prefers the native installer. Run `localClawd install` for the recommended setup.';
+const NPM_DEPRECATION_MESSAGE = 'localclawd prefers the native installer. Run `localclawd install` for the recommended setup.';
 export function useNpmDeprecationNotification() {
   useStartupNotification(_temp);
 }

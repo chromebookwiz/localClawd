@@ -35,7 +35,7 @@ export async function sendNotification(
   })
 }
 
-const DEFAULT_TITLE = 'localClawd'
+const DEFAULT_TITLE = 'localclawd'
 
 async function sendToChannel(
   channel: string,

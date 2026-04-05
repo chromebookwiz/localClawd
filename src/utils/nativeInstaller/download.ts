@@ -24,7 +24,7 @@ import { getBinaryName, getPlatform } from './installer.js'
 
 const EXTERNAL_RELEASE_METADATA_URL =
   process.env.LOCALCLAWD_BINARY_REPO_URL ??
-  'https://raw.githubusercontent.com/chromebookwiz/localClawd/main/release-manifests'
+  'https://raw.githubusercontent.com/chromebookwiz/localclawd/main/release-manifests'
 export const ARTIFACTORY_REGISTRY_URL =
   'https://artifactory.infra.ant.dev/artifactory/api/npm/npm-all/'
 
