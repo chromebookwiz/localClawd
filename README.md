@@ -167,9 +167,10 @@ localclawd
 
 ## Release status
 
-`v1.0.4` is live on npm. Install globally with `npm install -g localclawd` or run without installing with `npx localclawd`. Native multi-platform binaries can be added later without changing the install surface.
+`v1.0.5` is live on npm. Install globally with `npm install -g localclawd` or run without installing with `npx localclawd`. Native multi-platform binaries can be added later without changing the install surface.
 
 **Changelog**
+- `1.0.5` — Geometric algebra lattice (Cl(n,0) multivectors, FCA concept lattice, rotor temporal decay, IDF attention); /keepgoing upgraded to ultimate persistent mode with subagent support, 7 stop-signal patterns, unlimited rounds, round counter; /thinkharder enforces 4-phase DRAFT→CRITIQUE→REFINE→VERIFY pipeline per change.
 - `1.0.4` — Fix `util is not defined` crash permanently by externalizing zod from the Bun bundle; add `/buddy`, `/thinkharder`, `/thinknormal` commands; fix `/keepgoing` autonomous loop; indigo/violet color scheme finalized.
 - `1.0.3` — Fix `util3 is not defined` crash from zod v4 bundled inside `@modelcontextprotocol/sdk`; pin all deps to current versions; zod v3 forced globally via overrides+resolutions.
 - `1.0.2` — Fix zod v4 bundler crash (`_uppercase2 is not defined`); pin zod to `^3`; version string now reflects package.json correctly.
