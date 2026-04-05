@@ -7,18 +7,20 @@ import {
   type LocalLLMConfig,
   type LocalLLMProvider,
 } from '../utils/model/providers.js'
+import { fetchAvailableModels } from '../utils/model/scanModels.js'
 import { Select } from './CustomSelect/select.js'
 import TextInput from './TextInput.js'
 
 type Props = {
   initialConfig?: Partial<LocalLLMConfig>
-  onComplete(config: LocalLLMConfig): void
+  onComplete(config: LocalLLMConfig, options?: { saveGlobally: boolean }): void
   onCancel?(): void
   title?: string
   description?: string
+  showSaveGloballyOption?: boolean
 }
 
-type SetupStep = 'provider' | 'baseUrl' | 'model' | 'apiKey'
+type SetupStep = 'provider' | 'baseUrl' | 'scanningModels' | 'model' | 'apiKey' | 'saveScope'
 
 const PROVIDER_OPTIONS: Array<{ label: string; value: LocalLLMProvider }> = [
   {
@@ -46,7 +48,7 @@ function getProviderGuidance(provider: LocalLLMProvider): {
         baseUrl:
           'Use the URL for your local or remote vLLM server. Press Enter to keep the suggested /v1 endpoint.',
         model:
-          'Enter the exact served model name from vLLM, such as qwen2.5-coder-32b-instruct.',
+          'Select a model discovered from your vLLM server, or type a name if you want to override.',
         apiKey:
           'Leave blank for local servers without auth, or paste the gateway token if your deployment requires one.',
       }
@@ -55,7 +57,7 @@ function getProviderGuidance(provider: LocalLLMProvider): {
         baseUrl:
           'Use your Ollama OpenAI-compatible endpoint. The default local address works for standard Ollama setups.',
         model:
-          'Enter the exact Ollama model tag, such as qwen2.5-coder:32b.',
+          'Select a model discovered from your Ollama server, or type a name if you want to override.',
         apiKey:
           'Press Enter to keep the default local Ollama token, or replace it if your proxy expects a different value.',
       }
@@ -77,6 +79,7 @@ export function LocalBackendSetup({
   onCancel,
   title = 'Configure your model backend',
   description = 'localclawd speaks to OpenAI-compatible chat completion APIs. Pick a backend, then confirm the endpoint and model to use.',
+  showSaveGloballyOption = false,
 }: Props): React.ReactNode {
   const normalizedInitial = useMemo(
     () => normalizeLocalLLMConfig(initialConfig),
@@ -91,6 +94,8 @@ export function LocalBackendSetup({
   const [apiKey, setApiKey] = useState(normalizedInitial.apiKey)
   const [cursorOffset, setCursorOffset] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+  const [scanError, setScanError] = useState<string | null>(null)
 
   useEffect(() => {
     const nextValue =
@@ -102,9 +107,11 @@ export function LocalBackendSetup({
     const defaults = getDefaultLocalLLMConfig(nextProvider)
     setProvider(nextProvider)
     setBaseUrl(defaults.baseUrl)
-    setModel(defaults.model)
+    setModel('')
     setApiKey(defaults.apiKey)
     setError(null)
+    setScanError(null)
+    setAvailableModels([])
     setStep('baseUrl')
   }
 
@@ -124,7 +131,32 @@ export function LocalBackendSetup({
 
     setBaseUrl(trimmed)
     setError(null)
-    setStep('model')
+
+    // For providers that should scan, go to scanning step
+    if (provider === 'vllm' || provider === 'ollama') {
+      setStep('scanningModels')
+      setScanError(null)
+      setAvailableModels([])
+
+      fetchAvailableModels(trimmed, provider, apiKey)
+        .then((result) => {
+          if (result.ok) {
+            setAvailableModels(result.models)
+            setScanError(null)
+          } else {
+            setScanError(result.error)
+            setAvailableModels([])
+          }
+          setStep('model')
+        })
+        .catch((err) => {
+          setScanError(`Unexpected error scanning models: ${err instanceof Error ? err.message : String(err)}`)
+          setAvailableModels([])
+          setStep('model')
+        })
+    } else {
+      setStep('model')
+    }
   }
 
   function submitModel(value: string): void {
@@ -140,22 +172,35 @@ export function LocalBackendSetup({
   }
 
   function submitApiKey(value: string): void {
-    onComplete({
+    const nextConfig = {
       provider,
       baseUrl,
       model,
       apiKey: value.trim(),
+    }
+
+    setApiKey(nextConfig.apiKey)
+    setError(null)
+
+    if (showSaveGloballyOption) {
+      setStep('saveScope')
+      return
+    }
+
+    onComplete(nextConfig, {
+      saveGlobally: true,
     })
   }
 
   const providerLabel = getLocalLLMProviderLabel(provider)
   const baseUrlPlaceholder = getDefaultLocalLLMConfig(provider).baseUrl
-  const modelPlaceholder = getDefaultLocalLLMConfig(provider).model
   const apiKeyPlaceholder =
     provider === 'ollama'
       ? 'ollama'
       : 'Leave blank if your endpoint does not require auth'
   const guidance = getProviderGuidance(provider)
+
+  const modelSelectOptions = availableModels.map((m) => ({ label: m, value: m }))
 
   return (
     <Box flexDirection="column" gap={1} paddingLeft={1} width={80}>
@@ -200,24 +245,52 @@ export function LocalBackendSetup({
               />
             </>
           ) : null}
+          {step === 'scanningModels' ? (
+            <Box flexDirection="column" gap={1}>
+              <Text>
+                Scanning models at <Text bold>{baseUrl}</Text>…
+              </Text>
+              <Text dimColor>Connecting to the endpoint to discover available models.</Text>
+            </Box>
+          ) : null}
           {step === 'model' ? (
             <>
-              <Text>Model name</Text>
-              <Text dimColor>
-                {guidance.model}
-              </Text>
-              <TextInput
-                value={model}
-                onChange={setModel}
-                onSubmit={submitModel}
-                onExit={onCancel}
-                placeholder={modelPlaceholder}
-                columns={76}
-                cursorOffset={cursorOffset}
-                onChangeCursorOffset={setCursorOffset}
-                focus
-                showCursor
-              />
+              <Text>Model</Text>
+              {scanError ? (
+                <Text color="yellow" wrap="wrap">
+                  Could not scan models: {scanError}
+                </Text>
+              ) : null}
+              {availableModels.length > 0 ? (
+                <>
+                  <Text dimColor>{guidance.model}</Text>
+                  <Select
+                    options={modelSelectOptions}
+                    onChange={value => submitModel(value)}
+                    onCancel={onCancel}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text dimColor>
+                    {scanError
+                      ? 'Enter the model name manually.'
+                      : guidance.model}
+                  </Text>
+                  <TextInput
+                    value={model}
+                    onChange={setModel}
+                    onSubmit={submitModel}
+                    onExit={onCancel}
+                    placeholder={provider === 'openai' ? getDefaultLocalLLMConfig(provider).model : ''}
+                    columns={76}
+                    cursorOffset={cursorOffset}
+                    onChangeCursorOffset={setCursorOffset}
+                    focus
+                    showCursor
+                  />
+                </>
+              )}
             </>
           ) : null}
           {step === 'apiKey' ? (
@@ -240,10 +313,46 @@ export function LocalBackendSetup({
               />
             </>
           ) : null}
+          {step === 'saveScope' ? (
+            <>
+              <Text>How should localclawd use this backend?</Text>
+              <Text dimColor wrap="wrap">
+                Save it globally if you want this backend to be the default every time localclawd starts. Choose this launch only if you want a temporary override.
+              </Text>
+              <Select
+                options={[
+                  {
+                    label: 'Save as global default (recommended)',
+                    value: 'global',
+                  },
+                  {
+                    label: 'Use only for this launch',
+                    value: 'session',
+                  },
+                ]}
+                onChange={value => {
+                  onComplete(
+                    {
+                      provider,
+                      baseUrl,
+                      model,
+                      apiKey,
+                    },
+                    {
+                      saveGlobally: value === 'global',
+                    },
+                  )
+                }}
+                onCancel={() => setStep('apiKey')}
+              />
+            </>
+          ) : null}
           {error ? <Text color="error">{error}</Text> : null}
-          <Text dimColor>
-            Enter confirms the current value. Esc cancels this setup step. Environment variables still override saved defaults when present.
-          </Text>
+          {step !== 'scanningModels' && step !== 'saveScope' && step !== 'model' ? (
+            <Text dimColor>
+              Enter confirms the current value. Esc cancels this setup step. Environment variables still override saved defaults when present.
+            </Text>
+          ) : null}
         </>
       )}
     </Box>

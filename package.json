@@ -1,6 +1,6 @@
 {
   "name": "localclawd",
-  "version": "1.0.5",
+  "version": "1.0.8",
   "description": "Local-first coding CLI for vLLM, Ollama, and OpenAI-compatible backends.",
   "private": false,
   "type": "module",
@@ -11,6 +11,7 @@
   "files": [
     "bin",
     "dist/cli.mjs",
+    "dist/vendor/ripgrep",
     "README.md"
   ],
   "preferGlobal": true,

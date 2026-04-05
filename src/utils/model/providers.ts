@@ -13,15 +13,17 @@ export type LocalLLMConfig = {
   apiKey: string
 }
 
+let sessionLocalLLMConfigOverride: LocalLLMConfig | null = null
+
 const LOCAL_LLM_DEFAULTS: Record<LocalLLMProvider, Omit<LocalLLMConfig, 'provider'>> = {
   vllm: {
     baseUrl: 'http://127.0.0.1:8000/v1',
-    model: 'qwen2.5-coder-32b-instruct',
+    model: '', // no default — scanned from the vLLM /v1/models endpoint at setup time
     apiKey: '',
   },
   ollama: {
     baseUrl: 'http://127.0.0.1:11434/v1',
-    model: 'qwen2.5-coder:32b',
+    model: '', // no default — scanned from the Ollama /api/tags endpoint at setup time
     apiKey: 'ollama',
   },
   openai: {
@@ -89,16 +91,35 @@ export function normalizeLocalLLMConfig(
 ): LocalLLMConfig {
   const provider = config?.provider ?? 'vllm'
   const defaults = getDefaultLocalLLMConfig(provider)
+  // For vLLM and Ollama the default model is intentionally empty — callers must
+  // discover the model via fetchAvailableModels() rather than using a hardcoded name.
+  const fallbackModel = provider === 'openai' ? defaults.model : ''
   return {
     provider,
     baseUrl: config?.baseUrl?.trim() || defaults.baseUrl,
-    model: config?.model?.trim() || defaults.model,
+    model: config?.model?.trim() || fallbackModel,
     apiKey: config?.apiKey?.trim() || defaults.apiKey,
   }
 }
 
+export function setSessionLocalLLMConfigOverride(
+  config?: Partial<LocalLLMConfig> | null,
+): void {
+  sessionLocalLLMConfigOverride = config
+    ? normalizeLocalLLMConfig(config)
+    : null
+}
+
+export function clearSessionLocalLLMConfigOverride(): void {
+  sessionLocalLLMConfigOverride = null
+}
+
+export function getSessionLocalLLMConfigOverride(): LocalLLMConfig | null {
+  return sessionLocalLLMConfigOverride
+}
+
 export function getLocalLLMProvider(): LocalLLMProvider {
-  return getLocalLLMProviderFromEnv() ?? getConfiguredLocalLLMProvider() ?? 'vllm'
+  return getLocalLLMProviderFromEnv() ?? sessionLocalLLMConfigOverride?.provider ?? getConfiguredLocalLLMProvider() ?? 'vllm'
 }
 
 export function isLocalLLMProviderEnabled(): boolean {
@@ -115,6 +136,9 @@ export function getLocalLLMBaseUrl(provider = getLocalLLMProvider()): string {
   }
 
   const defaults = getDefaultLocalLLMConfig(provider)
+  if (sessionLocalLLMConfigOverride?.provider === provider) {
+    return sessionLocalLLMConfigOverride.baseUrl
+  }
   const globalConfig = getGlobalConfig()
   const configuredProvider = getConfiguredLocalLLMProvider()
   if (
@@ -137,6 +161,9 @@ export function getLocalLLMApiKey(provider = getLocalLLMProvider()): string {
   }
 
   const defaults = getDefaultLocalLLMConfig(provider)
+  if (sessionLocalLLMConfigOverride?.provider === provider) {
+    return sessionLocalLLMConfigOverride.apiKey
+  }
   const globalConfig = getGlobalConfig()
   const configuredProvider = getConfiguredLocalLLMProvider()
   if (configuredProvider === provider) {
@@ -155,14 +182,21 @@ export function getLocalLLMModel(provider = getLocalLLMProvider()): string | und
     return model
   }
 
-  const defaults = getDefaultLocalLLMConfig(provider)
+  if (sessionLocalLLMConfigOverride?.provider === provider) {
+    return sessionLocalLLMConfigOverride.model || undefined
+  }
   const globalConfig = getGlobalConfig()
   const configuredProvider = getConfiguredLocalLLMProvider()
   if (configuredProvider === provider && globalConfig.localBackendModel?.trim()) {
     return globalConfig.localBackendModel.trim()
   }
 
-  return defaults.model
+  // vLLM and Ollama have no hardcoded default — return undefined so the caller
+  // knows a model must be selected (via scan or explicit user config).
+  if (provider === 'openai') {
+    return getDefaultLocalLLMConfig(provider).model
+  }
+  return undefined
 }
 
 export function getAPIProvider(): APIProvider {
