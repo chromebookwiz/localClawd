@@ -449,6 +449,21 @@ function parseProviderError(payload: unknown): string {
   return 'Local backend request failed'
 }
 
+/** Patterns that indicate the local provider rejected the request due to context overflow */
+const CONTEXT_OVERFLOW_PATTERNS = [
+  /prompt is too long/i,
+  /context.{0,20}(length|limit|window).{0,30}exceeded/i,
+  /input.{0,20}(length|limit).{0,30}exceeded/i,
+  /maximum.{0,20}(context|token)/i,
+  /tokens?.{0,20}exceeds?.{0,20}(max|limit|context)/i,
+  /too.{0,5}many.{0,10}tokens/i,
+  /\bKV.{0,10}cache.{0,20}(full|exceeded)/i,
+]
+
+function isContextOverflowMessage(msg: string): boolean {
+  return CONTEXT_OVERFLOW_PATTERNS.some(p => p.test(msg))
+}
+
 async function normalizeErrorResponse(response: Response): Promise<Response> {
   let message = `Local backend request failed with status ${response.status}`
   try {
@@ -464,12 +479,20 @@ async function normalizeErrorResponse(response: Response): Promise<Response> {
       // ignore body parse failures
     }
   }
+
+  // Map context overflow errors → Anthropic prompt_too_long so the existing
+  // query.ts machinery (reactive compact / autocompact) kicks in automatically.
+  const errorType = isContextOverflowMessage(message) ? 'invalid_request_error' : 'api_error'
+  const errorMessage = isContextOverflowMessage(message)
+    ? `Prompt is too long: ${message}`
+    : message
+
   return new Response(
     JSON.stringify({
       type: 'error',
       error: {
-        type: 'api_error',
-        message,
+        type: errorType,
+        message: errorMessage,
       },
     }),
     {
@@ -480,6 +503,79 @@ async function normalizeErrorResponse(response: Response): Promise<Response> {
       },
     },
   )
+}
+
+// ─── Local provider context length detection ──────────────────────────────────
+
+/**
+ * Query the local provider's model metadata to determine its context window.
+ * - vLLM: GET /v1/models → data[0].max_model_len
+ * - Ollama: POST /api/show → model_info['llama.context_length']
+ * - OpenAI-compat: falls back to null (use configured default)
+ *
+ * Returns null if context length cannot be determined.
+ */
+export async function queryLocalProviderContextLength(
+  baseUrl: string,
+  model: string,
+  apiKey: string,
+  provider: string,
+): Promise<number | null> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' }
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
+
+  const base = baseUrl.trim().replace(/\/v1\/?$/, '').replace(/\/$/, '')
+
+  try {
+    if (provider === 'ollama') {
+      // Ollama: POST /api/show to get model details
+      const ollamaBase = base.replace(/:11434\/v1$/, ':11434').replace('/v1', '')
+      const res = await fetch(`${ollamaBase}/api/show`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ model, verbose: true }),
+        signal: AbortSignal.timeout(5_000),
+      })
+      if (!res.ok) return null
+      const data = await res.json() as Record<string, unknown>
+      // Try model_info first (verbose), then parameters
+      const info = data['model_info'] as Record<string, unknown> | undefined
+      if (info) {
+        for (const key of Object.keys(info)) {
+          if (/context.length|num.ctx|ctx.len/i.test(key)) {
+            const val = Number(info[key])
+            if (val > 0) return val
+          }
+        }
+      }
+      // parameters string may have "num_ctx <n>"
+      const params = String(data['parameters'] ?? '')
+      const m = params.match(/num_ctx\s+(\d+)/)
+      if (m) return parseInt(m[1]!, 10)
+      return null
+    }
+
+    // vLLM / generic OpenAI-compat: GET /v1/models
+    const modelsUrl = `${base}/v1/models`
+    const res = await fetch(modelsUrl, {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    })
+    if (!res.ok) return null
+    const data = await res.json() as { data?: Array<Record<string, unknown>> }
+    const models = data.data ?? []
+    // Find matching model or use first
+    const entry = models.find(m => String(m['id']) === model) ?? models[0]
+    if (!entry) return null
+
+    // vLLM exposes max_model_len
+    const maxLen = Number(entry['max_model_len'] ?? entry['context_length'] ?? entry['context_window'])
+    if (maxLen > 0) return maxLen
+
+    return null
+  } catch {
+    return null
+  }
 }
 
 function encodeSse(event: string, data: unknown): Uint8Array {

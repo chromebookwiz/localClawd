@@ -66,28 +66,38 @@ export function modelSupports1M(model: string): boolean {
   return canonical.includes('claude-sonnet-4') || canonical.includes('opus-4-6')
 }
 
+/** Parse a context window string like "200k", "1m", "131072" → number | null */
+export function parseContextWindowString(s: string): number | null {
+  const trimmed = s.trim().toLowerCase()
+  const mMatch = trimmed.match(/^(\d+(?:\.\d+)?)m$/)
+  if (mMatch) return Math.round(parseFloat(mMatch[1]!) * 1_000_000)
+  const kMatch = trimmed.match(/^(\d+(?:\.\d+)?)k$/)
+  if (kMatch) return Math.round(parseFloat(kMatch[1]!) * 1_000)
+  const plain = parseInt(trimmed, 10)
+  if (!isNaN(plain) && plain > 0) return plain
+  return null
+}
+
+/** Cached context window from the local provider (set by providerContextDetect.ts). */
+let _localProviderContextWindow: number | null = null
+
+export function setLocalProviderContextWindow(n: number | null): void {
+  _localProviderContextWindow = n
+}
+
+export function getLocalProviderContextWindow(): number | null {
+  return _localProviderContextWindow
+}
+
 export function getContextWindowForModel(
   model: string,
   betas?: string[],
 ): number {
-  // Allow override via environment variable (ant-only)
-  // This takes precedence over all other context window resolution, including 1M detection,
-  // so users can cap the effective context window for local decisions (auto-compact, etc.)
-  // while still using a 1M-capable endpoint.
-  if (
-    process.env.USER_TYPE === 'ant' &&
-    getEnvAlias('LOCALCLAWD_MAX_CONTEXT_TOKENS', 'CLAUDE_CODE_MAX_CONTEXT_TOKENS')
-  ) {
-    const override = parseInt(
-      getEnvAlias(
-        'LOCALCLAWD_MAX_CONTEXT_TOKENS',
-        'CLAUDE_CODE_MAX_CONTEXT_TOKENS',
-      ) as string,
-      10,
-    )
-    if (!isNaN(override) && override > 0) {
-      return override
-    }
+  // Allow override via environment variable (available to all users, not ant-only)
+  const envOverrideStr = getEnvAlias('LOCALCLAWD_MAX_CONTEXT_TOKENS', 'CLAUDE_CODE_MAX_CONTEXT_TOKENS')
+  if (envOverrideStr) {
+    const override = parseContextWindowString(envOverrideStr)
+    if (override !== null) return override
   }
 
   // [1m] suffix — explicit client-side opt-in, respected over all detection
@@ -118,6 +128,10 @@ export function getContextWindowForModel(
       return antModel.contextWindow
     }
   }
+  // Use context window detected from local provider (vLLM/Ollama model info)
+  if (_localProviderContextWindow && _localProviderContextWindow > 0) {
+    return _localProviderContextWindow
+  }
   return MODEL_CONTEXT_WINDOW_DEFAULT
 }
 
@@ -141,10 +155,8 @@ export function getConfiguredCompactContextWindow(): number | undefined {
     'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
   )
   if (envOverride) {
-    const parsed = parseInt(envOverride, 10)
-    if (!isNaN(parsed) && parsed > 0) {
-      return parsed
-    }
+    const parsed = parseContextWindowString(envOverride)
+    if (parsed !== null) return parsed
   }
 
   const configured = getGlobalConfig().compactContextWindowTokens

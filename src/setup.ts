@@ -49,6 +49,14 @@ import { saveWorktreeState } from './utils/sessionStorage.js'
 import { profileCheckpoint } from './utils/startupProfiler.js'
 import { initTelegram } from './services/telegram/telegramBot.js'
 import { initSecretStore } from './services/secrets/secretStore.js'
+import { queryLocalProviderContextLength } from './services/api/localBackend.js'
+import { setLocalProviderContextWindow } from './utils/context.js'
+import {
+  getLocalLLMBaseUrl,
+  getLocalLLMModel,
+  getLocalLLMApiKey,
+  getLocalLLMProvider,
+} from './utils/model/providers.js'
 import {
   createTmuxSessionForWorktree,
   createWorktreeForSession,
@@ -303,6 +311,22 @@ export async function setup(
   if (!isBareMode()) {
     void initTelegram() // Start Telegram bridge if TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID set
     initSecretStore() // Initialize encrypted secret store
+    // Query local provider for actual context window size (fire-and-forget)
+    void (async () => {
+      try {
+        const provider = getLocalLLMProvider()
+        const baseUrl = getLocalLLMBaseUrl(provider)
+        const model = getLocalLLMModel(provider) ?? ''
+        const apiKey = getLocalLLMApiKey(provider)
+        const contextLen = await queryLocalProviderContextLength(baseUrl, model, apiKey, provider)
+        if (contextLen && contextLen > 0) {
+          setLocalProviderContextWindow(contextLen)
+          logForDebugging(`[context] Local provider context window: ${contextLen} tokens`)
+        }
+      } catch {
+        // Non-fatal — fall back to configured default
+      }
+    })()
     initSessionMemory() // Synchronous - registers hook, gate check happens lazily
     if (feature('CONTEXT_COLLAPSE')) {
       /* eslint-disable @typescript-eslint/no-require-imports */
