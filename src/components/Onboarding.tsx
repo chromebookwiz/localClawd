@@ -17,7 +17,11 @@ import {
   formatCompactContextWindowOption,
 } from '../utils/context.js'
 import { env } from '../utils/env.js'
-import type { LocalLLMConfig } from '../utils/model/providers.js'
+import {
+  clearSessionLocalLLMConfigOverride,
+  setSessionLocalLLMConfigOverride,
+  type LocalLLMConfig,
+} from '../utils/model/providers.js'
 import type { ThemeSetting } from '../utils/theme.js'
 import { Select } from './CustomSelect/select.js'
 import { LocalBackendSetup } from './LocalBackendSetup.js'
@@ -40,9 +44,10 @@ interface OnboardingStep {
 
 type Props = {
   onDone(): void
+  showWelcome?: boolean
 }
 
-export function Onboarding({ onDone }: Props): React.ReactNode {
+export function Onboarding({ onDone, showWelcome = true }: Props): React.ReactNode {
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [theme, setTheme] = useTheme()
   const exitState = useExitOnCtrlCDWithKeybindings()
@@ -79,14 +84,19 @@ export function Onboarding({ onDone }: Props): React.ReactNode {
   )
 
   const handleLocalBackendSetup = useCallback(
-    (config: LocalLLMConfig) => {
-      saveGlobalConfig(current => ({
-        ...current,
-        localBackendProvider: config.provider,
-        localBackendBaseUrl: config.baseUrl,
-        localBackendModel: config.model,
-        localBackendApiKey: config.apiKey,
-      }))
+    (config: LocalLLMConfig, options?: { saveGlobally: boolean }) => {
+      if (options?.saveGlobally === false) {
+        setSessionLocalLLMConfigOverride(config)
+      } else {
+        clearSessionLocalLLMConfigOverride()
+        saveGlobalConfig(current => ({
+          ...current,
+          localBackendProvider: config.provider,
+          localBackendBaseUrl: config.baseUrl,
+          localBackendModel: config.model,
+          localBackendApiKey: config.apiKey,
+        }))
+      }
       goToNextStep()
     },
     [goToNextStep],
@@ -155,6 +165,7 @@ export function Onboarding({ onDone }: Props): React.ReactNode {
         onCancel={goToNextStep}
         title="Choose your local backend"
         description="Set the OpenAI-compatible endpoint and model localclawd should use by default. You can point vLLM at a local server, Ollama, or any other compatible host."
+        showSaveGloballyOption={true}
       />
     )
 
@@ -286,7 +297,7 @@ export function Onboarding({ onDone }: Props): React.ReactNode {
 
   return (
     <Box flexDirection="column">
-      <WelcomeV2 />
+      {showWelcome ? <WelcomeV2 /> : null}
       <Box flexDirection="column" marginTop={1}>
         {currentStep?.component}
         {exitState.pending ? (

@@ -42,8 +42,6 @@ export function StartPage({ currentConfig, onDone }: Props): React.ReactNode {
       setFocusIdx(i => (i + 1) % options.length)
     } else if (key.return) {
       onDone(options[focusIdx]!.value)
-    } else if (key.escape) {
-      onDone('continue')
     }
   })
 
@@ -102,7 +100,7 @@ export function StartPage({ currentConfig, onDone }: Props): React.ReactNode {
           ))}
         </Box>
 
-        <Text dimColor>↑↓ navigate · Enter confirm · Esc continue</Text>
+        <Text dimColor>↑↓ navigate · Enter confirm</Text>
       </Box>
     </Box>
   )

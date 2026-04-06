@@ -254,6 +254,31 @@ export function filterAgentsByMcpRequirements(
   return agents.filter(agent => hasRequiredMcpServers(agent, availableServers))
 }
 
+function withStartupAgentLoadLogging<T>(
+  label: string,
+  promise: Promise<T>,
+): Promise<T> {
+  const start = Date.now()
+  const slowLoadWarning = setTimeout(() => {
+    logForDebugging(`[STARTUP] Still loading ${label} after ${Date.now() - start}ms`)
+  }, 5000)
+
+  return promise
+    .then(result => {
+      clearTimeout(slowLoadWarning)
+      logForDebugging(`[STARTUP] Loaded ${label} in ${Date.now() - start}ms`)
+      return result
+    })
+    .catch(error => {
+      clearTimeout(slowLoadWarning)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      logForDebugging(
+        `[STARTUP] Failed loading ${label} after ${Date.now() - start}ms: ${errorMessage}`,
+      )
+      throw error
+    })
+}
+
 /**
  * Check for and initialize agent memory from project snapshots.
  * For agents with memory enabled, copies snapshot to local if no local memory exists.
@@ -305,7 +330,10 @@ export const getAgentDefinitionsWithOverrides = memoize(
     }
 
     try {
-      const markdownFiles = await loadMarkdownFilesForSubdir('agents', cwd)
+      const markdownFiles = await withStartupAgentLoadLogging(
+        'agent markdown files',
+        loadMarkdownFilesForSubdir('agents', cwd),
+      )
 
       const failedFiles: Array<{ path: string; error: string }> = []
       const customAgents = markdownFiles
@@ -344,11 +372,17 @@ export const getAgentDefinitionsWithOverrides = memoize(
       // Kick off plugin agent loading concurrently with memory snapshot init —
       // loadPluginAgents is memoized and takes no args, so it's independent.
       // Join both so neither becomes a floating promise if the other throws.
-      let pluginAgentsPromise = loadPluginAgents()
+      let pluginAgentsPromise = withStartupAgentLoadLogging(
+        'plugin agents',
+        loadPluginAgents(),
+      )
       if (feature('AGENT_MEMORY_SNAPSHOT') && isAutoMemoryEnabled()) {
         const [pluginAgents_] = await Promise.all([
           pluginAgentsPromise,
-          initializeAgentMemorySnapshots(customAgents),
+          withStartupAgentLoadLogging(
+            'agent memory snapshots',
+            initializeAgentMemorySnapshots(customAgents),
+          ),
         ])
         pluginAgentsPromise = Promise.resolve(pluginAgents_)
       }
@@ -371,11 +405,15 @@ export const getAgentDefinitionsWithOverrides = memoize(
         }
       }
 
-      return {
+      const result = {
         activeAgents,
         allAgents: allAgentsList,
         failedFiles: failedFiles.length > 0 ? failedFiles : undefined,
       }
+
+      logForDebugging(`[STARTUP] getAgentDefinitionsWithOverrides resolved with ${activeAgents.length} active agents`)
+
+      return result
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error)
@@ -383,11 +421,15 @@ export const getAgentDefinitionsWithOverrides = memoize(
       logError(error)
       // Even on error, return the built-in agents
       const builtInAgents = getBuiltInAgents()
-      return {
+      const result = {
         activeAgents: builtInAgents,
         allAgents: builtInAgents,
         failedFiles: [{ path: 'unknown', error: errorMessage }],
       }
+
+      logForDebugging(`[STARTUP] getAgentDefinitionsWithOverrides recovered with ${builtInAgents.length} built-in agents`)
+
+      return result
     }
   },
 )

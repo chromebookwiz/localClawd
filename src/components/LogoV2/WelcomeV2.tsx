@@ -16,12 +16,8 @@ export function WelcomeV2() {
         <Text dimColor>v{MACRO.VERSION}</Text>
       </Box>
       <Text dimColor>{'─'.repeat(48)}</Text>
-      <Box marginTop={1} gap={2}>
+      <Box marginTop={1}>
         <Clawd />
-        <Box flexDirection="column" justifyContent="center">
-          <Text dimColor>Local-first coding with vLLM, Ollama, and OpenAI-compatible APIs.</Text>
-          <Text dimColor>Vision flows through when your model supports it.</Text>
-        </Box>
       </Box>
     </Box>
   )

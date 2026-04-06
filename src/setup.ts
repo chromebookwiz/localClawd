@@ -26,6 +26,7 @@ import { checkAndRestoreTerminalBackup } from './utils/appleTerminalBackup.js'
 import { prefetchApiKeyFromApiKeyHelperIfSafe } from './utils/auth.js'
 import { clearMemoryFileCaches } from './utils/claudemd.js'
 import { getCurrentProjectConfig, getGlobalConfig } from './utils/config.js'
+import { logForDebugging } from './utils/debug.js'
 import { logForDiagnosticsNoPII } from './utils/diagLogs.js'
 import { env } from './utils/env.js'
 import { envDynamic } from './utils/envDynamic.js'
@@ -65,6 +66,7 @@ export async function setup(
   messagingSocketPath?: string,
 ): Promise<void> {
   logForDiagnosticsNoPII('info', 'setup_started')
+  logForDebugging('[STARTUP] setup() started')
 
   // Check for Node.js version < 18
   const nodeVersion = process.version.match(/^v(\d+)\./)?.[1]
@@ -93,11 +95,17 @@ export async function setup(
     // and $CLAUDE_CODE_MESSAGING_SOCKET is exported before any hook
     // (SessionStart in particular) can spawn and snapshot process.env.
     if (feature('UDS_INBOX')) {
-      const m = await import('./utils/udsMessaging.js')
-      await m.startUdsMessaging(
-        messagingSocketPath ?? m.getDefaultUdsSocketPath(),
-        { isExplicit: messagingSocketPath !== undefined },
-      )
+      if (process.platform === 'win32') {
+        logForDebugging('[STARTUP] Skipping UDS messaging on win32')
+      } else {
+        logForDebugging('[STARTUP] Starting UDS messaging server')
+        const m = await import('./utils/udsMessaging.js')
+        await m.startUdsMessaging(
+          messagingSocketPath ?? m.getDefaultUdsSocketPath(),
+          { isExplicit: messagingSocketPath !== undefined },
+        )
+        logForDebugging('[STARTUP] UDS messaging server ready')
+      }
     }
   }
 
@@ -318,6 +326,8 @@ export async function setup(
     // --bare: loadPluginHooks → loadAllPlugins is filesystem work that's
     // wasted when executeHooks early-returns under --bare anyway.
     isBareMode()
+
+  logForDebugging('[STARTUP] setup() completed')
   if (!skipPluginPrefetch) {
     void getCommands(getProjectRoot())
   }

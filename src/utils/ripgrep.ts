@@ -1,5 +1,6 @@
 import type { ChildProcess, ExecFileException } from 'child_process'
 import { execFile, spawn } from 'child_process'
+import { existsSync } from 'fs'
 import memoize from 'lodash-es/memoize.js'
 import { homedir } from 'os'
 import * as path from 'path'
@@ -55,11 +56,30 @@ const getRipgrepConfig = memoize((): RipgrepConfig => {
     }
   }
 
-  const rgRoot = path.resolve(__dirname, 'vendor', 'ripgrep')
+  const candidateRoots = [
+    path.resolve(__dirname, 'vendor', 'ripgrep'),
+    path.resolve(
+      process.cwd(),
+      'node_modules',
+      '@anthropic-ai',
+      'claude-agent-sdk',
+      'vendor',
+      'ripgrep',
+    ),
+  ]
+  const builtinCommandName = process.platform === 'win32' ? 'rg.exe' : 'rg'
+  const rgRoot =
+    candidateRoots.find(candidateRoot => {
+      const candidatePath =
+        process.platform === 'win32'
+          ? path.resolve(candidateRoot, `${process.arch}-win32`, builtinCommandName)
+          : path.resolve(candidateRoot, `${process.arch}-${process.platform}`, builtinCommandName)
+      return existsSync(candidatePath)
+    }) ?? candidateRoots[0]
   const command =
     process.platform === 'win32'
-      ? path.resolve(rgRoot, `${process.arch}-win32`, 'rg.exe')
-      : path.resolve(rgRoot, `${process.arch}-${process.platform}`, 'rg')
+      ? path.resolve(rgRoot, `${process.arch}-win32`, builtinCommandName)
+      : path.resolve(rgRoot, `${process.arch}-${process.platform}`, builtinCommandName)
 
   return { mode: 'builtin', command, args: [] }
 })

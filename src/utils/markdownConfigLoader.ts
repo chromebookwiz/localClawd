@@ -1,6 +1,7 @@
 import { feature } from 'bun:bundle'
 import { statSync } from 'fs'
 import { lstat, readdir, readFile, realpath, stat } from 'fs/promises'
+import { existsSync } from 'fs'
 import memoize from 'lodash-es/memoize.js'
 import { homedir } from 'os'
 import { dirname, join, resolve, sep } from 'path'
@@ -550,6 +551,10 @@ async function loadMarkdownFiles(dir: string): Promise<
     content: string
   }[]
 > {
+  if (!existsSync(dir)) {
+    return []
+  }
+
   // File search strategy:
   // - Default: ripgrep (faster, battle-tested)
   // - Fallback: native Node.js (when CLAUDE_CODE_USE_NATIVE_FILE_SEARCH is set)

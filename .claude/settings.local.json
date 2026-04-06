@@ -18,7 +18,11 @@
       "Bash(npm view:*)",
       "Bash(git checkout:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(grep -v \"utility\\\\|utilities\\\\|util\\\\.format\\\\|util\\\\.promisify\\\\|util\\\\.inspect\\\\|require.*util\\\\|import.*util\\\\|from.*util\\\\|//.*util\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(kill %1)",
+      "Bash(wc:*)"
     ]
   }
 }

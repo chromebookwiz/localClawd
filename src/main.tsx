@@ -164,6 +164,7 @@ import { peekForStdinData, writeToStderr } from 'src/utils/process.js';
 import { setCwd } from 'src/utils/Shell.js';
 import { type ProcessedResume, processResumedConversation } from 'src/utils/sessionRestore.js';
 import { parseSettingSourcesFlag } from 'src/utils/settings/constants.js';
+import { startStartupLoadingIndicator } from 'src/utils/startupLoading.js';
 import { plural } from 'src/utils/stringUtils.js';
 import { type ChannelEntry, getInitialMainLoopModel, getIsNonInteractiveSession, getSdkBetas, getSessionId, getUserMsgOptIn, setAllowedChannels, setAllowedSettingSources, setChromeFlagOverride, setClientType, setCwdState, setDirectConnectServerUrl, setFlagSettingsPath, setInitialMainLoopModel, setInlinePlugins, setIsInteractive, setKairosActive, setOriginalCwd, setQuestionPreviewFormat, setSdkBetas, setSessionBypassPermissionsMode, setSessionPersistenceDisabled, setSessionSource, setUserMsgOptIn, switchSession } from './bootstrap/state.js';
 
@@ -1332,6 +1333,7 @@ async function run(): Promise<CommanderCommand> {
 
     // Get isNonInteractiveSession from state (was set before init())
     const isNonInteractiveSession = getIsNonInteractiveSession();
+    const startupLoadingIndicator = !isNonInteractiveSession ? startStartupLoadingIndicator('Loading model and MCP configuration') : null;
 
     // Validate that fallback model is different from main model
     if (fallbackModel && options.model && fallbackModel === options.model) {
@@ -1800,7 +1802,6 @@ async function run(): Promise<CommanderCommand> {
     // Both interactive and -p use getClaudeCodeMcpConfigs (local file reads only).
     // The local promise is awaited later (before prefetchAllMcpResources) to
     // overlap config I/O with setup(), commands loading, and trust dialog.
-    logForDebugging('[STARTUP] Loading MCP configs...');
     const mcpConfigStart = Date.now();
     let mcpConfigResolvedMs: number | undefined;
     // --bare skips auto-discovered MCP (.mcp.json, user settings, plugins) —
@@ -1816,11 +1817,13 @@ async function run(): Promise<CommanderCommand> {
     // NOTE: We do NOT call prefetchAllMcpResources here - that's deferred until after trust dialog
 
     if (inputFormat && inputFormat !== 'text' && inputFormat !== 'stream-json') {
+      startupLoadingIndicator?.stop();
       // biome-ignore lint/suspicious/noConsole:: intentional console output
       console.error(`Error: Invalid input format "${inputFormat}".`);
       process.exit(1);
     }
     if (inputFormat === 'stream-json' && outputFormat !== 'stream-json') {
+      startupLoadingIndicator?.stop();
       // biome-ignore lint/suspicious/noConsole:: intentional console output
       console.error(`Error: --input-format=stream-json requires output-format=stream-json.`);
       process.exit(1);
@@ -1829,6 +1832,7 @@ async function run(): Promise<CommanderCommand> {
     // Validate sdkUrl is only used with appropriate formats (formats are auto-set above)
     if (sdkUrl) {
       if (inputFormat !== 'stream-json' || outputFormat !== 'stream-json') {
+        startupLoadingIndicator?.stop();
         // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.error(`Error: --sdk-url requires both --input-format=stream-json and --output-format=stream-json.`);
         process.exit(1);
@@ -1838,6 +1842,7 @@ async function run(): Promise<CommanderCommand> {
     // Validate replayUserMessages is only used with stream-json formats
     if (options.replayUserMessages) {
       if (inputFormat !== 'stream-json' || outputFormat !== 'stream-json') {
+        startupLoadingIndicator?.stop();
         // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.error(`Error: --replay-user-messages requires both --input-format=stream-json and --output-format=stream-json.`);
         process.exit(1);
@@ -1847,6 +1852,7 @@ async function run(): Promise<CommanderCommand> {
     // Validate includePartialMessages is only used with print mode and stream-json output
     if (effectiveIncludePartialMessages) {
       if (!isNonInteractiveSession || outputFormat !== 'stream-json') {
+        startupLoadingIndicator?.stop();
         writeToStderr(`Error: --include-partial-messages requires --print and --output-format=stream-json.`);
         process.exit(1);
       }
@@ -1854,16 +1860,19 @@ async function run(): Promise<CommanderCommand> {
 
     // Validate --no-session-persistence is only used with print mode
     if (options.sessionPersistence === false && !isNonInteractiveSession) {
+      startupLoadingIndicator?.stop();
       writeToStderr(`Error: --no-session-persistence can only be used with --print mode.`);
       process.exit(1);
     }
     const effectivePrompt = prompt || '';
+    startupLoadingIndicator?.update('Reading startup input');
     let inputPrompt = await getInputPrompt(effectivePrompt, (inputFormat ?? 'text') as 'text' | 'stream-json');
     profileCheckpoint('action_after_input_prompt');
 
     // Activate proactive mode BEFORE getTools() so SleepTool.isEnabled()
     // (which returns isProactiveActive()) passes and Sleep is included.
     // The later REPL-path maybeActivateProactive() calls are idempotent.
+    startupLoadingIndicator?.update('Checking available tools');
     maybeActivateProactive(options);
     let tools = getTools(toolPermissionContext);
 
@@ -1902,7 +1911,7 @@ async function run(): Promise<CommanderCommand> {
 
     // IMPORTANT: setup() must be called before any other code that depends on the cwd or worktree setup
     profileCheckpoint('action_before_setup');
-    logForDebugging('[STARTUP] Running setup()...');
+    startupLoadingIndicator?.update('Preparing workspace');
     const setupStart = Date.now();
     const {
       setup
@@ -1927,12 +1936,12 @@ async function run(): Promise<CommanderCommand> {
     const setupPromise = setup(preSetupCwd, permissionMode, allowDangerouslySkipPermissions, worktreeEnabled, worktreeName, tmuxEnabled, sessionId ? validateUuid(sessionId) : undefined, worktreePRNumber, messagingSocketPath);
     const commandsPromise = worktreeEnabled ? null : getCommands(preSetupCwd);
     const agentDefsPromise = worktreeEnabled ? null : getAgentDefinitionsWithOverrides(preSetupCwd);
+    logForDebugging(`[STARTUP] Startup context: worktreeEnabled=${worktreeEnabled}, preSetupCwd=${preSetupCwd}`);
     // Suppress transient unhandledRejection if these reject during the
     // ~28ms setupPromise await before Promise.all joins them below.
     commandsPromise?.catch(() => {});
     agentDefsPromise?.catch(() => {});
     await setupPromise;
-    logForDebugging(`[STARTUP] setup() completed in ${Date.now() - setupStart}ms`);
     profileCheckpoint('action_after_setup');
 
     // Replay user messages into stream-json only when the socket was
@@ -2014,131 +2023,138 @@ async function run(): Promise<CommanderCommand> {
       await initializeGrowthBook();
     }
 
-    // Special case the default model with the null keyword
-    // NOTE: Model resolution happens after setup() to ensure trust is established before AWS auth
-    const userSpecifiedModel = options.model === 'default' ? getDefaultMainLoopModel() : options.model;
-    const userSpecifiedFallbackModel = fallbackModel === 'default' ? getDefaultMainLoopModel() : fallbackModel;
+    try {
+      // Special case the default model with the null keyword
+      // NOTE: Model resolution happens after setup() to ensure trust is established before AWS auth
+      const userSpecifiedModel = options.model === 'default' ? getDefaultMainLoopModel() : options.model;
+      const userSpecifiedFallbackModel = fallbackModel === 'default' ? getDefaultMainLoopModel() : fallbackModel;
 
-    // Reuse preSetupCwd unless setup() chdir'd (worktreeEnabled). Saves a
-    // getCwd() syscall in the common path.
-    const currentCwd = worktreeEnabled ? getCwd() : preSetupCwd;
-    logForDebugging('[STARTUP] Loading commands and agents...');
-    const commandsStart = Date.now();
-    // Join the promises kicked before setup() (or start fresh if
-    // worktreeEnabled gated the early kick). Both memoized by cwd.
-    const [commands, agentDefinitionsResult] = await Promise.all([commandsPromise ?? getCommands(currentCwd), agentDefsPromise ?? getAgentDefinitionsWithOverrides(currentCwd)]);
-    logForDebugging(`[STARTUP] Commands and agents loaded in ${Date.now() - commandsStart}ms`);
+      // Reuse preSetupCwd unless setup() chdir'd (worktreeEnabled). Saves a
+      // getCwd() syscall in the common path.
+      const currentCwd = worktreeEnabled ? getCwd() : preSetupCwd;
+      logForDebugging(`[STARTUP] Await join using currentCwd=${currentCwd}`);
+      startupLoadingIndicator?.update('Loading commands and agents');
+      const commandsStart = Date.now();
+      logForDebugging('[STARTUP] Awaiting commands and agents');
+      // Join the promises kicked before setup() (or start fresh if
+      // worktreeEnabled gated the early kick). Both memoized by cwd.
+      const [commands, agentDefinitionsResult] = await Promise.all([commandsPromise ?? getCommands(currentCwd), agentDefsPromise ?? getAgentDefinitionsWithOverrides(currentCwd)]);
+      logForDebugging(`[STARTUP] Commands and agents loaded in ${Date.now() - commandsStart}ms`);
     profileCheckpoint('action_commands_loaded');
 
-    // Parse CLI agents if provided via --agents flag
-    let cliAgents: typeof agentDefinitionsResult.activeAgents = [];
-    if (agentsJson) {
-      try {
-        const parsedAgents = safeParseJSON(agentsJson);
-        if (parsedAgents) {
-          cliAgents = parseAgentsFromJson(parsedAgents, 'flagSettings');
-        }
-      } catch (error) {
-        logError(error);
-      }
-    }
-
-    // Merge CLI agents with existing ones
-    const allAgents = [...agentDefinitionsResult.allAgents, ...cliAgents];
-    const agentDefinitions = {
-      ...agentDefinitionsResult,
-      allAgents,
-      activeAgents: getActiveAgentsFromList(allAgents)
-    };
-
-    // Look up main thread agent from CLI flag or settings
-    const agentSetting = agentCli ?? getInitialSettings().agent;
-    let mainThreadAgentDefinition: (typeof agentDefinitions.activeAgents)[number] | undefined;
-    if (agentSetting) {
-      mainThreadAgentDefinition = agentDefinitions.activeAgents.find(agent => agent.agentType === agentSetting);
-      if (!mainThreadAgentDefinition) {
-        logForDebugging(`Warning: agent "${agentSetting}" not found. ` + `Available agents: ${agentDefinitions.activeAgents.map(a => a.agentType).join(', ')}. ` + `Using default behavior.`);
-      }
-    }
-
-    // Store the main thread agent type in bootstrap state so hooks can access it
-    setMainThreadAgentType(mainThreadAgentDefinition?.agentType);
-
-    // Log agent flag usage — only log agent name for built-in agents to avoid leaking custom agent names
-    if (mainThreadAgentDefinition) {
-      logEvent('tengu_agent_flag', {
-        agentType: isBuiltInAgent(mainThreadAgentDefinition) ? mainThreadAgentDefinition.agentType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS : 'custom' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        ...(agentCli && {
-          source: 'cli' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
-        })
-      });
-    }
-
-    // Persist agent setting to session transcript for resume view display and restoration
-    if (mainThreadAgentDefinition?.agentType) {
-      saveAgentSetting(mainThreadAgentDefinition.agentType);
-    }
-
-    // Apply the agent's system prompt for non-interactive sessions
-    // (interactive mode uses buildEffectiveSystemPrompt instead)
-    if (isNonInteractiveSession && mainThreadAgentDefinition && !systemPrompt && !isBuiltInAgent(mainThreadAgentDefinition)) {
-      const agentSystemPrompt = mainThreadAgentDefinition.getSystemPrompt();
-      if (agentSystemPrompt) {
-        systemPrompt = agentSystemPrompt;
-      }
-    }
-
-    // initialPrompt goes first so its slash command (if any) is processed;
-    // user-provided text becomes trailing context.
-    // Only concatenate when inputPrompt is a string. When it's an
-    // AsyncIterable (SDK stream-json mode), template interpolation would
-    // call .toString() producing "[object Object]". The AsyncIterable case
-    // is handled in print.ts via structuredIO.prependUserMessage().
-    if (mainThreadAgentDefinition?.initialPrompt) {
-      if (typeof inputPrompt === 'string') {
-        inputPrompt = inputPrompt ? `${mainThreadAgentDefinition.initialPrompt}\n\n${inputPrompt}` : mainThreadAgentDefinition.initialPrompt;
-      } else if (!inputPrompt) {
-        inputPrompt = mainThreadAgentDefinition.initialPrompt;
-      }
-    }
-
-    // Compute effective model early so hooks can run in parallel with MCP
-    // If user didn't specify a model but agent has one, use the agent's model
-    let effectiveModel = userSpecifiedModel;
-    if (!effectiveModel && mainThreadAgentDefinition?.model && mainThreadAgentDefinition.model !== 'inherit') {
-      effectiveModel = parseUserSpecifiedModel(mainThreadAgentDefinition.model);
-    }
-    setMainLoopModelOverride(effectiveModel);
-
-    // Compute resolved model for hooks (use user-specified model at launch)
-    setInitialMainLoopModel(getUserSpecifiedModelSetting() || null);
-    const initialMainLoopModel = getInitialMainLoopModel();
-    const resolvedInitialModel = parseUserSpecifiedModel(initialMainLoopModel ?? getDefaultMainLoopModel());
-    let advisorModel: string | undefined;
-    if (isAdvisorEnabled()) {
-      const advisorOption = canUserConfigureAdvisor() ? (options as {
-        advisor?: string;
-      }).advisor : undefined;
-      if (advisorOption) {
-        logForDebugging(`[AdvisorTool] --advisor ${advisorOption}`);
-        if (!modelSupportsAdvisor(resolvedInitialModel)) {
-          process.stderr.write(chalk.red(`Error: The model "${resolvedInitialModel}" does not support the advisor tool.\n`));
-          process.exit(1);
-        }
-        const normalizedAdvisorModel = normalizeModelStringForAPI(parseUserSpecifiedModel(advisorOption));
-        if (!isValidAdvisorModel(normalizedAdvisorModel)) {
-          process.stderr.write(chalk.red(`Error: The model "${advisorOption}" cannot be used as an advisor.\n`));
-          process.exit(1);
+      // Parse CLI agents if provided via --agents flag
+      let cliAgents: typeof agentDefinitionsResult.activeAgents = [];
+      if (agentsJson) {
+        try {
+          const parsedAgents = safeParseJSON(agentsJson);
+          if (parsedAgents) {
+            cliAgents = parseAgentsFromJson(parsedAgents, 'flagSettings');
+          }
+        } catch (error) {
+          logError(error);
         }
       }
-      advisorModel = canUserConfigureAdvisor() ? advisorOption ?? getInitialAdvisorSetting() : advisorOption;
-      if (advisorModel) {
-        logForDebugging(`[AdvisorTool] Advisor model: ${advisorModel}`);
-      }
-    }
 
-    // For tmux teammates with --agent-type, append the custom agent's prompt
-    if (isAgentSwarmsEnabled() && storedTeammateOpts?.agentId && storedTeammateOpts?.agentName && storedTeammateOpts?.teamName && storedTeammateOpts?.agentType) {
+      // Merge CLI agents with existing ones
+      const allAgents = [...agentDefinitionsResult.allAgents, ...cliAgents];
+      const agentDefinitions = {
+        ...agentDefinitionsResult,
+        allAgents,
+        activeAgents: getActiveAgentsFromList(allAgents)
+      };
+      logForDebugging('[STARTUP] Agent definitions merged');
+
+      // Look up main thread agent from CLI flag or settings
+      const agentSetting = agentCli ?? getInitialSettings().agent;
+      let mainThreadAgentDefinition: (typeof agentDefinitions.activeAgents)[number] | undefined;
+      if (agentSetting) {
+        mainThreadAgentDefinition = agentDefinitions.activeAgents.find(agent => agent.agentType === agentSetting);
+        if (!mainThreadAgentDefinition) {
+          logForDebugging(`Warning: agent "${agentSetting}" not found. ` + `Available agents: ${agentDefinitions.activeAgents.map(a => a.agentType).join(', ')}. ` + `Using default behavior.`);
+        }
+      }
+
+      // Store the main thread agent type in bootstrap state so hooks can access it
+      setMainThreadAgentType(mainThreadAgentDefinition?.agentType);
+
+      // Log agent flag usage — only log agent name for built-in agents to avoid leaking custom agent names
+      if (mainThreadAgentDefinition) {
+        logEvent('tengu_agent_flag', {
+          agentType: isBuiltInAgent(mainThreadAgentDefinition) ? mainThreadAgentDefinition.agentType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS : 'custom' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          ...(agentCli && {
+            source: 'cli' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
+          })
+        });
+      }
+
+      // Persist agent setting to session transcript for resume view display and restoration
+      if (mainThreadAgentDefinition?.agentType) {
+        saveAgentSetting(mainThreadAgentDefinition.agentType);
+      }
+
+      // Apply the agent's system prompt for non-interactive sessions
+      // (interactive mode uses buildEffectiveSystemPrompt instead)
+      if (isNonInteractiveSession && mainThreadAgentDefinition && !systemPrompt && !isBuiltInAgent(mainThreadAgentDefinition)) {
+        const agentSystemPrompt = mainThreadAgentDefinition.getSystemPrompt();
+        if (agentSystemPrompt) {
+          systemPrompt = agentSystemPrompt;
+        }
+      }
+
+      // initialPrompt goes first so its slash command (if any) is processed;
+      // user-provided text becomes trailing context.
+      // Only concatenate when inputPrompt is a string. When it's an
+      // AsyncIterable (SDK stream-json mode), template interpolation would
+      // call .toString() producing "[object Object]". The AsyncIterable case
+      // is handled in print.ts via structuredIO.prependUserMessage().
+      if (mainThreadAgentDefinition?.initialPrompt) {
+        if (typeof inputPrompt === 'string') {
+          inputPrompt = inputPrompt ? `${mainThreadAgentDefinition.initialPrompt}\n\n${inputPrompt}` : mainThreadAgentDefinition.initialPrompt;
+        } else if (!inputPrompt) {
+          inputPrompt = mainThreadAgentDefinition.initialPrompt;
+        }
+      }
+      logForDebugging('[STARTUP] Initial prompt resolved');
+
+      // Compute effective model early so hooks can run in parallel with MCP
+      // If user didn't specify a model but agent has one, use the agent's model
+      let effectiveModel = userSpecifiedModel;
+      if (!effectiveModel && mainThreadAgentDefinition?.model && mainThreadAgentDefinition.model !== 'inherit') {
+        effectiveModel = parseUserSpecifiedModel(mainThreadAgentDefinition.model);
+      }
+      setMainLoopModelOverride(effectiveModel);
+
+      // Compute resolved model for hooks (use user-specified model at launch)
+      setInitialMainLoopModel(getUserSpecifiedModelSetting() || null);
+      const initialMainLoopModel = getInitialMainLoopModel();
+      const resolvedInitialModel = parseUserSpecifiedModel(initialMainLoopModel ?? getDefaultMainLoopModel());
+      let advisorModel: string | undefined;
+      if (isAdvisorEnabled()) {
+        const advisorOption = canUserConfigureAdvisor() ? (options as {
+          advisor?: string;
+        }).advisor : undefined;
+        if (advisorOption) {
+          logForDebugging(`[AdvisorTool] --advisor ${advisorOption}`);
+          if (!modelSupportsAdvisor(resolvedInitialModel)) {
+            startupLoadingIndicator?.stop();
+            process.stderr.write(chalk.red(`Error: The model "${resolvedInitialModel}" does not support the advisor tool.\n`));
+            process.exit(1);
+          }
+          const normalizedAdvisorModel = normalizeModelStringForAPI(parseUserSpecifiedModel(advisorOption));
+          if (!isValidAdvisorModel(normalizedAdvisorModel)) {
+            startupLoadingIndicator?.stop();
+            process.stderr.write(chalk.red(`Error: The model "${advisorOption}" cannot be used as an advisor.\n`));
+            process.exit(1);
+          }
+        }
+        advisorModel = canUserConfigureAdvisor() ? advisorOption ?? getInitialAdvisorSetting() : advisorOption;
+        if (advisorModel) {
+          logForDebugging(`[AdvisorTool] Advisor model: ${advisorModel}`);
+        }
+      }
+
+      // For tmux teammates with --agent-type, append the custom agent's prompt
+      if (isAgentSwarmsEnabled() && storedTeammateOpts?.agentId && storedTeammateOpts?.agentName && storedTeammateOpts?.teamName && storedTeammateOpts?.agentType) {
       // Look up the custom agent definition
       const customAgent = agentDefinitions.activeAgents.find(a => a.agentType === storedTeammateOpts.agentType);
       if (customAgent) {
@@ -2170,8 +2186,8 @@ async function run(): Promise<CommanderCommand> {
       } else {
         logForDebugging(`[teammate] Custom agent ${storedTeammateOpts.agentType} not found in available agents`);
       }
-    }
-    maybeActivateBrief(options);
+      }
+      maybeActivateBrief(options);
     // defaultView: 'chat' is a persisted opt-in — check entitlement and set
     // userMsgOptIn so the tool + prompt section activate. Interactive-only:
     // defaultView is a display preference; SDK sessions have no display, and
@@ -2181,7 +2197,7 @@ async function run(): Promise<CommanderCommand> {
     // BEFORE any isBriefEnabled() read below (proactive prompt's
     // briefVisibility). A persisted 'chat' after a GB kill-switch falls
     // through (entitlement fails).
-    if ((feature('KAIROS') || feature('KAIROS_BRIEF')) && !getIsNonInteractiveSession() && !getUserMsgOptIn() && getInitialSettings().defaultView === 'chat') {
+      if ((feature('KAIROS') || feature('KAIROS_BRIEF')) && !getIsNonInteractiveSession() && !getUserMsgOptIn() && getInitialSettings().defaultView === 'chat') {
       /* eslint-disable @typescript-eslint/no-require-imports */
       const {
         isBriefEntitled
@@ -2190,11 +2206,11 @@ async function run(): Promise<CommanderCommand> {
       if (isBriefEntitled()) {
         setUserMsgOptIn(true);
       }
-    }
+      }
     // Coordinator mode has its own system prompt and filters out Sleep, so
     // the generic proactive prompt would tell it to call a tool it can't
     // access and conflict with delegation instructions.
-    if ((feature('PROACTIVE') || feature('KAIROS')) && ((options as {
+      if ((feature('PROACTIVE') || feature('KAIROS')) && ((options as {
       proactive?: boolean;
     }).proactive || isEnvTruthy(process.env.CLAUDE_CODE_PROACTIVE)) && !coordinatorModeModule?.isCoordinatorMode()) {
       /* eslint-disable @typescript-eslint/no-require-imports */
@@ -2202,31 +2218,38 @@ async function run(): Promise<CommanderCommand> {
       /* eslint-enable @typescript-eslint/no-require-imports */
       const proactivePrompt = `\n# Proactive Mode\n\nYou are in proactive mode. Take initiative — explore, act, and make progress without waiting for instructions.\n\nStart by briefly greeting the user.\n\nYou will receive periodic <tick> prompts. These are check-ins. Do whatever seems most useful, or call Sleep if there's nothing to do. ${briefVisibility}`;
       appendSystemPrompt = appendSystemPrompt ? `${appendSystemPrompt}\n\n${proactivePrompt}` : proactivePrompt;
-    }
-    if (feature('KAIROS') && kairosEnabled && assistantModule) {
+      }
+      if (feature('KAIROS') && kairosEnabled && assistantModule) {
       const assistantAddendum = assistantModule.getAssistantSystemPromptAddendum();
       appendSystemPrompt = appendSystemPrompt ? `${appendSystemPrompt}\n\n${assistantAddendum}` : assistantAddendum;
-    }
+      }
+      logForDebugging('[STARTUP] Pre-render startup configuration complete');
 
-    // Ink root is only needed for interactive sessions — patchConsole in the
-    // Ink constructor would swallow console output in headless mode.
-    let root!: Root;
-    let getFpsMetrics!: () => FpsMetrics | undefined;
-    let stats!: StatsStore;
+      // Ink root is only needed for interactive sessions — patchConsole in the
+      // Ink constructor would swallow console output in headless mode.
+      let root!: Root;
+      let getFpsMetrics!: () => FpsMetrics | undefined;
+      let stats!: StatsStore;
 
-    // Show setup screens after commands are loaded
-    if (!isNonInteractiveSession) {
+      // Show setup screens after commands are loaded
+      if (!isNonInteractiveSession) {
+      startupLoadingIndicator?.update('Launching dashboard');
       const ctx = getRenderContext(false);
       getFpsMetrics = ctx.getFpsMetrics;
       stats = ctx.stats;
+      logForDebugging('[STARTUP] Render context ready');
       // Install asciicast recorder before Ink mounts (ant-only, opt-in via CLAUDE_CODE_TERMINAL_RECORDING=1)
       if ("external" === 'ant') {
         installAsciicastRecorder();
       }
+      logForDebugging('[STARTUP] Importing Ink root');
       const {
         createRoot
       } = await import('./ink.js');
+      logForDebugging('[STARTUP] Ink root module imported');
+      startupLoadingIndicator?.stop();
       root = await createRoot(ctx.renderOptions);
+      logForDebugging('[STARTUP] Ink root created');
 
       // Log startup time now, before any blocking dialog renders. Logging
       // from REPL's first render (the old location) included however long
@@ -2236,14 +2259,12 @@ async function run(): Promise<CommanderCommand> {
         event: 'startup' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         durationMs: Math.round(process.uptime() * 1000)
       });
-      logForDebugging('[STARTUP] Running showSetupScreens()...');
       const setupScreensStart = Date.now();
       const onboardingShown = await showSetupScreens(root, permissionMode, allowDangerouslySkipPermissions, commands, enableClaudeInChrome, devChannels);
-      logForDebugging(`[STARTUP] showSetupScreens() completed in ${Date.now() - setupScreensStart}ms`);
 
       // Now that trust is established and GrowthBook has auth headers,
       // resolve the --remote-control / --rc entitlement gate.
-      if (feature('BRIDGE_MODE') && remoteControlOption !== undefined) {
+        if (feature('BRIDGE_MODE') && remoteControlOption !== undefined) {
         const {
           getBridgeDisabledReason
         } = await import('./bridge/bridgeEnabled.js');
@@ -2255,7 +2276,7 @@ async function run(): Promise<CommanderCommand> {
       }
 
       // Check for pending agent memory snapshot updates (only for --agent mode, ant-only)
-      if (feature('AGENT_MEMORY_SNAPSHOT') && mainThreadAgentDefinition && isCustomAgent(mainThreadAgentDefinition) && mainThreadAgentDefinition.memory && mainThreadAgentDefinition.pendingSnapshotUpdate) {
+        if (feature('AGENT_MEMORY_SNAPSHOT') && mainThreadAgentDefinition && isCustomAgent(mainThreadAgentDefinition) && mainThreadAgentDefinition.memory && mainThreadAgentDefinition.pendingSnapshotUpdate) {
         const agentDef = mainThreadAgentDefinition;
         const choice = await launchSnapshotUpdateDialog(root, {
           agentType: agentDef.agentType,
@@ -2302,7 +2323,10 @@ async function run(): Promise<CommanderCommand> {
       const orgValidation = await validateForceLoginOrg();
       if (!orgValidation.valid) {
         await exitWithError(root, orgValidation.message);
+        }
       }
+    } finally {
+      startupLoadingIndicator?.stop();
     }
 
     // If gracefulShutdown was initiated (e.g., user rejected trust dialog),

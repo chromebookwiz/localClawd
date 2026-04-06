@@ -4,7 +4,7 @@ This repository is ready for a source-first `v1.0.0` GitHub release. The univers
 
 ## Source-first `v1.0.0` publish
 
-1. Wait for `.github/workflows/ci.yml` to pass `audit:branding`, `bun run build`, and `verify:npm-install` on the commit you want to release.
+1. Wait for `.github/workflows/ci.yml` to pass `audit:branding`, `bun run build`, and `verify:npm-install` on the commit you want to release. `verify:npm-install` now checks both the packed binary fast-path and an installed interactive startup smoke test when a TTY is available.
 2. Verify the bootstrap installers and Bun-based source launcher from this checkout if you changed installer code.
 3. Create and push the `v1.0.0` tag.
 4. Publish GitHub release notes that describe the current distribution model as source-first, with native assets to follow.

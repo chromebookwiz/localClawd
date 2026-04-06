@@ -1,8 +1,33 @@
-import { readFileSync } from 'fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
 import { noTelemetryPlugin } from './no-telemetry-plugin'
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
 const version = pkg.version
+
+function failBuild(message: string): never {
+  console.error(`Build failed: ${message}`)
+  process.exit(1)
+}
+
+function getCurrentPlatformRipgrepBinary(root: string): string {
+  if (process.platform === 'win32') {
+    return `${root}/${process.arch}-win32/rg.exe`
+  }
+
+  return `${root}/${process.arch}-${process.platform}/rg`
+}
+
+function verifyPublishedFilesConfiguration(): void {
+  const requiredFiles = ['bin', 'dist/cli.mjs', 'dist/vendor/ripgrep']
+  const configuredFiles = Array.isArray(pkg.files) ? pkg.files : []
+  const missingFiles = requiredFiles.filter(file => !configuredFiles.includes(file))
+
+  if (missingFiles.length > 0) {
+    failBuild(
+      `package.json files is missing required publish entries: ${missingFiles.join(', ')}`,
+    )
+  }
+}
 
 const internalFeatureStubModules = new Map([
   [
@@ -375,6 +400,7 @@ const result = await Bun.build({
   ],
   external: [
     'zod',
+    'execa',
     '@opentelemetry/api',
     '@opentelemetry/api-logs',
     '@opentelemetry/core',
@@ -409,6 +435,37 @@ if (!result.success) {
     console.error(log)
   }
   process.exit(1)
+}
+
+const ripgrepVendorSource = './node_modules/@anthropic-ai/claude-agent-sdk/vendor/ripgrep'
+const ripgrepVendorDestination = './dist/vendor/ripgrep'
+const builtCliPath = './dist/cli.mjs'
+
+verifyPublishedFilesConfiguration()
+
+if (!existsSync(builtCliPath)) {
+  failBuild(`expected bundled CLI at ${builtCliPath}`)
+}
+
+rmSync(ripgrepVendorDestination, { recursive: true, force: true })
+
+if (!existsSync(ripgrepVendorSource)) {
+  failBuild(
+    `required ripgrep vendor directory was not found at ${ripgrepVendorSource}`,
+  )
+}
+
+mkdirSync('./dist/vendor', { recursive: true })
+cpSync(ripgrepVendorSource, ripgrepVendorDestination, { recursive: true })
+
+const currentPlatformRipgrepBinary = getCurrentPlatformRipgrepBinary(
+  ripgrepVendorDestination,
+)
+
+if (!existsSync(currentPlatformRipgrepBinary)) {
+  failBuild(
+    `expected ripgrep binary for ${process.platform}/${process.arch} at ${currentPlatformRipgrepBinary}`,
+  )
 }
 
 console.log(`Built localclawd v${version} -> dist/cli.mjs`)
