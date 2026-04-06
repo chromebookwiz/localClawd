@@ -4,35 +4,23 @@ import { Clawd } from './Clawd.js'
 
 const WELCOME_V2_WIDTH = 58
 
-const GEOMETRIC_BANNER = [
-  '◇   ◇◇◇   ◇◇◇    ◇◇◇   ◇   ◇',
-  '◇   ◇   ◇ ◇      ◇   ◇ ◇◇  ◇',
-  '◇   ◇   ◇ ◇      ◇◇◇◇◇ ◇ ◇ ◇',
-  ' ◇ ◇   ◇  ◇      ◇   ◇ ◇  ◇◇',
-  '  ◇   ◇◇◇    ◇◇◇ ◇   ◇ ◇   ◇',
-]
-
 export function WelcomeV2() {
   const [theme] = useTheme()
   const isLightTheme = ['light', 'light-daltonized', 'light-ansi'].includes(theme)
+  const accentColor = isLightTheme ? 'blue' : '#6366f1'
 
   return (
-    <Box width={WELCOME_V2_WIDTH} flexDirection="column">
-      <Text>
-        <Text color="claude">Welcome to localclawd </Text>
-        <Text dimColor={true}>v{MACRO.VERSION}</Text>
-      </Text>
-      <Text dimColor={true}>──────────────────────────────────────────────────────────</Text>
-      {GEOMETRIC_BANNER.map((line, index) => (
-        <Text key={index} color={isLightTheme ? 'clawd_body' : 'claude'}>
-          {line}
-        </Text>
-      ))}
-      <Box marginTop={1}>
+    <Box width={WELCOME_V2_WIDTH} flexDirection="column" gap={0}>
+      <Box gap={1}>
+        <Text bold color={accentColor}>localclawd</Text>
+        <Text dimColor>v{MACRO.VERSION}</Text>
+      </Box>
+      <Text dimColor>{'─'.repeat(48)}</Text>
+      <Box marginTop={1} gap={2}>
         <Clawd />
-        <Box marginLeft={2} flexDirection="column">
-          <Text dimColor={true}>Local-first coding, wired for vLLM, Ollama, and OpenAI-compatible endpoints.</Text>
-          <Text dimColor={true}>Vision and browser screenshots flow through when your model supports them.</Text>
+        <Box flexDirection="column" justifyContent="center">
+          <Text dimColor>Local-first coding with vLLM, Ollama, and OpenAI-compatible APIs.</Text>
+          <Text dimColor>Vision flows through when your model supports it.</Text>
         </Box>
       </Box>
     </Box>

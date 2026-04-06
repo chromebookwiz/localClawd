@@ -13,7 +13,6 @@ import {
   type DiscoveredEndpoint,
   type NetworkScanProgress,
 } from '../utils/model/scanModels.js'
-import { Select } from './CustomSelect/select.js'
 import { TriangleSpinner } from './Spinner/TriangleSpinner.js'
 import TextInput from './TextInput.js'
 
@@ -36,7 +35,73 @@ type SetupStep =
   | 'apiKey'
   | 'saveScope'
 
-const PROVIDER_OPTIONS: Array<{ label: string; value: LocalLLMProvider }> = [
+type MenuItem<T> = { label: string; value: T }
+
+// ─── Simple hand-rolled scrollable menu ──────────────────────────────────────
+// Uses plain useInput — no keybinding system, no ChordInterceptor, no Select.
+// isActive controls whether this menu responds to keypresses.
+
+type SimpleMenuProps<T> = {
+  items: MenuItem<T>[]
+  isActive: boolean
+  onSelect(value: T): void
+  onCancel?(): void
+}
+
+function SimpleMenu<T>({ items, isActive, onSelect, onCancel }: SimpleMenuProps<T>): React.ReactNode {
+  const VISIBLE = Math.min(7, items.length)
+  const [focusIdx, setFocusIdx] = useState(0)
+  const [fromIdx, setFromIdx] = useState(0)
+
+  useInput((_input, key) => {
+    if (!isActive) return
+    if (key.upArrow || (_input === 'k' && !key.ctrl)) {
+      setFocusIdx(prev => {
+        const next = Math.max(0, prev - 1)
+        if (next < fromIdx) setFromIdx(next)
+        return next
+      })
+    } else if (key.downArrow || (_input === 'j' && !key.ctrl)) {
+      setFocusIdx(prev => {
+        const next = Math.min(items.length - 1, prev + 1)
+        if (next >= fromIdx + VISIBLE) setFromIdx(next - VISIBLE + 1)
+        return next
+      })
+    } else if (key.return) {
+      const item = items[focusIdx]
+      if (item) onSelect(item.value)
+    } else if (key.escape) {
+      onCancel?.()
+    }
+  })
+
+  const visible = items.slice(fromIdx, fromIdx + VISIBLE)
+  const showScrollUp = fromIdx > 0
+  const showScrollDown = fromIdx + VISIBLE < items.length
+
+  return (
+    <Box flexDirection="column">
+      {showScrollUp && <Text dimColor>  ↑ more</Text>}
+      {visible.map((item, i) => {
+        const absIdx = fromIdx + i
+        const focused = absIdx === focusIdx
+        return (
+          <Box key={String(item.value)} gap={1}>
+            <Text color="#6366f1">{focused ? '▶' : ' '}</Text>
+            <Text bold={focused} color={focused ? '#818cf8' : undefined}>
+              {item.label}
+            </Text>
+          </Box>
+        )
+      })}
+      {showScrollDown && <Text dimColor>  ↓ more</Text>}
+    </Box>
+  )
+}
+
+// ─── Provider options ─────────────────────────────────────────────────────────
+
+const PROVIDER_OPTIONS: MenuItem<LocalLLMProvider>[] = [
   { label: 'Local vLLM server (recommended for self-hosted inference)', value: 'vllm' },
   { label: 'Local Ollama server', value: 'ollama' },
   { label: 'Hosted OpenAI-compatible API or gateway', value: 'openai' },
@@ -65,6 +130,8 @@ function getProviderGuidance(provider: LocalLLMProvider) {
   }
 }
 
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export function LocalBackendSetup({
   initialConfig,
   onComplete,
@@ -91,14 +158,10 @@ export function LocalBackendSetup({
   const [networkProgress, setNetworkProgress] = useState<NetworkScanProgress | null>(null)
   const [discoveredEndpoints, setDiscoveredEndpoints] = useState<DiscoveredEndpoint[]>([])
 
-  // Abort controllers for async operations — also aborted on unmount
   const networkAbortRef = useRef<AbortController | null>(null)
   const modelScanAbortRef = useRef<AbortController | null>(null)
-
-  // Snapshot of discovered endpoints at the moment of abort (for early exit from scan)
   const discoveredSnapshotRef = useRef<DiscoveredEndpoint[]>([])
 
-  // Cancel all in-flight operations when component unmounts
   useEffect(() => {
     return () => {
       networkAbortRef.current?.abort()
@@ -111,12 +174,11 @@ export function LocalBackendSetup({
     setCursorOffset(nextValue.length)
   }, [step, baseUrl, model, apiKey])
 
-  // Handle Esc and Enter during async scanning steps
+  // Handle Esc/Enter during async scanning steps
   useInput(
     (_input, key) => {
       if (step === 'networkScan') {
         if (key.escape || key.return) {
-          // Abort scan, use whatever was found so far
           networkAbortRef.current?.abort()
           setDiscoveredEndpoints(discoveredSnapshotRef.current)
           setStep('selectEndpoint')
@@ -126,7 +188,6 @@ export function LocalBackendSetup({
           modelScanAbortRef.current?.abort()
           goBack()
         } else if (key.return) {
-          // Skip model scan and go to manual entry
           modelScanAbortRef.current?.abort()
           setScanError('Model scan skipped. Enter the model name manually.')
           setAvailableModels([])
@@ -140,32 +201,14 @@ export function LocalBackendSetup({
   function goBack(): void {
     setError(null)
     switch (step) {
-      case 'provider':
-        onCancel?.()
-        break
-      case 'networkScan':
-        networkAbortRef.current?.abort()
-        setStep('provider')
-        break
-      case 'selectEndpoint':
-        setStep('provider')
-        break
-      case 'baseUrl':
-        setStep(provider === 'vllm' ? 'selectEndpoint' : 'provider')
-        break
-      case 'scanningModels':
-        modelScanAbortRef.current?.abort()
-        setStep('baseUrl')
-        break
-      case 'model':
-        setStep('baseUrl')
-        break
-      case 'apiKey':
-        setStep('model')
-        break
-      case 'saveScope':
-        setStep('apiKey')
-        break
+      case 'provider': onCancel?.(); break
+      case 'networkScan': networkAbortRef.current?.abort(); setStep('provider'); break
+      case 'selectEndpoint': setStep('provider'); break
+      case 'baseUrl': setStep(provider === 'vllm' ? 'selectEndpoint' : 'provider'); break
+      case 'scanningModels': modelScanAbortRef.current?.abort(); setStep('baseUrl'); break
+      case 'model': setStep('baseUrl'); break
+      case 'apiKey': setStep('model'); break
+      case 'saveScope': setStep('apiKey'); break
     }
   }
 
@@ -179,28 +222,21 @@ export function LocalBackendSetup({
     setScanError(null)
     setAvailableModels([])
     setDiscoveredEndpoints([])
-
-    if (nextProvider === 'vllm') {
-      startNetworkScan(defaults.baseUrl)
-    } else {
-      setStep('baseUrl')
-    }
+    if (nextProvider === 'vllm') startNetworkScan(defaults.baseUrl)
+    else setStep('baseUrl')
   }
 
   function startNetworkScan(defaultUrl: string): void {
-    // Abort any previous network scan
     networkAbortRef.current?.abort()
     const abort = new AbortController()
     networkAbortRef.current = abort
     discoveredSnapshotRef.current = []
-
     setDiscoveredEndpoints([])
     setNetworkProgress(null)
     setStep('networkScan')
 
     scanLocalNetworkForVllm('192.168.1', abort.signal, (progress) => {
       if (abort.signal.aborted) return
-      // Keep a live snapshot for early-exit
       discoveredSnapshotRef.current = [...discoveredSnapshotRef.current]
       setNetworkProgress(progress)
     }).then((endpoints) => {
@@ -216,10 +252,7 @@ export function LocalBackendSetup({
   }
 
   function selectEndpoint(url: string): void {
-    if (url === '__manual__') {
-      setStep('baseUrl')
-      return
-    }
+    if (url === '__manual__') { setStep('baseUrl'); return }
     setBaseUrl(url)
     setError(null)
     startModelScan(url)
@@ -227,24 +260,12 @@ export function LocalBackendSetup({
 
   function submitBaseUrl(value: string): void {
     const trimmed = value.trim()
-    if (!trimmed) {
-      setError('Base URL is required.')
-      return
-    }
-    try {
-      new URL(trimmed)
-    } catch {
-      setError('Base URL must include a valid scheme such as http:// or https://.')
-      return
-    }
+    if (!trimmed) { setError('Base URL is required.'); return }
+    try { new URL(trimmed) } catch { setError('Base URL must include a valid scheme such as http:// or https://.'); return }
     setBaseUrl(trimmed)
     setError(null)
-
-    if (provider === 'vllm' || provider === 'ollama') {
-      startModelScan(trimmed)
-    } else {
-      setStep('model')
-    }
+    if (provider === 'vllm' || provider === 'ollama') startModelScan(trimmed)
+    else setStep('model')
   }
 
   function startModelScan(url: string): void {
@@ -258,13 +279,8 @@ export function LocalBackendSetup({
     fetchAvailableModels(url, provider, apiKey, abort.signal)
       .then((result) => {
         if (abort.signal.aborted) return
-        if (result.ok) {
-          setAvailableModels(result.models)
-          setScanError(null)
-        } else {
-          setScanError(result.error)
-          setAvailableModels([])
-        }
+        if (result.ok) { setAvailableModels(result.models); setScanError(null) }
+        else { setScanError(result.error); setAvailableModels([]) }
         setStep('model')
       })
       .catch((err) => {
@@ -277,10 +293,7 @@ export function LocalBackendSetup({
 
   function submitModel(value: string): void {
     const trimmed = value.trim()
-    if (!trimmed) {
-      setError('Model name is required.')
-      return
-    }
+    if (!trimmed) { setError('Model name is required.'); return }
     setModel(trimmed)
     setError(null)
     setStep('apiKey')
@@ -290,10 +303,7 @@ export function LocalBackendSetup({
     const nextConfig = { provider, baseUrl, model, apiKey: value.trim() }
     setApiKey(nextConfig.apiKey)
     setError(null)
-    if (showSaveGloballyOption) {
-      setStep('saveScope')
-      return
-    }
+    if (showSaveGloballyOption) { setStep('saveScope'); return }
     onComplete(nextConfig, { saveGlobally: true })
   }
 
@@ -301,14 +311,20 @@ export function LocalBackendSetup({
   const baseUrlPlaceholder = getDefaultLocalLLMConfig(provider).baseUrl
   const apiKeyPlaceholder = provider === 'ollama' ? 'ollama' : 'Leave blank if your endpoint does not require auth'
   const guidance = getProviderGuidance(provider)
-  const modelSelectOptions = availableModels.map((m) => ({ label: m, value: m }))
 
-  const endpointSelectOptions = [
-    ...discoveredEndpoints.map((ep) => ({
+  const modelMenuItems: MenuItem<string>[] = availableModels.map(m => ({ label: m, value: m }))
+
+  const endpointMenuItems: MenuItem<string>[] = [
+    ...discoveredEndpoints.map(ep => ({
       label: `${ep.url}  [${ep.models.slice(0, 2).join(', ')}${ep.models.length > 2 ? ', …' : ''}]`,
       value: ep.url,
     })),
     { label: 'Enter URL manually', value: '__manual__' },
+  ]
+
+  const saveScopeItems: MenuItem<string>[] = [
+    { label: 'Save as global default (recommended)', value: 'global' },
+    { label: 'Use only for this launch', value: 'session' },
   ]
 
   return (
@@ -318,12 +334,14 @@ export function LocalBackendSetup({
 
       {step === 'provider' ? (
         <>
-          <Select
-            options={PROVIDER_OPTIONS}
-            onChange={value => applyProvider(value as LocalLLMProvider)}
+          <Text dimColor>Choose a backend:</Text>
+          <SimpleMenu
+            items={PROVIDER_OPTIONS}
+            isActive={step === 'provider'}
+            onSelect={value => applyProvider(value)}
             onCancel={onCancel}
           />
-          <Text dimColor>Enter to select · Esc exits setup</Text>
+          <Text dimColor>↑↓ navigate · Enter select · Esc exit</Text>
         </>
       ) : null}
 
@@ -349,17 +367,19 @@ export function LocalBackendSetup({
         <>
           {discoveredEndpoints.length > 0 ? (
             <Text>
-              Found <Text bold>{discoveredEndpoints.length}</Text> vLLM endpoint{discoveredEndpoints.length !== 1 ? 's' : ''} on 192.168.1.0/24
+              Found <Text bold>{discoveredEndpoints.length}</Text> vLLM endpoint
+              {discoveredEndpoints.length !== 1 ? 's' : ''} on 192.168.1.0/24
             </Text>
           ) : (
-            <Text>No vLLM endpoints found on 192.168.1.0/24 — enter the URL manually.</Text>
+            <Text dimColor>No vLLM endpoints found on 192.168.1.0/24 — enter the URL manually.</Text>
           )}
-          <Select
-            options={endpointSelectOptions}
-            onChange={value => selectEndpoint(value)}
+          <SimpleMenu
+            items={endpointMenuItems}
+            isActive={step === 'selectEndpoint'}
+            onSelect={value => selectEndpoint(value)}
             onCancel={() => setStep('provider')}
           />
-          <Text dimColor>Enter to select · Esc goes back to provider</Text>
+          <Text dimColor>↑↓ navigate · Enter select · Esc back to provider</Text>
         </>
       ) : null}
 
@@ -403,12 +423,13 @@ export function LocalBackendSetup({
               {availableModels.length > 0 ? (
                 <>
                   <Text dimColor>{guidance.model}</Text>
-                  <Select
-                    options={modelSelectOptions}
-                    onChange={value => submitModel(value)}
+                  <SimpleMenu
+                    items={modelMenuItems}
+                    isActive={step === 'model'}
+                    onSelect={value => submitModel(value)}
                     onCancel={goBack}
                   />
-                  <Text dimColor>Enter to select · Esc goes back to URL</Text>
+                  <Text dimColor>↑↓ navigate · Enter select · Esc back to URL</Text>
                 </>
               ) : (
                 <>
@@ -448,7 +469,7 @@ export function LocalBackendSetup({
                 focus
                 showCursor
               />
-              <Text dimColor>Enter to confirm · Esc goes back to model</Text>
+              <Text dimColor>Enter to confirm · Esc back to model</Text>
             </>
           ) : null}
 
@@ -456,23 +477,22 @@ export function LocalBackendSetup({
             <>
               <Text>How should localclawd use this backend?</Text>
               <Text dimColor wrap="wrap">
-                Save globally to make this the default every time localclawd starts. Choose "this launch only" for a temporary override.
+                Save globally to make this the default every time localclawd starts.
+                Choose "this launch only" for a temporary override.
               </Text>
-              <Select
-                options={[
-                  { label: 'Save as global default (recommended)', value: 'global' },
-                  { label: 'Use only for this launch', value: 'session' },
-                ]}
-                onChange={value => {
+              <SimpleMenu
+                items={saveScopeItems}
+                isActive={step === 'saveScope'}
+                onSelect={value => {
                   onComplete({ provider, baseUrl, model, apiKey }, { saveGlobally: value === 'global' })
                 }}
                 onCancel={goBack}
               />
-              <Text dimColor>Enter to confirm · Esc goes back to API key</Text>
+              <Text dimColor>↑↓ navigate · Enter confirm · Esc back to API key</Text>
             </>
           ) : null}
 
-          {error ? <Text color="error">{error}</Text> : null}
+          {error ? <Text color="red">{error}</Text> : null}
         </>
       ) : null}
     </Box>

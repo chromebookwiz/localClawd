@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { Box, Text, useInput } from '../ink.js'
 import type { LocalLLMConfig } from '../utils/model/providers.js'
 import { getLocalLLMProviderLabel } from '../utils/model/providers.js'
-import { Select } from './CustomSelect/select.js'
 import { WelcomeV2 } from './LogoV2/WelcomeV2.js'
 
 export type StartPageAction = 'continue' | 'configure-backend'
@@ -31,16 +30,22 @@ const SETUP_OPTIONS: Array<{ label: string; value: StartPageAction }> = [
 
 export function StartPage({ currentConfig, onDone }: Props): React.ReactNode {
   const hasSavedConfig = hasSavedBackendConfig(currentConfig)
-  const [focused, setFocused] = useState<StartPageAction>(
-    hasSavedConfig ? 'continue' : 'configure-backend',
-  )
+  const options = hasSavedConfig ? CONTINUE_OPTIONS : SETUP_OPTIONS
+
+  // Simple hand-rolled menu — no keybinding system, no Select, no indirect dispatch
+  const [focusIdx, setFocusIdx] = useState(0)
 
   useInput((_input, key) => {
-    if (key.return) onDone(focused)
-    else if (key.escape) onDone('continue')
+    if (key.upArrow || (key.ctrl && _input === 'p')) {
+      setFocusIdx(i => (i - 1 + options.length) % options.length)
+    } else if (key.downArrow || (key.ctrl && _input === 'n')) {
+      setFocusIdx(i => (i + 1) % options.length)
+    } else if (key.return) {
+      onDone(options[focusIdx]!.value)
+    } else if (key.escape) {
+      onDone('continue')
+    }
   })
-
-  const options = hasSavedConfig ? CONTINUE_OPTIONS : SETUP_OPTIONS
 
   return (
     <Box flexDirection="column" gap={1}>
@@ -49,15 +54,11 @@ export function StartPage({ currentConfig, onDone }: Props): React.ReactNode {
       <Box flexDirection="column" gap={1} paddingLeft={1} width={78}>
         {hasSavedConfig ? (
           <>
-            {/* Welcome back banner */}
-            <Box flexDirection="column" gap={0}>
-              <Text bold color="#818cf8">
-                Welcome back!
-              </Text>
+            <Box flexDirection="column">
+              <Text bold color="#818cf8">Welcome back!</Text>
               <Text dimColor>Ready when you are.</Text>
             </Box>
 
-            {/* Saved backend card */}
             <Box
               flexDirection="column"
               borderStyle="round"
@@ -66,48 +67,42 @@ export function StartPage({ currentConfig, onDone }: Props): React.ReactNode {
               paddingY={0}
               width={60}
             >
-              <Box gap={2} alignItems="center">
-                <Text color="#6366f1" bold>
-                  {'◈'}
-                </Text>
+              <Box gap={2}>
+                <Text color="#6366f1" bold>{'◈'}</Text>
                 <Text bold color="#818cf8">
                   {getLocalLLMProviderLabel(currentConfig.provider)}
                 </Text>
               </Box>
-              <Text dimColor>Model: <Text color="white">{currentConfig.model}</Text></Text>
+              <Text dimColor>
+                Model: <Text color="white">{currentConfig.model}</Text>
+              </Text>
               <Text dimColor>
                 Endpoint: <Text color="white">{currentConfig.baseUrl}</Text>
               </Text>
             </Box>
           </>
         ) : (
-          <>
-            <Box flexDirection="column" gap={0}>
-              <Text bold color="#818cf8">
-                Let&apos;s get you connected.
-              </Text>
-              <Text dimColor wrap="wrap">
-                localclawd needs an OpenAI-compatible backend — vLLM, Ollama, or any hosted
-                gateway. Set one up now and you&apos;re ready to code.
-              </Text>
-            </Box>
-
-            <Box paddingX={1}>
-              <Text color="#6366f1">{'▸'}</Text>
-              <Text dimColor>
-                {' '}Vision works automatically when your model accepts image content.
-              </Text>
-            </Box>
-          </>
+          <Box flexDirection="column" gap={0}>
+            <Text bold color="#818cf8">{"Let's get you connected."}</Text>
+            <Text dimColor wrap="wrap">
+              {"localclawd needs an OpenAI-compatible backend — vLLM, Ollama, or any hosted gateway."}
+            </Text>
+          </Box>
         )}
 
-        <Select
-          options={options}
-          onChange={value => onDone(value as StartPageAction)}
-          onCancel={() => onDone('continue')}
-          onFocus={value => setFocused(value as StartPageAction)}
-        />
-        <Text dimColor>↑↓ to navigate · Enter to confirm · Esc to continue</Text>
+        {/* Hand-rolled minimal menu */}
+        <Box flexDirection="column">
+          {options.map((opt, i) => (
+            <Box key={opt.value} gap={1}>
+              <Text color="#6366f1">{i === focusIdx ? '▶' : ' '}</Text>
+              <Text bold={i === focusIdx} color={i === focusIdx ? '#818cf8' : undefined}>
+                {opt.label}
+              </Text>
+            </Box>
+          ))}
+        </Box>
+
+        <Text dimColor>↑↓ navigate · Enter confirm · Esc continue</Text>
       </Box>
     </Box>
   )
