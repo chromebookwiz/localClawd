@@ -48,6 +48,7 @@ import { getPlanSlug } from './utils/plans.js'
 import { saveWorktreeState } from './utils/sessionStorage.js'
 import { profileCheckpoint } from './utils/startupProfiler.js'
 import { initTelegram } from './services/telegram/telegramBot.js'
+import { initSecretStore } from './services/secrets/secretStore.js'
 import {
   createTmuxSessionForWorktree,
   createWorktreeForSession,
@@ -301,6 +302,7 @@ export async function setup(
   // raced ahead and memoized an empty bundledSkills list.
   if (!isBareMode()) {
     void initTelegram() // Start Telegram bridge if TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID set
+    initSecretStore() // Initialize encrypted secret store
     initSessionMemory() // Synchronous - registers hook, gate check happens lazily
     if (feature('CONTEXT_COLLAPSE')) {
       /* eslint-disable @typescript-eslint/no-require-imports */

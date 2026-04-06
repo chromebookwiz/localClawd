@@ -23,6 +23,8 @@ import buddy from './commands/buddy/index.js'
 import keepgoing from './commands/keepgoing/index.js'
 import setup from './commands/setup/index.js'
 import telegram from './commands/telegram/index.js'
+import heartbeat from './commands/heartbeat/index.js'
+import sysprompt from './commands/sysprompt/index.js'
 import thinkharder from './commands/thinkharder/index.js'
 import thinknormal from './commands/thinkharder/thinknormal-index.js'
 import memory from './commands/memory/index.js'
@@ -323,6 +325,8 @@ const COMMANDS = memoize((): Command[] => [
   setup,
   buddy,
   telegram,
+  heartbeat,
+  sysprompt,
   ...(webCmd ? [webCmd] : []),
   ...(forkCmd ? [forkCmd] : []),
   ...(proactive ? [proactive] : []),

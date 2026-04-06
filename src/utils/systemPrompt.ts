@@ -8,6 +8,7 @@ import type { AgentDefinition } from '../tools/AgentTool/loadAgentsDir.js'
 import { isBuiltInAgent } from '../tools/AgentTool/loadAgentsDir.js'
 import { isEnvTruthy } from './envUtils.js'
 import { asSystemPrompt, type SystemPrompt } from './systemPromptType.js'
+import { getSessionSyspromptOverride } from '../services/sysprompt/sessionSysprompt.js'
 
 export { asSystemPrompt, type SystemPrompt } from './systemPromptType.js'
 
@@ -53,8 +54,9 @@ export function buildEffectiveSystemPrompt({
   appendSystemPrompt: string | undefined
   overrideSystemPrompt?: string | null
 }): SystemPrompt {
-  if (overrideSystemPrompt) {
-    return asSystemPrompt([overrideSystemPrompt])
+  const sessionOverride = getSessionSyspromptOverride()
+  if (overrideSystemPrompt ?? sessionOverride) {
+    return asSystemPrompt([(overrideSystemPrompt ?? sessionOverride)!])
   }
   // Coordinator mode: use coordinator prompt instead of default
   // Use inline env check instead of coordinatorModule to avoid circular
