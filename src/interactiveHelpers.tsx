@@ -10,7 +10,6 @@ import { getSystemContext } from './context.js';
 import { initializeTelemetryAfterTrust } from './entrypoints/init.js';
 import { isSynchronizedOutputSupported } from './ink/terminal.js';
 import type { RenderOptions, Root, TextProps } from './ink.js';
-import { KeybindingSetup } from './keybindings/KeybindingProviderSetup.js';
 import { startDeferredPrefetches } from './main.js';
 import { checkGate_CACHED_OR_BLOCKING, initializeGrowthBook, resetGrowthBook } from './services/analytics/growthbook.js';
 import { isQualifiedForGrove } from './services/api/grove.js';
@@ -79,15 +78,18 @@ export async function exitWithMessage(root: Root, message: string, options?: {
 }
 
 /**
- * Show a setup dialog wrapped in AppStateProvider + KeybindingSetup.
- * Reduces boilerplate in showSetupScreens() where every dialog needs these wrappers.
+ * Show a setup dialog wrapped in AppStateProvider.
+ * Intentionally does NOT include KeybindingSetup — its ChordInterceptor
+ * interferes with plain useInput handlers in startup dialogs.
  */
 export function showSetupDialog<T = void>(root: Root, renderer: (done: (result: T) => void) => React.ReactNode, options?: {
   onChangeAppState?: typeof onChangeAppState;
 }): Promise<T> {
-  return showDialog<T>(root, done => <AppStateProvider onChangeAppState={options?.onChangeAppState}>
-      <KeybindingSetup>{renderer(done)}</KeybindingSetup>
-    </AppStateProvider>);
+  return showDialog<T>(root, done =>
+    <AppStateProvider onChangeAppState={options?.onChangeAppState}>
+      {renderer(done)}
+    </AppStateProvider>
+  );
 }
 
 /**
@@ -127,30 +129,32 @@ export async function showSetupScreens(root: Root, permissionMode: PermissionMod
       clearSessionLocalLLMConfigOverride,
       setSessionLocalLLMConfigOverride
     } = await import('./utils/model/providers.js');
-    await showSetupDialog(root, done => <LocalBackendSetup initialConfig={{
-        provider: config.localBackendProvider,
-        baseUrl: config.localBackendBaseUrl,
-        model: config.localBackendModel,
-        apiKey: config.localBackendApiKey
-      }} onComplete={(nextConfig, options) => {
-        if (options?.saveGlobally === false) {
-          setSessionLocalLLMConfigOverride(nextConfig);
-        } else {
-          clearSessionLocalLLMConfigOverride();
-          saveGlobalConfig(current => ({
-            ...current,
-            localBackendProvider: nextConfig.provider,
-            localBackendBaseUrl: nextConfig.baseUrl,
-            localBackendModel: nextConfig.model,
-            localBackendApiKey: nextConfig.apiKey
-          }));
-        }
-        void done();
-      }} onCancel={() => {
-        void done();
-      }} title="Connect your model backend" description="Choose the OpenAI-compatible endpoint localclawd should talk to. You can save it globally for every run or use it only for this launch." showSaveGloballyOption={true} />, {
-      onChangeAppState
-    });
+    await showDialog(root, done =>
+      <AppStateProvider onChangeAppState={onChangeAppState}>
+        <LocalBackendSetup initialConfig={{
+          provider: config.localBackendProvider,
+          baseUrl: config.localBackendBaseUrl,
+          model: config.localBackendModel,
+          apiKey: config.localBackendApiKey
+        }} onComplete={(nextConfig, options) => {
+          if (options?.saveGlobally === false) {
+            setSessionLocalLLMConfigOverride(nextConfig);
+          } else {
+            clearSessionLocalLLMConfigOverride();
+            saveGlobalConfig(current => ({
+              ...current,
+              localBackendProvider: nextConfig.provider,
+              localBackendBaseUrl: nextConfig.baseUrl,
+              localBackendModel: nextConfig.model,
+              localBackendApiKey: nextConfig.apiKey
+            }));
+          }
+          void done();
+        }} onCancel={() => {
+          void done();
+        }} title="Connect your model backend" description="Choose the OpenAI-compatible endpoint localclawd should talk to. You can save it globally for every run or use it only for this launch." showSaveGloballyOption={true} />
+      </AppStateProvider>
+    );
   }
   let onboardingShown = false;
   if (!config.theme || !config.hasCompletedOnboarding // always show onboarding at least once
@@ -181,7 +185,11 @@ export async function showSetupScreens(root: Root, permissionMode: PermissionMod
       const {
         TrustDialog
       } = await import('./components/TrustDialog/TrustDialog.js');
-      await showSetupDialog(root, done => <TrustDialog commands={commands} onDone={done} />);
+      await showDialog(root, done =>
+        <AppStateProvider onChangeAppState={onChangeAppState}>
+          <TrustDialog commands={commands} onDone={done} />
+        </AppStateProvider>
+      );
     }
 
     // Signal that trust has been verified for this session.
@@ -211,7 +219,11 @@ export async function showSetupScreens(root: Root, permissionMode: PermissionMod
       const {
         ClaudeMdExternalIncludesDialog
       } = await import('./components/ClaudeMdExternalIncludesDialog.js');
-      await showSetupDialog(root, done => <ClaudeMdExternalIncludesDialog onDone={done} isStandaloneDialog externalIncludes={externalIncludes} />);
+      await showDialog(root, done =>
+        <AppStateProvider onChangeAppState={onChangeAppState}>
+          <ClaudeMdExternalIncludesDialog onDone={done} isStandaloneDialog externalIncludes={externalIncludes} />
+        </AppStateProvider>
+      );
     }
   }
 

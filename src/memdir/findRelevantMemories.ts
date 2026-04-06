@@ -1,4 +1,5 @@
 import { feature } from 'bun:bundle'
+import { isThinkHarderMode } from '../commands/thinkharder/thinkharder.js'
 import { logForDebugging } from '../utils/debug.js'
 import { errorMessage } from '../utils/errors.js'
 import { getDefaultSonnetModel } from '../utils/model/model.js'
@@ -95,6 +96,12 @@ async function selectRelevantMemories(
       ? `\n\nRecently used tools: ${recentTools.join(', ')}`
       : ''
 
+  // In thinkharder mode, run lattice scoring in parallel with Sonnet
+  // so semantic memory is ACTIVE (not just a fallback on failure).
+  const latticePromise = isThinkHarderMode
+    ? Promise.resolve(topLatticeMemories(query, memories).map(m => m.filename))
+    : Promise.resolve([] as string[])
+
   try {
     const result = await sideQuery({
       model: getDefaultSonnetModel(),
@@ -128,7 +135,24 @@ async function selectRelevantMemories(
     }
 
     const parsed: { selected_memories: string[] } = jsonParse(textBlock.text)
-    return parsed.selected_memories.filter(f => validFilenames.has(f))
+    const sonnetSelected = parsed.selected_memories.filter(f => validFilenames.has(f))
+
+    // In thinkharder mode: merge Sonnet + lattice results (union, up to 8).
+    // The lattice captures structural/algebraic similarity that Sonnet may miss.
+    if (isThinkHarderMode) {
+      const latticeSelected = await latticePromise
+      const merged = [...new Set([...sonnetSelected, ...latticeSelected])]
+        .filter(f => validFilenames.has(f))
+        .slice(0, 8)
+      if (merged.length > sonnetSelected.length) {
+        logForDebugging(
+          `[memdir] thinkharder: lattice added ${merged.length - sonnetSelected.length} extra memories`,
+        )
+      }
+      return merged
+    }
+
+    return sonnetSelected
   } catch (e) {
     if (signal.aborted) {
       return []
@@ -140,12 +164,14 @@ async function selectRelevantMemories(
     // Lattice fallback: when sideQuery is unavailable (local-only backend,
     // network error, rate limit), rank memories using tag-based lattice
     // scoring. This keeps memory recall functional without a hosted model.
-    const latticeResults = topLatticeMemories(query, memories)
+    const latticeResults = await latticePromise.catch(
+      () => topLatticeMemories(query, memories).map(m => m.filename),
+    )
     if (latticeResults.length > 0) {
       logForDebugging(
         `[memdir] lattice fallback selected ${latticeResults.length} memories`,
       )
-      return latticeResults.map(m => m.filename)
+      return latticeResults
     }
     return []
   }

@@ -47,6 +47,7 @@ import type { PermissionMode } from './utils/permissions/PermissionMode.js'
 import { getPlanSlug } from './utils/plans.js'
 import { saveWorktreeState } from './utils/sessionStorage.js'
 import { profileCheckpoint } from './utils/startupProfiler.js'
+import { initTelegram } from './services/telegram/telegramBot.js'
 import {
   createTmuxSessionForWorktree,
   createWorktreeForSession,
@@ -299,6 +300,7 @@ export async function setup(
   // the await points above (startUdsMessaging, ~20ms) meant getCommands()
   // raced ahead and memoized an empty bundledSkills list.
   if (!isBareMode()) {
+    void initTelegram() // Start Telegram bridge if TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID set
     initSessionMemory() // Synchronous - registers hook, gate check happens lazily
     if (feature('CONTEXT_COLLAPSE')) {
       /* eslint-disable @typescript-eslint/no-require-imports */

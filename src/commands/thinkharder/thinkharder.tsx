@@ -1,18 +1,21 @@
 /**
- * /thinkharder — formal 5-phase refinement pipeline with mathematical rigour.
+ * /thinkharder — 4-layer human cognition loop + 5-phase formal refinement.
  *
- * Injects a structured meta-message enforcing a five-phase development cycle
- * PER FILE OR CHANGE before any Edit/Write/Bash call:
+ * Architecture: mirrors the neuroscience model of human memory systems
+ * (Baddeley, Tulving, Anderson) layered on top of a formal verification
+ * pipeline. The lattice memory scoring system is ACTIVE in this mode —
+ * semantic memory queries run on every task, not just as a fallback.
  *
- *   PHASE 0 — ORIENT:   Map the type system, invariants, and module contracts.
- *   PHASE 1 — DRAFT:    Write the initial implementation. Think aloud.
- *   PHASE 2 — CRITIQUE: Self-review across 10 categories. List every issue.
- *   PHASE 3 — REFINE:   Apply every fix. Preserve all invariants and contracts.
- *   PHASE 4 — VERIFY:   Formal gate — confirm each issue resolved and that
- *                        the solution composes correctly as a morphism in the
- *                        broader module graph. Write only after ✓ on all items.
+ * Memory layers (pre-phase priming):
+ *   Layer 0 — WORKING MEMORY   (Baddeley): active task context, ~7 items
+ *   Layer 1 — EPISODIC MEMORY  (Tulving):  session history, recent actions
+ *   Layer 2 — SEMANTIC MEMORY  (lattice):  long-term knowledge, memory files
+ *   Layer 3 — PROCEDURAL MEMORY (implicit): CLAUDE.md rules, standing patterns
  *
- * /thinknormal resets to default pipeline.
+ * Followed by 5-phase verification per change:
+ *   Phase 0 ORIENT → Phase 1 DRAFT → Phase 2 CRITIQUE → Phase 3 REFINE → Phase 4 VERIFY
+ *
+ * /thinknormal resets to default pipeline and deactivates lattice.
  */
 
 import * as React from 'react'
@@ -30,97 +33,145 @@ export function setThinkHarderMode(value: boolean): void {
 // ─── Prompts ─────────────────────────────────────────────────────────────────
 
 const THINKHARDER_PROMPT = `\
-[THINK HARDER — 5-PHASE FORMAL REFINEMENT PIPELINE ACTIVE]
+[THINK HARDER — HUMAN COGNITION LOOP + 5-PHASE FORMAL PIPELINE ACTIVE]
 
-Every code change must pass all five phases before being written to disk.
-Do NOT call Edit, Write, or Bash with new code until Phase 4 is complete.
+══════════════════════════════════════════════════════════════════════
+PRE-PHASE — MEMORY PRIMING  (run before every task, not just per file)
+══════════════════════════════════════════════════════════════════════
 
-══════════════════════════════════════════════════════════
+Your cognition is modelled on four neuroscientific memory systems.
+Prime each layer now before beginning any work:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  Layer 0 — WORKING MEMORY  (Baddeley's phonological + visuospatial) │
+│                                                                     │
+│  Capacity: ~7 ± 2 items. Decays in seconds without rehearsal.      │
+│  Action: State the CURRENT GOAL in one sentence. List the active   │
+│  files, pending decisions, and any open questions. Anything not     │
+│  listed here is at risk of being forgotten — be explicit.           │
+├─────────────────────────────────────────────────────────────────────┤
+│  Layer 1 — EPISODIC MEMORY  (Tulving's autonoetic consciousness)    │
+│                                                                     │
+│  Session-bound, time-indexed recall of personal experience.         │
+│  Action: What happened THIS SESSION? What was attempted and         │
+│  succeeded? What failed and why? What blockers were hit?           │
+│  Use this to avoid repeating mistakes and to build on progress.     │
+├─────────────────────────────────────────────────────────────────────┤
+│  Layer 2 — SEMANTIC MEMORY  (lattice-indexed long-term knowledge)   │
+│                                                                     │
+│  Conceptual knowledge decoupled from time. In this mode the        │
+│  geometric algebra lattice is ACTIVE — memory files are scored      │
+│  and recalled via Clifford algebra multivector similarity.          │
+│  Action: Read the memory files surfaced by the system. Extract      │
+│  architectural decisions, known invariants, and prior context       │
+│  relevant to this task. Treat memory files as your long-term brain. │
+├─────────────────────────────────────────────────────────────────────┤
+│  Layer 3 — PROCEDURAL MEMORY  (Anderson's ACT-R implicit skills)    │
+│                                                                     │
+│  Compiled habits that run without conscious attention.              │
+│  Action: Apply CLAUDE.md rules, project conventions, and standing   │
+│  style guides as automatic constraints — not as a checklist to      │
+│  consult, but as invariants that must hold by construction.         │
+└─────────────────────────────────────────────────────────────────────┘
+
+Write a MEMORY PRIME block (4 short bullet groups, one per layer)
+before Phase 0. This block is your cognitive anchor for the task.
+
+═══════════════════════════════════════════════════════════════════════
 PHASE 0 — ORIENT  (invariant mapping)
-══════════════════════════════════════════════════════════
-Before writing anything, map the landscape:
-  • List the module's public contracts (exported types / functions / constants).
-  • Identify any state invariants that must hold before and after your change
-    (e.g. "array is always sorted", "ref is non-null after init").
-  • Identify composability constraints: does this function act as a morphism
-    in a larger pipeline? What are its domain and codomain types?
-  • Note any side-effects (I/O, global state mutation, async races).
+═══════════════════════════════════════════════════════════════════════
+Building on your Memory Prime, map the landscape formally:
+  • Public contracts: exported types, functions, constants this module exposes.
+  • State invariants: conditions that must hold before AND after your change.
+  • Composability: does this act as a morphism in a pipeline? Domain → codomain?
+  • Side-effects: I/O, global state mutation, async races, resource acquisition.
 
 Write a short bulleted ORIENT block before proceeding.
 
-══════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════
 PHASE 1 — DRAFT
-══════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════
 Write the initial implementation in full inside a code block.
-Think aloud: describe your approach, key decisions, and tradeoffs.
-Reference the invariants identified in Phase 0.
+Think aloud: describe approach, key decisions, tradeoffs.
+Reference invariants from Phase 0 and semantic memory from Layer 2.
 Do NOT call any write tool yet.
 
-══════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════
 PHASE 2 — CRITIQUE  (10-category self-review)
-══════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════
 Critically review your draft. For each issue found, write:
   ✗ [CATEGORY] Description of the issue
 
-Categories (check all ten):
+Categories (check ALL ten — no skipping):
   CORRECTNESS       — logic errors, wrong algorithm, incorrect output
   INVARIANT         — any invariant from Phase 0 that could be violated
   EDGE CASE         — empty inputs, boundary values, overflow, null/undefined
   PERFORMANCE       — algorithmic complexity, unnecessary allocations, hot paths
   SECURITY          — injection, path traversal, XSS, unvalidated external input
   TYPE SAFETY       — unsound casts, any types, missing discriminants
-  COMPOSABILITY     — does the function compose cleanly? breaks callers? leaks impl?
-  CONCURRENCY       — race conditions, missing abort handling, unguarded shared state
-  ERROR HANDLING    — uncaught throws, swallowed errors, missing cleanup on failure
+  COMPOSABILITY     — does it compose cleanly? breaks callers? leaks internals?
+  CONCURRENCY       — races, missing abort handling, unguarded shared state
+  ERROR HANDLING    — uncaught throws, swallowed errors, missing cleanup
   STYLE / NAMING    — misleading names, poor readability, unnecessary complexity
 
-If the draft is flawless (rare), write: ✓ No issues found — proceeding to Phase 3.
+If the draft is flawless: ✓ No issues found — proceeding to Phase 3.
 
-══════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════
 PHASE 3 — REFINE
-══════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════
 Apply every fix from Phase 2. For each fix, write:
   → [CATEGORY] What you changed and why.
 
-Re-verify invariants from Phase 0 after each fix — a fix for one category
-must not introduce a violation in another.
+Re-verify invariants from Phase 0 after each fix.
+A fix for one category must not introduce a violation in another.
 Write the complete refined implementation in a code block.
 
-══════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════
 PHASE 4 — VERIFY  (formal gate)
-══════════════════════════════════════════════════════════
-For each issue listed in Phase 2, confirm:
+═══════════════════════════════════════════════════════════════════════
+For each issue from Phase 2, confirm resolution:
   ✓ [CATEGORY] Resolved: description of what was fixed.
 
-Then confirm the two composition checks:
-  ✓ MORPHISM   The change preserves the function's role as a valid morphism
-               in the module graph — callers still type-check, contracts hold.
-  ✓ INVARIANTS All invariants mapped in Phase 0 hold after this change.
+Then confirm composition checks:
+  ✓ MORPHISM    Change preserves function's role as a valid morphism in the
+                module graph — callers still type-check, contracts hold.
+  ✓ INVARIANTS  All invariants from Phase 0 hold after this change.
+  ✓ MEMORY      Solution is consistent with semantic memory (Layer 2) — no
+                architectural decisions in memory files are violated.
 
-Only after ALL items are marked ✓ may you call Edit/Write/Bash to persist
-the code. If new issues surface during verification, loop back to Phase 3.
+Only after ALL items are ✓ may you call Edit/Write/Bash to persist.
+If new issues surface during verification, loop back to Phase 3.
 
-══════════════════════════════════════════════════════════
-STANDING RULES
-══════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════
+STANDING RULES  (procedural memory — always active)
+═══════════════════════════════════════════════════════════════════════
 • READ every file before editing — never guess current contents.
 • CHECK memory files at task start for relevant architectural context.
-• After writing a change, READ the file back to confirm correctness.
+• After writing a change, READ back to confirm correctness.
 • Prefer small, focused edits over large sweeping rewrites.
-• Explain each non-trivial decision concisely for the user.
-• Treat the type system as a proof assistant: if TypeScript accepts it
-  without casts, that is evidence (not proof) of correctness.
+• Treat the type system as a proof assistant.
+• Run builds/tests after non-trivial changes.
+• Commit logical units of work with descriptive messages.
 
-Begin Phase 0 now.`
+Begin Memory Priming now, then proceed to Phase 0.`
+
+export const THINKHARDER_ROUND_PROMPT = `\
+[THINK HARDER — ROUND CONTINUATION]
+Memory priming active. Before proceeding:
+  L0 Working: restate current goal and active context
+  L1 Episodic: what did the last round accomplish?
+  L2 Semantic: any memory files relevant to next step?
+  L3 Procedural: which CLAUDE.md rules apply here?
+Then continue with the 5-phase pipeline for the next change.`
 
 const THINKNORMAL_PROMPT = `\
 [THINK HARDER DEACTIVATED — default pipeline restored]
 
 Resume standard operation:
-• Normal tool use and response pipeline apply.
-• Lattice memory scoring is available as a fallback only (not invoked by default).
-• You may write code without the 5-phase refinement cycle, though careful
-  reasoning is always encouraged.`
+• Normal tool use and response pipeline.
+• Lattice memory scoring returns to fallback-only mode.
+• Memory priming and 5-phase refinement are no longer required,
+  though careful reasoning is always encouraged.`
 
 // ─── UI Components ───────────────────────────────────────────────────────────
 
@@ -133,11 +184,11 @@ function ThinkHarderBanner({ onReady }: { onReady: () => void }): React.ReactNod
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold color="#818cf8">
-        {'◆ Think Harder — 5-phase formal refinement pipeline ACTIVE'}
+        {'◆ Think Harder — Human Cognition Loop + 5-Phase Pipeline ACTIVE'}
       </Text>
       <Box flexDirection="column" marginLeft={2}>
-        <Text dimColor>{'Phase 0 ORIENT → Phase 1 DRAFT → Phase 2 CRITIQUE → Phase 3 REFINE → Phase 4 VERIFY → Write'}</Text>
-        <Text dimColor>{'Invariant mapping, 10-category critique, and morphism check before every save.'}</Text>
+        <Text dimColor>{'L0 Working · L1 Episodic · L2 Semantic (lattice ON) · L3 Procedural'}</Text>
+        <Text dimColor>{'ORIENT → DRAFT → CRITIQUE → REFINE → VERIFY before every write.'}</Text>
         <Text dimColor>{'Use /thinknormal to return to default.'}</Text>
       </Box>
     </Box>

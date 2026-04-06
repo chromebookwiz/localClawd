@@ -22,7 +22,9 @@
       "Bash(grep -v \"utility\\\\|utilities\\\\|util\\\\.format\\\\|util\\\\.promisify\\\\|util\\\\.inspect\\\\|require.*util\\\\|import.*util\\\\|from.*util\\\\|//.*util\")",
       "Bash(echo \"exit: $?\")",
       "Bash(kill %1)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(grep -n \"return\\\\|enter\\\\|\\\\\\\\\\\\\\\\r\\\\|\\\\\\\\\\\\\\\\n\\\\|0x0d\\\\|0x0a\" \"C:\\\\code\\\\vllmClawd\\\\src\\\\ink\\\\parse-keypress.ts\")",
+      "Bash(find:*)"
     ]
   }
 }

@@ -22,6 +22,7 @@ import doctor from './commands/doctor/index.js'
 import buddy from './commands/buddy/index.js'
 import keepgoing from './commands/keepgoing/index.js'
 import setup from './commands/setup/index.js'
+import telegram from './commands/telegram/index.js'
 import thinkharder from './commands/thinkharder/index.js'
 import thinknormal from './commands/thinkharder/thinknormal-index.js'
 import memory from './commands/memory/index.js'
@@ -321,6 +322,7 @@ const COMMANDS = memoize((): Command[] => [
   vim,
   setup,
   buddy,
+  telegram,
   ...(webCmd ? [webCmd] : []),
   ...(forkCmd ? [forkCmd] : []),
   ...(proactive ? [proactive] : []),

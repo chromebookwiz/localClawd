@@ -1,40 +1,34 @@
 /**
  * /keepgoing — ultimate persistent autonomous mode.
  *
- * The model works continuously until it explicitly signals completion.
- * After each response the command re-queues itself via nextInput, creating
- * an unbroken loop. The only exits are:
+ * Works standalone or combined with /thinkharder:
+ *   /thinkharder → /keepgoing   Each round uses the full 4-layer cognition
+ *                               loop + 5-phase pipeline. The model primes
+ *                               memory, verifies invariants, and writes only
+ *                               after formal verification on every iteration.
  *
- *   a) Model emits a STOP SIGNAL (see list below)
- *   b) User presses Ctrl+C or types a new message (interrupts the loop)
- *   c) Round cap is reached (default: 50, override with /keepgoing 100 or
- *      /keepgoing unlimited)
+ * Telegram bridge: if TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set, the
+ * agent sends a status update after each round and any messages you send
+ * from Telegram are injected as the next round's focus.
  *
- * STOP SIGNALS (any of these in the last assistant message ends the loop):
- *   TASK COMPLETE:   — all work is done
- *   TASK_COMPLETE:   — underscore variant
- *   NEEDS INPUT:     — blocked, requires user clarification
- *   NEEDS_INPUT:     — underscore variant
- *   FINISHED:        — simple completion marker
- *   ALL DONE:        — natural language variant
- *   WORK COMPLETE:   — work complete variant
+ * Stop signals (any in the last assistant message ends the loop):
+ *   TASK COMPLETE:   TASK_COMPLETE:   NEEDS INPUT:   NEEDS_INPUT:
+ *   FINISHED         ALL DONE         WORK COMPLETE:
  *
- * SUBAGENT SUPPORT
- * The continuation prompt explicitly tells the model it may spawn subagents
- * for parallel or complex work using the Agent tool. Sub-tasks that are
- * independent should run in parallel. The model is reminded of all available
- * tools on every round so it does not forget capabilities.
- *
- * ROUND COUNTER
- * The banner shows which round the loop is on so the user has visibility into
- * how much autonomous work has been done.
+ * Round cap: default 50. Override: /keepgoing 100  or  /keepgoing unlimited
  */
 
 import * as React from 'react'
 import { Box, Text } from '../../ink.js'
 import type { LocalJSXCommandCall } from '../../types/command.js'
+import { isThinkHarderMode, THINKHARDER_ROUND_PROMPT } from '../thinkharder/thinkharder.js'
+import {
+  getPendingTelegramMessage,
+  isTelegramActive,
+  sendTelegramMessage,
+} from '../../services/telegram/telegramBot.js'
 
-// ─── Module-level loop state (per process) ───────────────────────────────────
+// ─── Module-level loop state ─────────────────────────────────────────────────
 
 let sessionRound = 0
 let sessionFocus = ''
@@ -87,20 +81,52 @@ function detectStopSignal(text: string): string | null {
   return null
 }
 
+function extractLastAssistantText(
+  messages: Array<{ role: string; content: unknown }>,
+): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]!
+    if (msg.role !== 'assistant') continue
+    const blocks = Array.isArray(msg.content) ? msg.content : []
+    return (blocks as Array<{ type: string; text?: string }>)
+      .filter(b => b.type === 'text')
+      .map(b => b.text ?? '')
+      .join('\n')
+  }
+  return ''
+}
+
 // ─── Continuation prompt ──────────────────────────────────────────────────────
 
-function buildContinuationPrompt(round: number, maxRounds: number, focus: string): string {
+function buildContinuationPrompt(
+  round: number,
+  maxRounds: number,
+  focus: string,
+  telegramMsg: string | null,
+): string {
   const roundInfo = isFinite(maxRounds)
     ? `Round ${round} of ${maxRounds}`
     : `Round ${round} (unlimited)`
+
+  const modeTag = isThinkHarderMode
+    ? ' · 🧠 THINK HARDER'
+    : ''
 
   const focusLine = focus
     ? `\nCurrent focus: ${focus}\n`
     : ''
 
+  const telegramSection = telegramMsg
+    ? `\n━━━ 📱 TELEGRAM MESSAGE FROM USER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${telegramMsg}\n━━━ (respond to this, then continue autonomous work) ━━━━━━━━━━━━━━\n`
+    : ''
+
+  const thinkHarderSection = isThinkHarderMode
+    ? `\n${THINKHARDER_ROUND_PROMPT}\n`
+    : ''
+
   return `\
-[KEEP GOING — AUTONOMOUS OPERATION — ${roundInfo}]
-${focusLine}
+[KEEP GOING — AUTONOMOUS OPERATION — ${roundInfo}${modeTag}]
+${focusLine}${telegramSection}${thinkHarderSection}
 You are in full autonomous mode. Work continuously until all tasks are done.
 
 ━━━ CAPABILITIES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -139,11 +165,15 @@ function KeepGoingBanner({
   round,
   maxRounds,
   focus,
+  thinkHarder,
+  telegram,
   onReady,
 }: {
   round: number
   maxRounds: number
   focus: string
+  thinkHarder: boolean
+  telegram: boolean
   onReady: () => void
 }): React.ReactNode {
   React.useEffect(() => {
@@ -155,10 +185,15 @@ function KeepGoingBanner({
     ? `${round}/${maxRounds}`
     : `${round}/∞`
 
+  const badges: string[] = []
+  if (thinkHarder) badges.push('🧠 ThinkHarder')
+  if (telegram) badges.push('📱 Telegram')
+  const badgeStr = badges.length > 0 ? `  ${badges.join(' · ')}` : ''
+
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold color="cyan">
-        {`◆ Keep Going  [round ${roundDisplay}]`}
+        {`◆ Keep Going  [round ${roundDisplay}]${badgeStr}`}
       </Text>
       {focus ? (
         <Text dimColor color="cyan">{`  ↳ Focus: ${focus}`}</Text>
@@ -225,40 +260,36 @@ function KeepGoingCapReached({
 
 export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const rawArgs = args?.trim() ?? ''
-
-  // On first invocation (round 0), initialize session state.
-  // Subsequent invocations (round > 0) detect this because sessionRound > 0
-  // AND the focus matches. If focus changed, reset.
   const { maxRounds, focus } = parseMaxRounds(rawArgs)
 
-  // Reset if the user started a new /keepgoing session with different args,
-  // or if this is the first call.
   if (sessionRound === 0 || (focus && focus !== sessionFocus)) {
     resetSession(focus)
   }
 
   // ── Detect stop signal from the last model response ──────────────────────
   let stopReason: string | null = null
+  let lastText = ''
   context.setMessages(prev => {
-    if (prev.length === 0) return prev
-    // Scan backwards for the last assistant message
-    for (let i = prev.length - 1; i >= 0; i--) {
-      const msg = prev[i]!
-      if (msg.role !== 'assistant') continue
-      const blocks = Array.isArray(msg.content) ? msg.content : []
-      const text = (blocks as Array<{ type: string; text?: string }>)
-        .filter(b => b.type === 'text')
-        .map(b => b.text ?? '')
-        .join('\n')
-      stopReason = detectStopSignal(text)
-      break
-    }
+    lastText = extractLastAssistantText(
+      prev as Array<{ role: string; content: unknown }>,
+    )
+    stopReason = detectStopSignal(lastText)
     return prev
   })
+
+  // ── Send last response to Telegram (fire-and-forget) ─────────────────────
+  if (isTelegramActive() && lastText.trim()) {
+    const preview = lastText.slice(0, 1200)
+    const suffix = lastText.length > 1200 ? '\n…(truncated)' : ''
+    void sendTelegramMessage(`🤖 *Round ${sessionRound}*\n${preview}${suffix}`)
+  }
 
   if (stopReason !== null) {
     const finalRound = sessionRound
     resetSession('')
+    if (isTelegramActive()) {
+      void sendTelegramMessage(`✅ *keepgoing stopped*\nRound ${finalRound} · ${stopReason}`)
+    }
     return (
       <KeepGoingDone
         round={finalRound}
@@ -274,6 +305,9 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   if (isFinite(maxRounds) && round > maxRounds) {
     const finalRound = sessionRound
     resetSession('')
+    if (isTelegramActive()) {
+      void sendTelegramMessage(`⏸ *keepgoing paused*\nRound cap ${finalRound}/${maxRounds} reached.`)
+    }
     return (
       <KeepGoingCapReached
         round={finalRound}
@@ -284,21 +318,25 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     )
   }
 
-  // ── Continue: prime model and re-queue ────────────────────────────────────
-  const prompt = buildContinuationPrompt(round, maxRounds, focus)
+  // ── Check for incoming Telegram message to inject ─────────────────────────
+  const telegramMsg = getPendingTelegramMessage()
 
-  // Reconstruct the next-input command preserving any flags the user set
+  // ── Build prompt + re-queue ───────────────────────────────────────────────
+  const prompt = buildContinuationPrompt(round, maxRounds, focus, telegramMsg)
+
   const nextArgs: string[] = []
   if (!isFinite(maxRounds)) nextArgs.push('unlimited')
   else if (maxRounds !== DEFAULT_MAX_ROUNDS) nextArgs.push(String(maxRounds))
   if (focus) nextArgs.push(focus)
   const nextCmd = `/keepgoing${nextArgs.length ? ' ' + nextArgs.join(' ') : ''}`
 
+  const metaMessages = [prompt]
+
   const handleReady = () => {
     onDone(undefined, {
       display: 'system',
       shouldQuery: true,
-      metaMessages: [prompt],
+      metaMessages,
       nextInput: nextCmd,
       submitNextInput: true,
     })
@@ -309,6 +347,8 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
       round={round}
       maxRounds={maxRounds}
       focus={focus}
+      thinkHarder={isThinkHarderMode}
+      telegram={isTelegramActive()}
       onReady={handleReady}
     />
   )
