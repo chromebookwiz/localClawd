@@ -1,6 +1,7 @@
 import { c as _c } from "react/compiler-runtime";
 import { homedir } from 'os';
 import React from 'react';
+import { useInput } from '../../ink.js';
 import { logEvent } from 'src/services/analytics/index.js';
 import { setSessionTrustAccepted } from '../../bootstrap/state.js';
 import type { Command } from '../../commands.js';
@@ -204,6 +205,12 @@ export function TrustDialog(t0) {
     t15 = $[19];
   }
   useKeybinding("confirm:no", _temp7, t15);
+  // Direct fallback: ensures Enter always confirms trust and Esc always exits,
+  // regardless of keybinding system state.
+  useInput((_input, key) => {
+    if (key.return) { onChange('enable_all'); }
+    else if (key.escape) { gracefulShutdownSync(0); }
+  }, { isActive: !hasTrustDialogAccepted });
   if (hasTrustDialogAccepted) {
     setTimeout(onDone);
     return null;

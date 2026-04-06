@@ -14,6 +14,7 @@ import {
   type NetworkScanProgress,
 } from '../utils/model/scanModels.js'
 import { Select } from './CustomSelect/select.js'
+import { TriangleSpinner } from './Spinner/TriangleSpinner.js'
 import TextInput from './TextInput.js'
 
 type Props = {
@@ -328,14 +329,17 @@ export function LocalBackendSetup({
 
       {step === 'networkScan' ? (
         <Box flexDirection="column" gap={1}>
-          <Text>Scanning <Text bold>192.168.1.0/24</Text> for vLLM endpoints…</Text>
+          <Box gap={1}>
+            <TriangleSpinner />
+            <Text>Scanning <Text bold>192.168.1.0/24</Text> for vLLM endpoints</Text>
+          </Box>
           {networkProgress ? (
             <Text dimColor>
               {networkProgress.scanned}/{networkProgress.total} hosts probed
               {networkProgress.found > 0 ? ` · ${networkProgress.found} found` : ''}
             </Text>
           ) : (
-            <Text dimColor>Starting scan…</Text>
+            <Text dimColor>Starting…</Text>
           )}
           <Text dimColor>Enter to use results so far · Esc to go back</Text>
         </Box>
@@ -384,7 +388,10 @@ export function LocalBackendSetup({
 
           {step === 'scanningModels' ? (
             <Box flexDirection="column" gap={1}>
-              <Text>Scanning models at <Text bold>{baseUrl}</Text>…</Text>
+              <Box gap={1}>
+                <TriangleSpinner />
+                <Text>Scanning models at <Text bold>{baseUrl}</Text></Text>
+              </Box>
               <Text dimColor>Enter to skip and type manually · Esc to go back</Text>
             </Box>
           ) : null}
