@@ -131,9 +131,30 @@ function HeartbeatSleeping({
 
 export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const rawArgs = args?.trim() ?? ''
+  const { extractChain, validateCommandChain, parseCommandChain, chainWarning } =
+    await import('../../utils/commandChaining.js')
+  const { ownArgs: chainedArgs } = extractChain(rawArgs)
+
+  // Validate chain upfront
+  if (rawArgs !== chainedArgs) {
+    const fullChain = parseCommandChain(`/heartbeat ${rawArgs}`)
+    if (fullChain && fullChain.length > 1) {
+      const validation = validateCommandChain(fullChain)
+      if (!validation.ok) {
+        return (
+          <HeartbeatBanner
+            beat={0}
+            intervalMins={heartbeatInterval}
+            task={chainWarning(validation.reason)}
+            onReady={() => onDone(chainWarning(validation.reason))}
+          />
+        )
+      }
+    }
+  }
 
   // Parse args: first number token = interval, rest = task
-  const parts = rawArgs.split(/\s+/)
+  const parts = chainedArgs.split(/\s+/)
   const firstNum = parts[0] && /^\d+(\.\d+)?$/.test(parts[0]) ? parseFloat(parts[0]) : null
 
   if (firstNum !== null) {

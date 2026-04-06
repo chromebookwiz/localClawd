@@ -211,30 +211,54 @@ function ThinkNormalBanner({ onReady }: { onReady: () => void }): React.ReactNod
 
 // ─── Command implementations ─────────────────────────────────────────────────
 
-export const call: LocalJSXCommandCall = async (onDone, _context, _args) => {
+export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
+  const { extractChain, validateCommandChain, parseCommandChain, chainWarning } =
+    await import('../../utils/commandChaining.js')
+  const { ownArgs: _ownArgs, nextCmd } = extractChain(args ?? '')
+
+  // Validate full chain upfront
+  if (nextCmd) {
+    const fullChain = parseCommandChain(`/thinkharder ${args ?? ''}`)
+    if (fullChain && fullChain.length > 1) {
+      const validation = validateCommandChain(fullChain)
+      if (!validation.ok) {
+        const handleReady = () => onDone(chainWarning(validation.reason))
+        return (
+          <ThinkHarderBanner onReady={handleReady} />
+        )
+      }
+    }
+  }
+
   setThinkHarderMode(true)
   return (
     <ThinkHarderBanner
       onReady={() =>
         onDone(undefined, {
           display: 'system',
-          shouldQuery: true,
+          shouldQuery: !nextCmd,
           metaMessages: [THINKHARDER_PROMPT],
+          nextInput: nextCmd ?? undefined,
+          submitNextInput: nextCmd ? true : undefined,
         })
       }
     />
   )
 }
 
-export const callNormal: LocalJSXCommandCall = async (onDone, _context, _args) => {
+export const callNormal: LocalJSXCommandCall = async (onDone, _context, args) => {
+  const { extractChain } = await import('../../utils/commandChaining.js')
+  const { nextCmd } = extractChain(args ?? '')
   setThinkHarderMode(false)
   return (
     <ThinkNormalBanner
       onReady={() =>
         onDone(undefined, {
           display: 'system',
-          shouldQuery: true,
+          shouldQuery: !nextCmd,
           metaMessages: [THINKNORMAL_PROMPT],
+          nextInput: nextCmd ?? undefined,
+          submitNextInput: nextCmd ? true : undefined,
         })
       }
     />

@@ -89,6 +89,8 @@ import {
   EthBalanceTool,
   EthSendTool,
 } from './tools/CryptoTool/CryptoTool.js'
+import { LocalWebSearchTool } from './tools/LocalWebSearchTool/LocalWebSearchTool.js'
+import { WebScreenshotTool } from './tools/WebScreenshotTool/WebScreenshotTool.js'
 import { EnterWorktreeTool } from './tools/EnterWorktreeTool/EnterWorktreeTool.js'
 import { ExitWorktreeTool } from './tools/ExitWorktreeTool/ExitWorktreeTool.js'
 import { ConfigTool } from './tools/ConfigTool/ConfigTool.js'
@@ -269,6 +271,10 @@ export function getAllBaseTools(): Tools {
     EthAddressTool,
     EthBalanceTool,
     EthSendTool,
+    // localClawd: Web search for local providers (DuckDuckGo/Brave/SearXNG)
+    LocalWebSearchTool,
+    // localClawd: Web screenshot/vision tool
+    WebScreenshotTool,
   ]
 }
 

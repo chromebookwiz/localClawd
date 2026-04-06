@@ -224,6 +224,25 @@ export async function handlePromptSubmit(
   )
   logEvent('tengu_paste_text', { pastedTextCount, pastedTextBytes })
 
+  // ── Command chain validation (localClawd) ─────────────────────────────────
+  // If the input contains multiple slash commands, validate compatibility early
+  // and show a warning before any command executes.
+  if (!skipSlashCommands && finalInput.trim().startsWith('/')) {
+    const { parseCommandChain, validateCommandChain, chainWarning } =
+      await import('./commandChaining.js')
+    const chain = parseCommandChain(finalInput.trim())
+    if (chain && chain.length > 1) {
+      const validation = validateCommandChain(chain)
+      if (!validation.ok) {
+        const warning = chainWarning(validation.reason)
+        if (params.addNotification) {
+          params.addNotification({ key: 'chain-warn', text: warning, priority: 'immediate' })
+        }
+        return
+      }
+    }
+  }
+
   // Handle local-jsx immediate commands (e.g., /config, /doctor)
   // Skip for remote bridge messages — slash commands from CCR clients are plain text
   if (!skipSlashCommands && finalInput.trim().startsWith('/')) {

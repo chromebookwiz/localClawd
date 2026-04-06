@@ -260,7 +260,12 @@ function KeepGoingCapReached({
 
 export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const rawArgs = args?.trim() ?? ''
-  const { maxRounds, focus } = parseMaxRounds(rawArgs)
+  const { extractChain, validateCommandChain, parseCommandChain, chainWarning } =
+    await import('../../utils/commandChaining.js')
+  const { ownArgs: chainedArgs, nextCmd: _nextCmdFromChain } = extractChain(rawArgs)
+  // keepgoing is a loop — it absorbs all chain commands as part of the loop context
+  // and warns if an incompatible command follows it
+  const { maxRounds, focus } = parseMaxRounds(chainedArgs)
 
   if (sessionRound === 0 || (focus && focus !== sessionFocus)) {
     resetSession(focus)
