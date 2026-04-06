@@ -19,53 +19,95 @@ function hasSavedBackendConfig(
   return Boolean(config?.provider && config?.baseUrl?.trim() && config?.model?.trim())
 }
 
-const OPTIONS: Array<{ label: string; value: StartPageAction }> = [
+const CONTINUE_OPTIONS: Array<{ label: string; value: StartPageAction }> = [
   { label: 'Continue to dashboard', value: 'continue' },
-  { label: 'Configure model backend', value: 'configure-backend' },
+  { label: 'Change backend', value: 'configure-backend' },
+]
+
+const SETUP_OPTIONS: Array<{ label: string; value: StartPageAction }> = [
+  { label: 'Set up a backend now', value: 'configure-backend' },
+  { label: 'Skip for now', value: 'continue' },
 ]
 
 export function StartPage({ currentConfig, onDone }: Props): React.ReactNode {
   const hasSavedConfig = hasSavedBackendConfig(currentConfig)
-  // Track the focused option from Select so Enter always knows what to confirm
-  const [focused, setFocused] = useState<StartPageAction>('continue')
+  const [focused, setFocused] = useState<StartPageAction>(
+    hasSavedConfig ? 'continue' : 'configure-backend',
+  )
 
-  // Direct fallback input handler — guarantees responsiveness even if the
-  // keybinding system doesn't fire its handler for Enter/Esc.
   useInput((_input, key) => {
     if (key.return) onDone(focused)
     else if (key.escape) onDone('continue')
   })
 
+  const options = hasSavedConfig ? CONTINUE_OPTIONS : SETUP_OPTIONS
+
   return (
     <Box flexDirection="column" gap={1}>
       <WelcomeV2 />
+
       <Box flexDirection="column" gap={1} paddingLeft={1} width={78}>
-        <Text bold>Connect a model backend</Text>
-        <Text dimColor wrap="wrap">
-          localclawd works with vLLM, Ollama, and other OpenAI-compatible endpoints.
-          Start your model server, then configure the endpoint and model you want to use.
-        </Text>
         {hasSavedConfig ? (
-          <Box flexDirection="column">
-            <Text>
-              Saved default:{' '}
-              <Text bold>{getLocalLLMProviderLabel(currentConfig.provider)}</Text>
-            </Text>
-            <Text dimColor>Model: {currentConfig.model}</Text>
-            <Text dimColor>Endpoint: {currentConfig.baseUrl}</Text>
-          </Box>
+          <>
+            {/* Welcome back banner */}
+            <Box flexDirection="column" gap={0}>
+              <Text bold color="#818cf8">
+                Welcome back!
+              </Text>
+              <Text dimColor>Ready when you are.</Text>
+            </Box>
+
+            {/* Saved backend card */}
+            <Box
+              flexDirection="column"
+              borderStyle="round"
+              borderColor="#6366f1"
+              paddingX={2}
+              paddingY={0}
+              width={60}
+            >
+              <Box gap={2} alignItems="center">
+                <Text color="#6366f1" bold>
+                  {'◈'}
+                </Text>
+                <Text bold color="#818cf8">
+                  {getLocalLLMProviderLabel(currentConfig.provider)}
+                </Text>
+              </Box>
+              <Text dimColor>Model: <Text color="white">{currentConfig.model}</Text></Text>
+              <Text dimColor>
+                Endpoint: <Text color="white">{currentConfig.baseUrl}</Text>
+              </Text>
+            </Box>
+          </>
         ) : (
-          <Text dimColor wrap="wrap">
-            No global backend saved yet — configure one now or come back later with /provider.
-          </Text>
+          <>
+            <Box flexDirection="column" gap={0}>
+              <Text bold color="#818cf8">
+                Let&apos;s get you connected.
+              </Text>
+              <Text dimColor wrap="wrap">
+                localclawd needs an OpenAI-compatible backend — vLLM, Ollama, or any hosted
+                gateway. Set one up now and you&apos;re ready to code.
+              </Text>
+            </Box>
+
+            <Box paddingX={1}>
+              <Text color="#6366f1">{'▸'}</Text>
+              <Text dimColor>
+                {' '}Vision works automatically when your model accepts image content.
+              </Text>
+            </Box>
+          </>
         )}
+
         <Select
-          options={OPTIONS}
+          options={options}
           onChange={value => onDone(value as StartPageAction)}
           onCancel={() => onDone('continue')}
           onFocus={value => setFocused(value as StartPageAction)}
         />
-        <Text dimColor>↑↓ to navigate · Enter or Ctrl+C to confirm</Text>
+        <Text dimColor>↑↓ to navigate · Enter to confirm · Esc to continue</Text>
       </Box>
     </Box>
   )

@@ -19,8 +19,9 @@ import cost from './commands/cost/index.js'
 import diff from './commands/diff/index.js'
 import ctx_viz from './commands/ctx_viz/index.js'
 import doctor from './commands/doctor/index.js'
-import keepgoing from './commands/keepgoing/index.js'
 import buddy from './commands/buddy/index.js'
+import keepgoing from './commands/keepgoing/index.js'
+import setup from './commands/setup/index.js'
 import thinkharder from './commands/thinkharder/index.js'
 import thinknormal from './commands/thinkharder/thinknormal-index.js'
 import memory from './commands/memory/index.js'
@@ -115,11 +116,6 @@ const peersCmd = feature('UDS_INBOX')
 const forkCmd = feature('FORK_SUBAGENT')
   ? (
       require('./commands/fork/index.js') as typeof import('./commands/fork/index.js')
-    ).default
-  : null
-const buddy = feature('BUDDY')
-  ? (
-      require('./commands/buddy/index.js') as typeof import('./commands/buddy/index.js')
     ).default
   : null
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -262,7 +258,6 @@ const COMMANDS = memoize((): Command[] => [
   advisor,
   agents,
   branch,
-  buddy,
   btw,
   chrome,
   clear,
@@ -324,9 +319,10 @@ const COMMANDS = memoize((): Command[] => [
   usage,
   usageReport,
   vim,
+  setup,
+  buddy,
   ...(webCmd ? [webCmd] : []),
   ...(forkCmd ? [forkCmd] : []),
-  ...(buddy ? [buddy] : []),
   ...(proactive ? [proactive] : []),
   ...(briefCommand ? [briefCommand] : []),
   ...(assistantCommand ? [assistantCommand] : []),
@@ -356,6 +352,30 @@ export const builtInCommandNames = memoize(
   (): Set<string> =>
     new Set(COMMANDS().flatMap(_ => [_.name, ...(_.aliases ?? [])])),
 )
+
+function withStartupLoadLogging<T>(
+  label: string,
+  promise: Promise<T>,
+): Promise<T> {
+  const start = Date.now()
+  const slowLoadWarning = setTimeout(() => {
+    logForDebugging(`[STARTUP] Still loading ${label} after ${Date.now() - start}ms`)
+  }, 5000)
+
+  return promise
+    .then(result => {
+      clearTimeout(slowLoadWarning)
+      logForDebugging(`[STARTUP] Loaded ${label} in ${Date.now() - start}ms`)
+      return result
+    })
+    .catch(error => {
+      clearTimeout(slowLoadWarning)
+      logForDebugging(
+        `[STARTUP] Failed loading ${label} after ${Date.now() - start}ms: ${toError(error).message}`,
+      )
+      throw error
+    })
+}
 
 async function getSkills(cwd: string): Promise<{
   skillDirCommands: Command[]
@@ -459,12 +479,15 @@ const loadAllCommands = memoize(async (cwd: string): Promise<Command[]> => {
     pluginCommands,
     workflowCommands,
   ] = await Promise.all([
-    getSkills(cwd),
-    getPluginCommands(),
-    getWorkflowCommands ? getWorkflowCommands(cwd) : Promise.resolve([]),
+      withStartupLoadLogging('skill sources', getSkills(cwd)),
+      withStartupLoadLogging('plugin commands', getPluginCommands()),
+      withStartupLoadLogging(
+        'workflow commands',
+        getWorkflowCommands ? getWorkflowCommands(cwd) : Promise.resolve([]),
+      ),
   ])
 
-  return [
+  const allCommands = [
     ...bundledSkills,
     ...builtinPluginSkills,
     ...skillDirCommands,
@@ -473,6 +496,10 @@ const loadAllCommands = memoize(async (cwd: string): Promise<Command[]> => {
     ...pluginSkills,
     ...COMMANDS(),
   ]
+
+  logForDebugging(`[STARTUP] loadAllCommands resolved with ${allCommands.length} commands`)
+
+  return allCommands
 })
 
 /**
@@ -481,17 +508,41 @@ const loadAllCommands = memoize(async (cwd: string): Promise<Command[]> => {
  * auth changes (e.g. /login) take effect immediately.
  */
 export async function getCommands(cwd: string): Promise<Command[]> {
+  logForDebugging(`[STARTUP] getCommands invoked for cwd: ${cwd}`)
   const allCommands = await loadAllCommands(cwd)
 
   // Get dynamic skills discovered during file operations
   const dynamicSkills = getDynamicSkills()
+  logForDebugging(`[STARTUP] Dynamic skills discovered for ${cwd}: ${dynamicSkills.length}`)
 
-  // Build base commands without dynamic skills
-  const baseCommands = allCommands.filter(
-    _ => meetsAvailabilityRequirement(_) && isCommandEnabled(_),
-  )
+  // Build base commands without dynamic skills. Guard individual command
+  // enablement so one faulty command cannot block the entire startup path.
+  const baseCommands: Command[] = []
+  for (const command of allCommands) {
+    if (!meetsAvailabilityRequirement(command)) {
+      continue
+    }
+
+    logForDebugging(`[STARTUP] Evaluating command enablement for ${cwd}: ${command.name}`)
+
+    try {
+      const isEnabled = isCommandEnabled(command)
+      logForDebugging(
+        `[STARTUP] Command enablement resolved: ${command.name} -> ${isEnabled}`,
+      )
+      if (isEnabled) {
+        baseCommands.push(command)
+      }
+    } catch (error) {
+      logError(toError(error))
+      logForDebugging(
+        `[STARTUP] Command enablement failed: ${command.name} -> ${toError(error).message}`,
+      )
+    }
+  }
 
   if (dynamicSkills.length === 0) {
+    logForDebugging(`[STARTUP] getCommands resolved for ${cwd} with ${baseCommands.length} commands`)
     return baseCommands
   }
 
@@ -503,8 +554,10 @@ export async function getCommands(cwd: string): Promise<Command[]> {
       meetsAvailabilityRequirement(s) &&
       isCommandEnabled(s),
   )
+  logForDebugging(`[STARTUP] Unique dynamic skills retained for ${cwd}: ${uniqueDynamicSkills.length}`)
 
   if (uniqueDynamicSkills.length === 0) {
+    logForDebugging(`[STARTUP] getCommands resolved for ${cwd} with ${baseCommands.length} commands`)
     return baseCommands
   }
 
@@ -513,14 +566,20 @@ export async function getCommands(cwd: string): Promise<Command[]> {
   const insertIndex = baseCommands.findIndex(c => builtInNames.has(c.name))
 
   if (insertIndex === -1) {
-    return [...baseCommands, ...uniqueDynamicSkills]
+    const mergedCommands = [...baseCommands, ...uniqueDynamicSkills]
+    logForDebugging(`[STARTUP] getCommands resolved for ${cwd} with ${mergedCommands.length} commands`)
+    return mergedCommands
   }
 
-  return [
+  const mergedCommands = [
     ...baseCommands.slice(0, insertIndex),
     ...uniqueDynamicSkills,
     ...baseCommands.slice(insertIndex),
   ]
+
+  logForDebugging(`[STARTUP] getCommands resolved for ${cwd} with ${mergedCommands.length} commands`)
+
+  return mergedCommands
 }
 
 /**
