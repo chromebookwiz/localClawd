@@ -107,69 +107,9 @@ export async function showSetupScreens(root: Root, permissionMode: PermissionMod
   ) {
     return false;
   }
-  const config = getGlobalConfig();
-  const {
-    StartPage
-  } = await import('./components/StartPage.js');
-  const startAction = await showDialog<'continue' | 'configure-backend'>(root, done =>
-    <AppStateProvider onChangeAppState={onChangeAppState}>
-      <StartPage currentConfig={{
-        provider: config.localBackendProvider,
-        baseUrl: config.localBackendBaseUrl,
-        model: config.localBackendModel,
-        apiKey: config.localBackendApiKey
-      }} onDone={done} />
-    </AppStateProvider>
-  );
-  if (startAction === 'configure-backend') {
-    const {
-      LocalBackendSetup
-    } = await import('./components/LocalBackendSetup.js');
-    const {
-      clearSessionLocalLLMConfigOverride,
-      setSessionLocalLLMConfigOverride
-    } = await import('./utils/model/providers.js');
-    await showDialog(root, done =>
-      <AppStateProvider onChangeAppState={onChangeAppState}>
-        <LocalBackendSetup initialConfig={{
-          provider: config.localBackendProvider,
-          baseUrl: config.localBackendBaseUrl,
-          model: config.localBackendModel,
-          apiKey: config.localBackendApiKey
-        }} onComplete={(nextConfig, options) => {
-          if (options?.saveGlobally === false) {
-            setSessionLocalLLMConfigOverride(nextConfig);
-          } else {
-            clearSessionLocalLLMConfigOverride();
-            saveGlobalConfig(current => ({
-              ...current,
-              localBackendProvider: nextConfig.provider,
-              localBackendBaseUrl: nextConfig.baseUrl,
-              localBackendModel: nextConfig.model,
-              localBackendApiKey: nextConfig.apiKey
-            }));
-          }
-          void done();
-        }} onCancel={() => {
-          void done();
-        }} title="Connect your model backend" description="Choose the OpenAI-compatible endpoint localclawd should talk to. You can save it globally for every run or use it only for this launch." showSaveGloballyOption={true} />
-      </AppStateProvider>
-    );
-  }
-  let onboardingShown = false;
-  if (!config.theme || !config.hasCompletedOnboarding // always show onboarding at least once
-  ) {
-    onboardingShown = true;
-    const {
-      Onboarding
-    } = await import('./components/Onboarding.js');
-    await showSetupDialog(root, done => <Onboarding showWelcome={false} onDone={() => {
-      completeOnboarding();
-      void done();
-    }} />, {
-      onChangeAppState
-    });
-  }
+  // Skip startup screens — go straight to dashboard using saved settings.
+  // Use /setup to configure the backend at any time.
+  const onboardingShown = false;
 
   // Always show the trust dialog in interactive sessions, regardless of permission mode.
   // The trust dialog is the workspace trust boundary — it warns about untrusted repos

@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { homedir } from 'os'
 import { Box, Text, useInput } from '../../ink.js'
 import { setSessionTrustAccepted } from '../../bootstrap/state.js'
 import type { Command } from '../../commands.js'
-import { checkHasTrustDialogAccepted, saveCurrentProjectConfig } from '../../utils/config.js'
+import { saveCurrentProjectConfig } from '../../utils/config.js'
 import { getCwd } from '../../utils/cwd.js'
 import { getFsImplementation } from '../../utils/fsOperations.js'
 import { gracefulShutdownSync } from '../../utils/gracefulShutdown.js'
-import type { Key } from '../../ink/events/input-event.js'
 import { PermissionDialog } from '../permissions/PermissionDialog.js'
 
 type Props = {
@@ -20,55 +19,35 @@ const OPTIONS = [
   { label: 'No, exit', value: 'exit' as const },
 ]
 
-/** Robust Enter detection — catches \r (standard), \n (VSCode ConPTY ICRNL),
- *  and key.return which covers both plus Kitty/CSI-u codepoint-13 sequences. */
-function isEnter(input: string, key: Key): boolean {
-  return key.return || input === '\r' || input === '\n'
-}
-
 export function TrustDialog({ onDone }: Props): React.ReactNode {
   const [focusIdx, setFocusIdx] = useState(0)
-  // Track acceptance in local state so we never flip to null mid-render,
-  // which was causing the blank screen between trust dialog and REPL.
-  const [accepted, setAccepted] = useState(false)
-
-  // Fast-path: already trusted from a previous run. Call onDone, but keep
-  // something rendered until interactiveHelpers replaces the root render.
-  useEffect(() => {
-    if (checkHasTrustDialogAccepted()) {
-      setSessionTrustAccepted(true)
-      setAccepted(true)
-      onDone()
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // useRef updates synchronously — no React batching issues.
+  // Prevents double-fire if two keypresses arrive in the same event batch.
+  const doneRef = useRef(false)
 
   useInput((input, key) => {
-    if (accepted) return
+    if (doneRef.current) return
 
     if (key.upArrow) {
       setFocusIdx(i => (i - 1 + OPTIONS.length) % OPTIONS.length)
     } else if (key.downArrow) {
       setFocusIdx(i => (i + 1) % OPTIONS.length)
-    } else if (isEnter(input, key)) {
+    } else if (key.return) {
+      doneRef.current = true
       const chosen = OPTIONS[focusIdx]
       if (chosen?.value === 'exit') {
         gracefulShutdownSync(1)
       } else {
         try {
-          const isHomeDir = homedir() === getCwd()
-          if (!isHomeDir) {
+          if (homedir() !== getCwd()) {
             try {
-              saveCurrentProjectConfig(current => ({ ...current, hasTrustDialogAccepted: true }))
+              saveCurrentProjectConfig(c => ({ ...c, hasTrustDialogAccepted: true }))
             } catch {
-              // config write error; trust is accepted for this session anyway
+              // config write error — trust accepted for this session only
             }
           }
           setSessionTrustAccepted(true)
         } finally {
-          // Mark accepted BEFORE calling onDone so that if React re-renders
-          // this component synchronously, we show the transition UI instead
-          // of the interactive menu (which is now stale).
-          setAccepted(true)
           onDone()
         }
       }
@@ -77,20 +56,11 @@ export function TrustDialog({ onDone }: Props): React.ReactNode {
     }
   })
 
+  // Never return null — interactiveHelpers already skips rendering this
+  // component when the folder is trusted, so we're always shown for a reason.
+  // Staying rendered after acceptance prevents the blank-screen flash between
+  // the trust dialog and the first REPL render.
   const cwd = getFsImplementation().cwd()
-
-  // When accepted, render a non-interactive transition state.
-  // This stays visible until interactiveHelpers calls root.render() with
-  // the next screen — preventing the blank flash.
-  if (accepted) {
-    return (
-      <PermissionDialog color="warning" titleColor="warning" title="Accessing workspace:">
-        <Box paddingTop={1}>
-          <Text dimColor>Trusted. Loading…</Text>
-        </Box>
-      </PermissionDialog>
-    )
-  }
 
   return (
     <PermissionDialog color="warning" titleColor="warning" title="Accessing workspace:">

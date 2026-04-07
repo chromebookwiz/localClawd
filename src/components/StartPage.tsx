@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { Box, Text, useInput } from '../ink.js'
-import type { Key } from '../ink/events/input-event.js'
 import { gracefulShutdownSync } from '../utils/gracefulShutdown.js'
 import type { LocalLLMConfig } from '../utils/model/providers.js'
 import { getLocalLLMProviderLabel } from '../utils/model/providers.js'
@@ -30,27 +29,17 @@ const SETUP_OPTIONS: Array<{ label: string; value: StartPageAction }> = [
   { label: 'Skip for now', value: 'continue' },
 ]
 
-/** Robust Enter detection — catches \r (standard), \n (VSCode ConPTY ICRNL),
- *  and key.return which covers Kitty/CSI-u codepoint-13 sequences too. */
-function isEnter(input: string, key: Key): boolean {
-  return key.return || input === '\r' || input === '\n'
-}
-
 export function StartPage({ currentConfig, onDone }: Props): React.ReactNode {
   const hasSavedConfig = hasSavedBackendConfig(currentConfig)
   const options = hasSavedConfig ? CONTINUE_OPTIONS : SETUP_OPTIONS
   const [focusIdx, setFocusIdx] = useState(0)
-  const [submitted, setSubmitted] = useState(false)
 
   useInput((input, key) => {
-    if (submitted) return
-
     if (key.upArrow) {
       setFocusIdx(i => (i - 1 + options.length) % options.length)
     } else if (key.downArrow) {
       setFocusIdx(i => (i + 1) % options.length)
-    } else if (isEnter(input, key)) {
-      setSubmitted(true)
+    } else if (key.return) {
       onDone(options[focusIdx]!.value)
     } else if (key.escape || (key.ctrl && input === 'c')) {
       gracefulShutdownSync(0)

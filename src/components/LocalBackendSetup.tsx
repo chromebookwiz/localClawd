@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Text, useInput } from '../ink.js'
-import type { Key } from '../ink/events/input-event.js'
 import {
   getDefaultLocalLLMConfig,
   getLocalLLMProviderLabel,
@@ -38,12 +37,6 @@ type SetupStep =
 
 type MenuItem<T> = { label: string; value: T }
 
-/** Robust Enter detection — catches \r (standard), \n (VSCode ConPTY ICRNL),
- *  and key.return which covers Kitty/CSI-u codepoint-13 sequences too. */
-function isEnter(input: string, key: Key): boolean {
-  return key.return || input === '\r' || input === '\n'
-}
-
 // ─── Simple hand-rolled scrollable menu ──────────────────────────────────────
 // Uses plain useInput — no keybinding system, no ChordInterceptor, no Select.
 // isActive controls whether this menu responds to keypresses.
@@ -59,12 +52,12 @@ function SimpleMenu<T>({ items, isActive, onSelect, onCancel }: SimpleMenuProps<
   const VISIBLE = Math.min(7, items.length)
   const [focusIdx, setFocusIdx] = useState(0)
   const [fromIdx, setFromIdx] = useState(0)
-  // Guard: prevent double-fire when Enter arrives before React re-renders
-  // with the new step (which would flip isActive to false).
-  const [submitted, setSubmitted] = useState(false)
+  // useRef updates synchronously within a single event batch —
+  // prevents double-fire when two keypresses arrive before React re-renders.
+  const doneRef = useRef(false)
 
   useInput((input, key) => {
-    if (!isActive || submitted) return
+    if (!isActive || doneRef.current) return
 
     if (key.upArrow) {
       setFocusIdx(prev => {
@@ -78,10 +71,10 @@ function SimpleMenu<T>({ items, isActive, onSelect, onCancel }: SimpleMenuProps<
         if (next >= fromIdx + VISIBLE) setFromIdx(next - VISIBLE + 1)
         return next
       })
-    } else if (isEnter(input, key)) {
+    } else if (key.return) {
       const item = items[focusIdx]
       if (item) {
-        setSubmitted(true)
+        doneRef.current = true
         onSelect(item.value)
       }
     } else if (key.escape || (key.ctrl && input === 'c')) {
@@ -175,7 +168,6 @@ export function LocalBackendSetup({
   const networkAbortRef = useRef<AbortController | null>(null)
   const modelScanAbortRef = useRef<AbortController | null>(null)
   const discoveredSnapshotRef = useRef<DiscoveredEndpoint[]>([])
-  // Guard against double-fire in scan step handlers (same race as SimpleMenu)
   const scanStepDoneRef = useRef(false)
 
   useEffect(() => {
@@ -185,7 +177,7 @@ export function LocalBackendSetup({
     }
   }, [])
 
-  // Reset scan step guard whenever the step changes
+  // Reset scan guard each time we enter a new step.
   useEffect(() => {
     scanStepDoneRef.current = false
   }, [step])
@@ -197,10 +189,10 @@ export function LocalBackendSetup({
 
   // Handle Esc/Enter during async scanning steps.
   useInput(
-    (input, key) => {
+    (_input, key) => {
       if (scanStepDoneRef.current) return
       if (step === 'networkScan') {
-        if (key.escape || isEnter(input, key)) {
+        if (key.escape || key.return) {
           scanStepDoneRef.current = true
           networkAbortRef.current?.abort()
           setDiscoveredEndpoints(discoveredSnapshotRef.current)
@@ -211,7 +203,7 @@ export function LocalBackendSetup({
           scanStepDoneRef.current = true
           modelScanAbortRef.current?.abort()
           goBack()
-        } else if (isEnter(input, key)) {
+        } else if (key.return) {
           scanStepDoneRef.current = true
           modelScanAbortRef.current?.abort()
           setScanError('Model scan skipped. Enter the model name manually.')
