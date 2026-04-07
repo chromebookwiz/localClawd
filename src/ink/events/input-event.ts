@@ -36,7 +36,10 @@ function parseKey(keypress: ParsedKey): [Key, string] {
     wheelDown: keypress.name === 'wheeldown',
     home: keypress.name === 'home',
     end: keypress.name === 'end',
-    return: keypress.name === 'return',
+    // 'return' = \r (standard terminals), 'enter' = \n (VSCode ConPTY on Windows
+    // translates CR→LF even in raw mode due to ICRNL not being fully disabled).
+    // Both represent the Enter key from the user's perspective.
+    return: keypress.name === 'return' || keypress.name === 'enter',
     escape: keypress.name === 'escape',
     fn: keypress.fn,
     ctrl: keypress.ctrl,

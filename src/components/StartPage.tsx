@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { Box, Text } from '../ink.js'
+import React, { useState } from 'react'
+import { Box, Text, useInput } from '../ink.js'
 import type { LocalLLMConfig } from '../utils/model/providers.js'
 import { getLocalLLMProviderLabel } from '../utils/model/providers.js'
 import { WelcomeV2 } from './LogoV2/WelcomeV2.js'
@@ -31,47 +31,17 @@ const SETUP_OPTIONS: Array<{ label: string; value: StartPageAction }> = [
 export function StartPage({ currentConfig, onDone }: Props): React.ReactNode {
   const hasSavedConfig = hasSavedBackendConfig(currentConfig)
   const options = hasSavedConfig ? CONTINUE_OPTIONS : SETUP_OPTIONS
-
   const [focusIdx, setFocusIdx] = useState(0)
 
-  // Use a ref so the stdin handler always reads the latest focusIdx without
-  // needing to be re-registered on every state change.
-  const stateRef = useRef({ focusIdx: 0, done: false, options })
-  stateRef.current.options = options
-
-  useEffect(() => {
-    // Ensure stdin is flowing so 'data' events fire.
-    if (!process.stdin.readableFlowing) {
-      process.stdin.resume()
+  useInput((_input, key) => {
+    if (key.upArrow) {
+      setFocusIdx(i => (i - 1 + options.length) % options.length)
+    } else if (key.downArrow) {
+      setFocusIdx(i => (i + 1) % options.length)
+    } else if (key.return) {
+      onDone(options[focusIdx]!.value)
     }
-
-    const onData = (chunk: Buffer | string) => {
-      const str = typeof chunk === 'string' ? chunk : chunk.toString('utf8')
-
-      if (str === '\x1b[A' || str === '\x1bOA') {
-        // Up arrow
-        const next = (stateRef.current.focusIdx - 1 + stateRef.current.options.length) % stateRef.current.options.length
-        stateRef.current.focusIdx = next
-        setFocusIdx(next)
-      } else if (str === '\x1b[B' || str === '\x1bOB') {
-        // Down arrow
-        const next = (stateRef.current.focusIdx + 1) % stateRef.current.options.length
-        stateRef.current.focusIdx = next
-        setFocusIdx(next)
-      } else if (str === '\r' || str === '\n' || str === '\r\n') {
-        // Enter — guard against double-fire
-        if (stateRef.current.done) return
-        stateRef.current.done = true
-        const chosen = stateRef.current.options[stateRef.current.focusIdx]
-        if (chosen) onDone(chosen.value)
-      }
-    }
-
-    process.stdin.on('data', onData)
-    return () => {
-      process.stdin.off('data', onData)
-    }
-  }, [onDone])
+  })
 
   return (
     <Box flexDirection="column" gap={1}>

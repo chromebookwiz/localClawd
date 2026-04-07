@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState } from 'react'
 import { homedir } from 'os'
-import { Box, Text } from '../../ink.js'
+import { Box, Text, useInput } from '../../ink.js'
 import { setSessionTrustAccepted } from '../../bootstrap/state.js'
 import type { Command } from '../../commands.js'
 import { checkHasTrustDialogAccepted, saveCurrentProjectConfig } from '../../utils/config.js'
@@ -19,88 +19,52 @@ const OPTIONS = [
   { label: 'No, exit', value: 'exit' as const },
 ]
 
-function acceptTrust(onDone: () => void): void {
-  try {
-    const isHomeDir = homedir() === getCwd()
-    if (isHomeDir) {
-      setSessionTrustAccepted(true)
-    } else {
-      try {
-        saveCurrentProjectConfig(current => ({ ...current, hasTrustDialogAccepted: true }))
-      } catch {
-        // config write error; trust is accepted for this session anyway
-      }
-      setSessionTrustAccepted(true)
-    }
-  } finally {
-    onDone()
-  }
-}
-
 export function TrustDialog({ onDone }: Props): React.ReactNode {
   const hasTrustDialogAccepted = checkHasTrustDialogAccepted()
   const [focusIdx, setFocusIdx] = useState(0)
 
-  // Mutable ref so the stdin handler always sees the latest state without
-  // needing to re-register on every render.
-  const stateRef = useRef({ focusIdx: 0, done: false })
-
-  // Fast-path: already trusted — resolve immediately without rendering.
-  useEffect(() => {
-    if (hasTrustDialogAccepted) {
-      setSessionTrustAccepted(true)
-      onDone()
-    }
-  }, [])
-
-  useEffect(() => {
+  // When already trusted, resolve immediately.
+  // We render null but still run the useInput below so setRawMode(true) is
+  // called — Ink requires at least one active useInput for stdin to be in raw
+  // mode during setup dialogs (no KeybindingSetup in the tree).
+  useInput((_input, key) => {
     if (hasTrustDialogAccepted) return
 
-    // Ensure stdin is flowing so 'data' events fire in all terminal environments
-    // (VSCode integrated terminal, embedded views, piped stdin, etc.)
-    if (!process.stdin.readableFlowing) {
-      process.stdin.resume()
-    }
-
-    const onData = (chunk: Buffer | string) => {
-      const str = typeof chunk === 'string' ? chunk : chunk.toString('utf8')
-
-      if (str === '\x1b[A' || str === '\x1bOA') {
-        // Up arrow
-        const next = (stateRef.current.focusIdx - 1 + OPTIONS.length) % OPTIONS.length
-        stateRef.current.focusIdx = next
-        setFocusIdx(next)
-      } else if (str === '\x1b[B' || str === '\x1bOB') {
-        // Down arrow
-        const next = (stateRef.current.focusIdx + 1) % OPTIONS.length
-        stateRef.current.focusIdx = next
-        setFocusIdx(next)
-      } else if (str === '\r' || str === '\n' || str === '\r\n') {
-        // Enter — guard against double-fire
-        if (stateRef.current.done) return
-        stateRef.current.done = true
-        const chosen = OPTIONS[stateRef.current.focusIdx]
-        if (chosen?.value === 'exit') {
-          gracefulShutdownSync(1)
-        } else {
-          acceptTrust(onDone)
-        }
-      } else if (str === '\x1b' || str === '\x1b\x1b') {
-        // Escape — exit
-        gracefulShutdownSync(0)
-      } else if (str === '\x03') {
-        // Ctrl+C — exit
+    if (key.upArrow) {
+      setFocusIdx(i => (i - 1 + OPTIONS.length) % OPTIONS.length)
+    } else if (key.downArrow) {
+      setFocusIdx(i => (i + 1) % OPTIONS.length)
+    } else if (key.return) {
+      const chosen = OPTIONS[focusIdx]
+      if (chosen?.value === 'exit') {
         gracefulShutdownSync(1)
+      } else {
+        try {
+          const isHomeDir = homedir() === getCwd()
+          if (isHomeDir) {
+            setSessionTrustAccepted(true)
+          } else {
+            try {
+              saveCurrentProjectConfig(current => ({ ...current, hasTrustDialogAccepted: true }))
+            } catch {
+              // config write error; trust is accepted for this session anyway
+            }
+            setSessionTrustAccepted(true)
+          }
+        } finally {
+          onDone()
+        }
       }
+    } else if (key.escape) {
+      gracefulShutdownSync(0)
     }
+  })
 
-    process.stdin.on('data', onData)
-    return () => {
-      process.stdin.off('data', onData)
-    }
-  }, [hasTrustDialogAccepted, onDone])
-
-  if (hasTrustDialogAccepted) return null
+  if (hasTrustDialogAccepted) {
+    // Already trusted — schedule resolution and render nothing.
+    setTimeout(onDone, 0)
+    return null
+  }
 
   const cwd = getFsImplementation().cwd()
 
