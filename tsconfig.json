@@ -12,6 +12,7 @@
     "skipLibCheck": true,
     "strict": false,
     "noEmit": true,
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
       "src/*": ["./src/*"]

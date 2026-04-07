@@ -221,10 +221,10 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     const fullChain = parseCommandChain(`/thinkharder ${args ?? ''}`)
     if (fullChain && fullChain.length > 1) {
       const validation = validateCommandChain(fullChain)
-      if (!validation.ok) {
-        const handleReady = () => onDone(chainWarning(validation.reason))
+      if (validation.ok === false) {
+        const msg = chainWarning(validation.reason)
         return (
-          <ThinkHarderBanner onReady={handleReady} />
+          <ThinkHarderBanner onReady={() => onDone(msg)} />
         )
       }
     }

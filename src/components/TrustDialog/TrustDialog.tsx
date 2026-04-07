@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { homedir } from 'os'
 import { Box, Text, useInput } from '../../ink.js'
 import { setSessionTrustAccepted } from '../../bootstrap/state.js'
@@ -23,11 +23,15 @@ export function TrustDialog({ onDone }: Props): React.ReactNode {
   const hasTrustDialogAccepted = checkHasTrustDialogAccepted()
   const [focusIdx, setFocusIdx] = useState(0)
 
-  // When already trusted, resolve immediately.
-  // We render null but still run the useInput below so setRawMode(true) is
-  // called — Ink requires at least one active useInput for stdin to be in raw
-  // mode during setup dialogs (no KeybindingSetup in the tree).
-  useInput((_input, key) => {
+  // When already trusted, resolve on mount.
+  useEffect(() => {
+    if (hasTrustDialogAccepted) {
+      setSessionTrustAccepted(true)
+      onDone()
+    }
+  }, [hasTrustDialogAccepted, onDone])
+
+  useInput((input, key) => {
     if (hasTrustDialogAccepted) return
 
     if (key.upArrow) {
@@ -55,16 +59,12 @@ export function TrustDialog({ onDone }: Props): React.ReactNode {
           onDone()
         }
       }
-    } else if (key.escape) {
+    } else if (key.escape || (key.ctrl && input === 'c')) {
       gracefulShutdownSync(0)
     }
   })
 
-  if (hasTrustDialogAccepted) {
-    // Already trusted — schedule resolution and render nothing.
-    setTimeout(onDone, 0)
-    return null
-  }
+  if (hasTrustDialogAccepted) return null
 
   const cwd = getFsImplementation().cwd()
 

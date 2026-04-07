@@ -24,7 +24,11 @@
       "Bash(kill %1)",
       "Bash(wc:*)",
       "Bash(grep -n \"return\\\\|enter\\\\|\\\\\\\\\\\\\\\\r\\\\|\\\\\\\\\\\\\\\\n\\\\|0x0d\\\\|0x0a\" \"C:\\\\code\\\\vllmClawd\\\\src\\\\ink\\\\parse-keypress.ts\")",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npm version:*)",
+      "Bash(npx tsc:*)",
+      "Bash(sed -n '40,55p' C:/code/vllmclawd/src/commands/ctx/ctx.tsx)",
+      "Bash(sed -n '20,35p' C:/code/vllmclawd/src/commands/sysprompt/sysprompt.tsx)"
     ]
   }
 }

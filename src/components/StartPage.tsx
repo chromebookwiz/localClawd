@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Box, Text, useInput } from '../ink.js'
+import { gracefulShutdownSync } from '../utils/gracefulShutdown.js'
 import type { LocalLLMConfig } from '../utils/model/providers.js'
 import { getLocalLLMProviderLabel } from '../utils/model/providers.js'
 import { WelcomeV2 } from './LogoV2/WelcomeV2.js'
@@ -33,13 +34,15 @@ export function StartPage({ currentConfig, onDone }: Props): React.ReactNode {
   const options = hasSavedConfig ? CONTINUE_OPTIONS : SETUP_OPTIONS
   const [focusIdx, setFocusIdx] = useState(0)
 
-  useInput((_input, key) => {
+  useInput((input, key) => {
     if (key.upArrow) {
       setFocusIdx(i => (i - 1 + options.length) % options.length)
     } else if (key.downArrow) {
       setFocusIdx(i => (i + 1) % options.length)
     } else if (key.return) {
       onDone(options[focusIdx]!.value)
+    } else if (key.escape || (key.ctrl && input === 'c')) {
+      gracefulShutdownSync(0)
     }
   })
 
@@ -97,7 +100,7 @@ export function StartPage({ currentConfig, onDone }: Props): React.ReactNode {
           ))}
         </Box>
 
-        <Text dimColor>↑↓ navigate · Enter confirm</Text>
+        <Text dimColor>↑↓ navigate · Enter confirm · Esc exit</Text>
       </Box>
     </Box>
   )

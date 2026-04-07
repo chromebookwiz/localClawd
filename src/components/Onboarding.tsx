@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import {
   setupTerminal,
   shouldOfferTerminalSetup,
@@ -36,7 +36,7 @@ function SimpleMenu<T>({ items, isActive, onSelect, onCancel }: SimpleMenuProps<
   const [focusIdx, setFocusIdx] = useState(0)
   const [fromIdx, setFromIdx] = useState(0)
 
-  useInput((_input, key) => {
+  useInput((input, key) => {
     if (key.upArrow) {
       setFocusIdx(prev => {
         const next = Math.max(0, prev - 1)
@@ -52,7 +52,7 @@ function SimpleMenu<T>({ items, isActive, onSelect, onCancel }: SimpleMenuProps<
     } else if (key.return) {
       const item = items[focusIdx]
       if (item) onSelect(item.value)
-    } else if (key.escape) {
+    } else if (key.escape || (key.ctrl && input === 'c')) {
       onCancel?.()
     }
   }, { isActive })

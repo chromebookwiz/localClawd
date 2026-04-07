@@ -161,7 +161,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     const fullChain = parseCommandChain(`/research ${rawArgs}`)
     if (fullChain && fullChain.length > 1) {
       const validation = validateCommandChain(fullChain)
-      if (!validation.ok) {
+      if (validation.ok === false) {
         const msg = chainWarning(validation.reason)
         return (
           <ResearchWarning message={msg} onReady={() => onDone(msg)} />

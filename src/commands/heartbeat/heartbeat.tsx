@@ -140,13 +140,14 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     const fullChain = parseCommandChain(`/heartbeat ${rawArgs}`)
     if (fullChain && fullChain.length > 1) {
       const validation = validateCommandChain(fullChain)
-      if (!validation.ok) {
+      if (validation.ok === false) {
+        const msg = chainWarning(validation.reason)
         return (
           <HeartbeatBanner
             beat={0}
             intervalMins={heartbeatInterval}
-            task={chainWarning(validation.reason)}
-            onReady={() => onDone(chainWarning(validation.reason))}
+            task={msg}
+            onReady={() => onDone(msg)}
           />
         )
       }
