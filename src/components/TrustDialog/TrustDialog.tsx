@@ -7,6 +7,7 @@ import { checkHasTrustDialogAccepted, saveCurrentProjectConfig } from '../../uti
 import { getCwd } from '../../utils/cwd.js'
 import { getFsImplementation } from '../../utils/fsOperations.js'
 import { gracefulShutdownSync } from '../../utils/gracefulShutdown.js'
+import type { Key } from '../../ink/events/input-event.js'
 import { PermissionDialog } from '../permissions/PermissionDialog.js'
 
 type Props = {
@@ -19,43 +20,55 @@ const OPTIONS = [
   { label: 'No, exit', value: 'exit' as const },
 ]
 
-export function TrustDialog({ onDone }: Props): React.ReactNode {
-  const hasTrustDialogAccepted = checkHasTrustDialogAccepted()
-  const [focusIdx, setFocusIdx] = useState(0)
+/** Robust Enter detection — catches \r (standard), \n (VSCode ConPTY ICRNL),
+ *  and key.return which covers both plus Kitty/CSI-u codepoint-13 sequences. */
+function isEnter(input: string, key: Key): boolean {
+  return key.return || input === '\r' || input === '\n'
+}
 
-  // When already trusted, resolve on mount.
+export function TrustDialog({ onDone }: Props): React.ReactNode {
+  const [focusIdx, setFocusIdx] = useState(0)
+  // Track acceptance in local state so we never flip to null mid-render,
+  // which was causing the blank screen between trust dialog and REPL.
+  const [accepted, setAccepted] = useState(false)
+
+  // Fast-path: already trusted from a previous run. Call onDone, but keep
+  // something rendered until interactiveHelpers replaces the root render.
   useEffect(() => {
-    if (hasTrustDialogAccepted) {
+    if (checkHasTrustDialogAccepted()) {
       setSessionTrustAccepted(true)
+      setAccepted(true)
       onDone()
     }
-  }, [hasTrustDialogAccepted, onDone])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useInput((input, key) => {
-    if (hasTrustDialogAccepted) return
+    if (accepted) return
 
     if (key.upArrow) {
       setFocusIdx(i => (i - 1 + OPTIONS.length) % OPTIONS.length)
     } else if (key.downArrow) {
       setFocusIdx(i => (i + 1) % OPTIONS.length)
-    } else if (key.return) {
+    } else if (isEnter(input, key)) {
       const chosen = OPTIONS[focusIdx]
       if (chosen?.value === 'exit') {
         gracefulShutdownSync(1)
       } else {
         try {
           const isHomeDir = homedir() === getCwd()
-          if (isHomeDir) {
-            setSessionTrustAccepted(true)
-          } else {
+          if (!isHomeDir) {
             try {
               saveCurrentProjectConfig(current => ({ ...current, hasTrustDialogAccepted: true }))
             } catch {
               // config write error; trust is accepted for this session anyway
             }
-            setSessionTrustAccepted(true)
           }
+          setSessionTrustAccepted(true)
         } finally {
+          // Mark accepted BEFORE calling onDone so that if React re-renders
+          // this component synchronously, we show the transition UI instead
+          // of the interactive menu (which is now stale).
+          setAccepted(true)
           onDone()
         }
       }
@@ -64,9 +77,20 @@ export function TrustDialog({ onDone }: Props): React.ReactNode {
     }
   })
 
-  if (hasTrustDialogAccepted) return null
-
   const cwd = getFsImplementation().cwd()
+
+  // When accepted, render a non-interactive transition state.
+  // This stays visible until interactiveHelpers calls root.render() with
+  // the next screen — preventing the blank flash.
+  if (accepted) {
+    return (
+      <PermissionDialog color="warning" titleColor="warning" title="Accessing workspace:">
+        <Box paddingTop={1}>
+          <Text dimColor>Trusted. Loading…</Text>
+        </Box>
+      </PermissionDialog>
+    )
+  }
 
   return (
     <PermissionDialog color="warning" titleColor="warning" title="Accessing workspace:">

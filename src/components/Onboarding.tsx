@@ -4,6 +4,7 @@ import {
   shouldOfferTerminalSetup,
 } from '../commands/terminalSetup/terminalSetup.js'
 import { Box, Newline, Text, useInput, useTheme } from '../ink.js'
+import type { Key } from '../ink/events/input-event.js'
 import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
 import {
   COMPACT_CONTEXT_WINDOW_CHOICES,
@@ -20,6 +21,12 @@ import { LocalBackendSetup } from './LocalBackendSetup.js'
 import { WelcomeV2 } from './LogoV2/WelcomeV2.js'
 import { OrderedList } from './ui/OrderedList.js'
 
+/** Robust Enter detection — catches \r (standard), \n (VSCode ConPTY ICRNL),
+ *  and key.return which covers Kitty/CSI-u codepoint-13 sequences too. */
+function isEnter(input: string, key: Key): boolean {
+  return key.return || input === '\r' || input === '\n'
+}
+
 // ─── Simple hand-rolled menu (no Select, no KeybindingSetup) ─────────────────
 
 type MenuItem<T> = { label: string; value: T }
@@ -35,8 +42,11 @@ function SimpleMenu<T>({ items, isActive, onSelect, onCancel }: SimpleMenuProps<
   const VISIBLE = Math.min(7, items.length)
   const [focusIdx, setFocusIdx] = useState(0)
   const [fromIdx, setFromIdx] = useState(0)
+  const [submitted, setSubmitted] = useState(false)
 
   useInput((input, key) => {
+    if (!isActive || submitted) return
+
     if (key.upArrow) {
       setFocusIdx(prev => {
         const next = Math.max(0, prev - 1)
@@ -49,13 +59,16 @@ function SimpleMenu<T>({ items, isActive, onSelect, onCancel }: SimpleMenuProps<
         if (next >= fromIdx + VISIBLE) setFromIdx(next - VISIBLE + 1)
         return next
       })
-    } else if (key.return) {
+    } else if (isEnter(input, key)) {
       const item = items[focusIdx]
-      if (item) onSelect(item.value)
+      if (item) {
+        setSubmitted(true)
+        onSelect(item.value)
+      }
     } else if (key.escape || (key.ctrl && input === 'c')) {
       onCancel?.()
     }
-  }, { isActive })
+  })
 
   const visible = items.slice(fromIdx, fromIdx + VISIBLE)
 
@@ -77,14 +90,21 @@ function SimpleMenu<T>({ items, isActive, onSelect, onCancel }: SimpleMenuProps<
   )
 }
 
-// ─── Press-Enter-to-continue with working Enter handler ──────────────────────
+// ─── Press-Enter-to-continue ──────────────────────────────────────────────────
 
 type PressEnterProps = { isActive: boolean; onContinue(): void }
 
 function PressEnterToContinue({ isActive, onContinue }: PressEnterProps): React.ReactNode {
-  useInput((_input, key) => {
-    if (key.return) onContinue()
-  }, { isActive })
+  const [done, setDone] = useState(false)
+
+  useInput((input, key) => {
+    // Guard against double-fire: once onContinue is called, stop listening.
+    if (!isActive || done) return
+    if (isEnter(input, key)) {
+      setDone(true)
+      onContinue()
+    }
+  })
 
   return (
     <Text color="permission">
