@@ -146,24 +146,32 @@ export async function showSetupScreens(root: Root, permissionMode: PermissionMod
     void getSystemContext();
 
     // If settings are valid, check for any mcp.json servers that need approval
-    const {
-      errors: allErrors
-    } = getSettingsWithAllErrors();
-    if (allErrors.length === 0) {
-      await handleMcpjsonServerApprovals(root);
+    try {
+      const {
+        errors: allErrors
+      } = getSettingsWithAllErrors();
+      if (allErrors.length === 0) {
+        await handleMcpjsonServerApprovals(root);
+      }
+    } catch {
+      // Non-fatal: MCP server approval check failed, continue without it
     }
 
     // Check for claude.md includes that need approval
-    if (await shouldShowClaudeMdExternalIncludesWarning()) {
-      const externalIncludes = getExternalClaudeMdIncludes(await getMemoryFiles(true));
-      const {
-        ClaudeMdExternalIncludesDialog
-      } = await import('./components/ClaudeMdExternalIncludesDialog.js');
-      await showDialog(root, done =>
-        <AppStateProvider onChangeAppState={onChangeAppState}>
-          <ClaudeMdExternalIncludesDialog onDone={done} isStandaloneDialog externalIncludes={externalIncludes} />
-        </AppStateProvider>
-      );
+    try {
+      if (await shouldShowClaudeMdExternalIncludesWarning()) {
+        const externalIncludes = getExternalClaudeMdIncludes(await getMemoryFiles(true));
+        const {
+          ClaudeMdExternalIncludesDialog
+        } = await import('./components/ClaudeMdExternalIncludesDialog.js');
+        await showDialog(root, done =>
+          <AppStateProvider onChangeAppState={onChangeAppState}>
+            <ClaudeMdExternalIncludesDialog onDone={done} isStandaloneDialog externalIncludes={externalIncludes} />
+          </AppStateProvider>
+        );
+      }
+    } catch {
+      // Non-fatal: CLAUDE.md includes check failed, continue without it
     }
   }
 
@@ -185,16 +193,20 @@ export async function showSetupScreens(root: Root, permissionMode: PermissionMod
   // Defer to next tick so the OTel dynamic import resolves after first render
   // instead of during the pre-render microtask queue.
   setImmediate(() => initializeTelemetryAfterTrust());
-  if (await isQualifiedForGrove()) {
-    const {
-      GroveDialog
-    } = await import('src/components/grove/Grove.js');
-    const decision = await showSetupDialog<string>(root, done => <GroveDialog showIfAlreadyViewed={false} location={onboardingShown ? 'onboarding' : 'policy_update_modal'} onDone={done} />);
-    if (decision === 'escape') {
-      logEvent('tengu_grove_policy_exited', {});
-      gracefulShutdownSync(0);
-      return false;
+  try {
+    if (await isQualifiedForGrove()) {
+      const {
+        GroveDialog
+      } = await import('src/components/grove/Grove.js');
+      const decision = await showSetupDialog<string>(root, done => <GroveDialog showIfAlreadyViewed={false} location={onboardingShown ? 'onboarding' : 'policy_update_modal'} onDone={done} />);
+      if (decision === 'escape') {
+        logEvent('tengu_grove_policy_exited', {});
+        gracefulShutdownSync(0);
+        return false;
+      }
     }
+  } catch {
+    // Non-fatal: Grove check failed, continue without it
   }
 
   if ((permissionMode === 'bypassPermissions' || allowDangerouslySkipPermissions) && !hasSkipDangerousModePermissionPrompt()) {

@@ -244,6 +244,10 @@ export const PushMetricExporter = noopClass;
 export const SeverityNumber = {};
 `
 
+// Remove stale build artifacts before rebuilding to prevent stale cache issues
+rmSync('./dist/cli.mjs', { force: true })
+rmSync('./dist/cli.mjs.map', { force: true })
+
 const result = await Bun.build({
   entrypoints: ['./src/entrypoints/cli.tsx'],
   outdir: './dist',
