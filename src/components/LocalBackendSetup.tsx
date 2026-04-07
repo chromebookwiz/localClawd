@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Box, Text, useInput } from '../ink.js'
+import { Box, Text } from '../ink.js'
 import {
   getDefaultLocalLLMConfig,
   getLocalLLMProviderLabel,
@@ -53,27 +53,58 @@ function SimpleMenu<T>({ items, isActive, onSelect, onCancel }: SimpleMenuProps<
   const [focusIdx, setFocusIdx] = useState(0)
   const [fromIdx, setFromIdx] = useState(0)
 
-  useInput((_input, key) => {
+  // Use a ref so the stdin handler always reads the latest state without
+  // needing to re-register on every render.
+  const stateRef = useRef({ focusIdx: 0, fromIdx: 0, items, done: false })
+  stateRef.current.items = items
+
+  useEffect(() => {
+    // Only attach the listener when this menu is the active input handler.
     if (!isActive) return
-    if (key.upArrow || (_input === 'k' && !key.ctrl)) {
-      setFocusIdx(prev => {
-        const next = Math.max(0, prev - 1)
-        if (next < fromIdx) setFromIdx(next)
-        return next
-      })
-    } else if (key.downArrow || (_input === 'j' && !key.ctrl)) {
-      setFocusIdx(prev => {
-        const next = Math.min(items.length - 1, prev + 1)
-        if (next >= fromIdx + VISIBLE) setFromIdx(next - VISIBLE + 1)
-        return next
-      })
-    } else if (key.return) {
-      const item = items[focusIdx]
-      if (item) onSelect(item.value)
-    } else if (key.escape) {
-      onCancel?.()
+
+    // Reset done flag when becoming active
+    stateRef.current.done = false
+
+    if (!process.stdin.readableFlowing) {
+      process.stdin.resume()
     }
-  })
+
+    const onData = (chunk: Buffer | string) => {
+      const str = typeof chunk === 'string' ? chunk : chunk.toString('utf8')
+      const s = stateRef.current
+      const visible = Math.min(VISIBLE, s.items.length)
+
+      if (str === '\x1b[A' || str === '\x1bOA' || str === 'k') {
+        // Up arrow or k
+        const next = Math.max(0, s.focusIdx - 1)
+        const nextFrom = next < s.fromIdx ? next : s.fromIdx
+        stateRef.current.focusIdx = next
+        stateRef.current.fromIdx = nextFrom
+        setFocusIdx(next)
+        setFromIdx(nextFrom)
+      } else if (str === '\x1b[B' || str === '\x1bOB' || str === 'j') {
+        // Down arrow or j
+        const next = Math.min(s.items.length - 1, s.focusIdx + 1)
+        const nextFrom = next >= s.fromIdx + visible ? next - visible + 1 : s.fromIdx
+        stateRef.current.focusIdx = next
+        stateRef.current.fromIdx = nextFrom
+        setFocusIdx(next)
+        setFromIdx(nextFrom)
+      } else if (str === '\r' || str === '\n' || str === '\r\n') {
+        if (s.done) return
+        stateRef.current.done = true
+        const item = s.items[s.focusIdx]
+        if (item) onSelect(item.value)
+      } else if (str === '\x1b' || str === '\x1b\x1b') {
+        onCancel?.()
+      }
+    }
+
+    process.stdin.on('data', onData)
+    return () => {
+      process.stdin.off('data', onData)
+    }
+  }, [isActive, onSelect, onCancel])
 
   const visible = items.slice(fromIdx, fromIdx + VISIBLE)
   const showScrollUp = fromIdx > 0
@@ -174,29 +205,47 @@ export function LocalBackendSetup({
     setCursorOffset(nextValue.length)
   }, [step, baseUrl, model, apiKey])
 
-  // Handle Esc/Enter during async scanning steps
-  useInput(
-    (_input, key) => {
-      if (step === 'networkScan') {
-        if (key.escape || key.return) {
+  // Handle Esc/Enter during async scanning steps using direct stdin listener.
+  // Only active during scanning steps so it doesn't conflict with SimpleMenu or TextInput.
+  const scanStepActive = step === 'networkScan' || step === 'scanningModels'
+  const scanStepRef = useRef(step)
+  scanStepRef.current = step
+
+  useEffect(() => {
+    if (!scanStepActive) return
+
+    if (!process.stdin.readableFlowing) {
+      process.stdin.resume()
+    }
+
+    const onData = (chunk: Buffer | string) => {
+      const str = typeof chunk === 'string' ? chunk : chunk.toString('utf8')
+      const current = scanStepRef.current
+
+      if (current === 'networkScan') {
+        if (str === '\x1b' || str === '\x1b\x1b' || str === '\r' || str === '\n' || str === '\r\n') {
           networkAbortRef.current?.abort()
           setDiscoveredEndpoints(discoveredSnapshotRef.current)
           setStep('selectEndpoint')
         }
-      } else if (step === 'scanningModels') {
-        if (key.escape) {
+      } else if (current === 'scanningModels') {
+        if (str === '\x1b' || str === '\x1b\x1b') {
           modelScanAbortRef.current?.abort()
           goBack()
-        } else if (key.return) {
+        } else if (str === '\r' || str === '\n' || str === '\r\n') {
           modelScanAbortRef.current?.abort()
           setScanError('Model scan skipped. Enter the model name manually.')
           setAvailableModels([])
           setStep('model')
         }
       }
-    },
-    { isActive: step === 'networkScan' || step === 'scanningModels' },
-  )
+    }
+
+    process.stdin.on('data', onData)
+    return () => {
+      process.stdin.off('data', onData)
+    }
+  }, [scanStepActive])
 
   function goBack(): void {
     setError(null)
