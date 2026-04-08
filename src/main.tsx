@@ -2248,7 +2248,13 @@ async function run(): Promise<CommanderCommand> {
       } = await import('./ink.js');
       logForDebugging('[STARTUP] Ink root module imported');
       startupLoadingIndicator?.stop();
-      root = await createRoot(ctx.renderOptions);
+      try {
+        root = await createRoot(ctx.renderOptions);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        process.stderr.write(`\nlocalclawd: failed to initialize terminal — ${msg}\nIf using VSCode, open a new terminal with Ctrl+\` and try again.\n`);
+        process.exit(1);
+      }
       logForDebugging('[STARTUP] Ink root created');
 
       // Log startup time now, before any blocking dialog renders. Logging
@@ -2260,7 +2266,14 @@ async function run(): Promise<CommanderCommand> {
         durationMs: Math.round(process.uptime() * 1000)
       });
       const setupScreensStart = Date.now();
-      const onboardingShown = await showSetupScreens(root, permissionMode, allowDangerouslySkipPermissions, commands, enableClaudeInChrome, devChannels);
+      let onboardingShown: boolean;
+      try {
+        onboardingShown = await showSetupScreens(root, permissionMode, allowDangerouslySkipPermissions, commands, enableClaudeInChrome, devChannels);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        process.stderr.write(`\nlocalclawd: startup error — ${msg}\nRun with --debug for more details.\n`);
+        process.exit(1);
+      }
 
       // Now that trust is established and GrowthBook has auth headers,
       // resolve the --remote-control / --rc entitlement gate.
@@ -4119,10 +4132,10 @@ async function run(): Promise<CommanderCommand> {
     });
   }
 
-  // claude auth
+  // claude auth (hidden — localclawd uses API keys / local backends, not account login)
 
-  const auth = program.command('auth').description('Manage authentication').configureHelp(createSortedHelpConfig());
-  auth.command('login').description('Sign in to your Anthropic account').option('--email <email>', 'Pre-populate email address on the login page').option('--sso', 'Force SSO login flow').option('--console', 'Use Anthropic Console (API usage billing) instead of Claude subscription').option('--claudeai', 'Use Claude subscription (default)').action(async ({
+  const auth = program.command('auth').description('Manage API authentication').hideHelp().configureHelp(createSortedHelpConfig());
+  auth.command('login').description('Sign in (API key users)').hideHelp().option('--email <email>', 'Pre-populate email address on the login page').option('--sso', 'Force SSO login flow').option('--console', 'Use Console (API usage billing)').option('--claudeai', 'Use subscription (default)').action(async ({
     email,
     sso,
     console: useConsole,
@@ -4152,7 +4165,7 @@ async function run(): Promise<CommanderCommand> {
     } = await import('./cli/handlers/auth.js');
     await authStatus(opts);
   });
-  auth.command('logout').description('Log out from your Anthropic account').action(async () => {
+  auth.command('logout').description('Sign out').action(async () => {
     const {
       authLogout
     } = await import('./cli/handlers/auth.js');

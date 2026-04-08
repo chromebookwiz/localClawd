@@ -29,7 +29,8 @@
       "Bash(npx tsc:*)",
       "Bash(sed -n '40,55p' C:/code/vllmclawd/src/commands/ctx/ctx.tsx)",
       "Bash(sed -n '20,35p' C:/code/vllmclawd/src/commands/sysprompt/sysprompt.tsx)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(ls /c/code/vllmclawd/src/components/*.tsx)"
     ]
   }
 }

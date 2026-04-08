@@ -133,9 +133,9 @@ The bootstrap scripts expect release assets to follow the native installer platf
 
 ### Backend setup after install
 
-localclawd accepts native environment variable names. Legacy `CLAUDE_CODE_*` names are still accepted as compatibility aliases, but new setups should prefer `LOCALCLAWD_*`.
+localclawd requires no account or login. Run `localclawd` and use `/setup` to configure your local backend, or set environment variables before launching.
 
-Most users should configure the backend during first-run onboarding or later in `/config`. Environment variables still work when you want non-interactive setup, shell-specific overrides, or CI automation.
+localclawd accepts native environment variable names. Legacy `CLAUDE_CODE_*` names are still accepted as compatibility aliases, but new setups should prefer `LOCALCLAWD_*`.
 
 For vLLM:
 
@@ -165,17 +165,26 @@ Then run:
 localclawd
 ```
 
+## No account required
+
+localclawd does not require any account, login, or subscription. Connect it to a local model (vLLM, Ollama) or any OpenAI-compatible endpoint and start coding immediately. Use `/setup` at any time to configure or change your backend.
+
+If you want to use the Anthropic API directly, set `ANTHROPIC_API_KEY` in your environment — no login flow needed.
+
 ## Release status
 
-`v1.0.5` is live on npm. Install globally with `npm install -g localclawd` or run without installing with `npx localclawd`. Native multi-platform binaries can be added later without changing the install surface.
+`v1.1.15` is live on npm. Install globally with `npm install -g localclawd` or run without installing with `npx localclawd`.
 
 **Changelog**
-- `1.0.5` — Geometric algebra lattice (Cl(n,0) multivectors, FCA concept lattice, rotor temporal decay, IDF attention); /keepgoing upgraded to ultimate persistent mode with subagent support, 7 stop-signal patterns, unlimited rounds, round counter; /thinkharder enforces 4-phase DRAFT→CRITIQUE→REFINE→VERIFY pipeline per change.
-- `1.0.4` — Fix `util is not defined` crash permanently by externalizing zod from the Bun bundle; add `/buddy`, `/thinkharder`, `/thinknormal` commands; fix `/keepgoing` autonomous loop; indigo/violet color scheme finalized.
-- `1.0.3` — Fix `util3 is not defined` crash from zod v4 bundled inside `@modelcontextprotocol/sdk`; pin all deps to current versions; zod v3 forced globally via overrides+resolutions.
-- `1.0.2` — Fix zod v4 bundler crash (`_uppercase2 is not defined`); pin zod to `^3`; version string now reflects package.json correctly.
-- `1.0.1` — Fix npm bin entry; add `/keepgoing` command; lattice memory scoring; branding cleanup.
-- `1.0.0` — Initial source-first release.
+- `1.1.15` — Full branding cleanup (no Anthropic/Claude references in UI); global crash handler shows errors instead of silent exit; auth commands hidden (use env vars or /setup); all startup errors surfaced with actionable messages.
+- `1.1.14` — Error handling for all startup awaits; clean build artifacts before rebuild to prevent stale cache issues.
+- `1.1.13` — Go straight to dashboard on launch; /setup for configuration; fix all stuck menus; useRef guards everywhere.
+- `1.1.12` — Fix onboarding blank screen; no stuck menus; VSCode Enter handling.
+- `1.1.11` — Ctrl+C everywhere; clean command list; lint fixes.
+- `1.1.10` — Fix Enter key on VSCode/ConPTY.
+- `1.0.5` — Geometric algebra lattice; /keepgoing upgraded with subagent support; /thinkharder 4-phase pipeline.
+- `1.0.4` — Fix `util is not defined` crash; add `/buddy`, `/thinkharder`, `/thinknormal`; fix `/keepgoing`.
+- `1.0.0` — Initial release.
 
 External native update metadata is now expected under `release-manifests/`, the main verification workflow lives in `.github/workflows/ci.yml`, and the native asset publication workflow lives in `.github/workflows/publish-release-assets.yml`. See `docs/release.md` for the expected asset set and publish sequence.
 
