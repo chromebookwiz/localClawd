@@ -4134,8 +4134,8 @@ async function run(): Promise<CommanderCommand> {
 
   // claude auth (hidden — localclawd uses API keys / local backends, not account login)
 
-  const auth = program.command('auth').description('Manage API authentication').hideHelp().configureHelp(createSortedHelpConfig());
-  auth.command('login').description('Sign in (API key users)').hideHelp().option('--email <email>', 'Pre-populate email address on the login page').option('--sso', 'Force SSO login flow').option('--console', 'Use Console (API usage billing)').option('--claudeai', 'Use subscription (default)').action(async ({
+  const auth = program.command('auth', { hidden: true }).description('Manage API authentication').configureHelp(createSortedHelpConfig());
+  auth.command('login', { hidden: true }).description('Sign in (API key users)').option('--email <email>', 'Pre-populate email address on the login page').option('--sso', 'Force SSO login flow').option('--console', 'Use Console (API usage billing)').option('--claudeai', 'Use subscription (default)').action(async ({
     email,
     sso,
     console: useConsole,
