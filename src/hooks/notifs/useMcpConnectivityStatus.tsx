@@ -40,13 +40,7 @@ export function useMcpConnectivityStatus(t0) {
           priority: "medium"
         });
       }
-      if (failedClaudeAiClients.length > 0) {
-        addNotification({
-          key: "mcp-claudeai-failed",
-          jsx: <><Text color="error">{failedClaudeAiClients.length} claude.ai{" "}{failedClaudeAiClients.length === 1 ? "connector" : "connectors"}{" "}unavailable</Text><Text dimColor={true}> · /mcp</Text></>,
-          priority: "medium"
-        });
-      }
+      // claude.ai connectors are cloud-only — not shown in localclawd
       if (needsAuthLocalServers.length > 0) {
         addNotification({
           key: "mcp-needs-auth",
@@ -54,13 +48,7 @@ export function useMcpConnectivityStatus(t0) {
           priority: "medium"
         });
       }
-      if (needsAuthClaudeAiServers.length > 0) {
-        addNotification({
-          key: "mcp-claudeai-needs-auth",
-          jsx: <><Text color="warning">{needsAuthClaudeAiServers.length} claude.ai{" "}{needsAuthClaudeAiServers.length === 1 ? "connector needs" : "connectors need"}{" "}auth</Text><Text dimColor={true}> · /mcp</Text></>,
-          priority: "medium"
-        });
-      }
+      // claude.ai connector auth is cloud-only — not shown in localclawd
     };
     t3 = [addNotification, mcpClients];
     $[0] = addNotification;

@@ -19,6 +19,9 @@ export function useCanSwitchToExistingSubscription() {
  * localclawd keeps the notice informational because this fork is local-first.
  */
 async function _temp2() {
+  // Subscription switching is a cloud-only feature — disabled in localclawd
+  return null;
+  // eslint-disable-next-line no-unreachable
   if ((getGlobalConfig().subscriptionNoticeCount ?? 0) >= MAX_SHOW_COUNT) {
     return null;
   }

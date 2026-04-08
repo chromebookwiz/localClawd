@@ -173,9 +173,10 @@ If you want to use the Anthropic API directly, set `ANTHROPIC_API_KEY` in your e
 
 ## Release status
 
-`v1.1.15` is live on npm. Install globally with `npm install -g localclawd` or run without installing with `npx localclawd`.
+`v1.1.16` is live on npm. Install globally with `npm install -g localclawd` or run without installing with `npx localclawd`.
 
 **Changelog**
+- `1.1.16` — Complete branding purge (no Claude/Anthropic references anywhere in UI or prompts); Grove data-sharing and subscription features fully disabled; MCP client identity updated to localclawd; all cloud-only error messages reworded to be backend-agnostic.
 - `1.1.15` — Full branding cleanup (no Anthropic/Claude references in UI); global crash handler shows errors instead of silent exit; auth commands hidden (use env vars or /setup); all startup errors surfaced with actionable messages.
 - `1.1.14` — Error handling for all startup awaits; clean build artifacts before rebuild to prevent stale cache issues.
 - `1.1.13` — Go straight to dashboard on launch; /setup for configuration; fix all stuck menus; useRef guards everywhere.

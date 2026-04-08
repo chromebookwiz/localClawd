@@ -353,7 +353,7 @@ export function registerScheduleRemoteAgentsSkill(): void {
         return [
           {
             type: 'text',
-            text: "We're having trouble connecting with your remote claude.ai account to set up a scheduled task. Please try /schedule again in a few minutes.",
+            text: "We're having trouble connecting with the remote backend to set up a scheduled task. Please try /schedule again in a few minutes.",
           },
         ]
       }
@@ -372,7 +372,7 @@ export function registerScheduleRemoteAgentsSkill(): void {
           return [
             {
               type: 'text',
-              text: 'No remote environments found, and we could not create one automatically. Visit https://claude.ai/code to set one up, then run /schedule again.',
+              text: 'No remote environments found, and we could not create one automatically. Please configure a remote environment and run /schedule again.',
             },
           ]
         }

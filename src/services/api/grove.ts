@@ -155,6 +155,9 @@ export async function updateGroveSettings(
  * false and the Grove dialog won't show until the next session.
  */
 export async function isQualifiedForGrove(): Promise<boolean> {
+  // Grove is a hosted Anthropic data-sharing feature — disabled in localclawd
+  return false
+  // eslint-disable-next-line no-unreachable
   if (!isConsumerSubscriber()) {
     return false
   }
