@@ -1,4 +1,4 @@
-***BROKEN ATM, I NEED MORE TOKENS!***
+***BROKEN AT THE MOMENT, I NEED MORE TOKENS!***
 
 # localclawd
 
