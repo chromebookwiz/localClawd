@@ -98,6 +98,7 @@ import { VALID_INSTALLABLE_SCOPES, VALID_UPDATE_SCOPES } from './services/plugin
 import { initBundledSkills } from './skills/bundled/index.js';
 import type { AgentColorName } from './tools/AgentTool/agentColorManager.js';
 import { getActiveAgentsFromList, getAgentDefinitionsWithOverrides, isBuiltInAgent, isCustomAgent, parseAgentsFromJson } from './tools/AgentTool/loadAgentsDir.js';
+import type { AgentDefinition, AgentDefinitionsResult } from './tools/AgentTool/loadAgentsDir.js';
 import type { LogOption } from './types/logs.js';
 import type { Message as MessageType } from './types/message.js';
 import { assertMinVersion } from './utils/autoUpdater.js';
@@ -2026,16 +2027,28 @@ async function run(): Promise<CommanderCommand> {
     // Declare outside try so they remain in scope after the finally block
     let commands: Awaited<ReturnType<typeof getCommands>>
     let agentDefinitionsResult: Awaited<ReturnType<typeof getAgentDefinitionsWithOverrides>>
+    let userSpecifiedModel: string | undefined
+    let userSpecifiedFallbackModel: string | undefined
+    let currentCwd!: string
+    let agentDefinitions!: AgentDefinitionsResult
+    let mainThreadAgentDefinition: AgentDefinition | undefined
+    let effectiveModel: string | undefined
+    let initialMainLoopModel!: ReturnType<typeof getInitialMainLoopModel>
+    let resolvedInitialModel!: string
+    let advisorModel: string | undefined
+    let root!: Root
+    let getFpsMetrics!: () => FpsMetrics | undefined
+    let stats!: StatsStore
 
     try {
       // Special case the default model with the null keyword
       // NOTE: Model resolution happens after setup() to ensure trust is established before AWS auth
-      const userSpecifiedModel = options.model === 'default' ? getDefaultMainLoopModel() : options.model;
-      const userSpecifiedFallbackModel = fallbackModel === 'default' ? getDefaultMainLoopModel() : fallbackModel;
+      userSpecifiedModel = options.model === 'default' ? getDefaultMainLoopModel() : options.model;
+      userSpecifiedFallbackModel = fallbackModel === 'default' ? getDefaultMainLoopModel() : fallbackModel;
 
       // Reuse preSetupCwd unless setup() chdir'd (worktreeEnabled). Saves a
       // getCwd() syscall in the common path.
-      const currentCwd = worktreeEnabled ? getCwd() : preSetupCwd;
+      currentCwd = worktreeEnabled ? getCwd() : preSetupCwd;
       logForDebugging(`[STARTUP] Await join using currentCwd=${currentCwd}`);
       startupLoadingIndicator?.update('Loading commands and agents');
       const commandsStart = Date.now();
@@ -2061,7 +2074,7 @@ async function run(): Promise<CommanderCommand> {
 
       // Merge CLI agents with existing ones
       const allAgents = [...agentDefinitionsResult.allAgents, ...cliAgents];
-      const agentDefinitions = {
+      agentDefinitions = {
         ...agentDefinitionsResult,
         allAgents,
         activeAgents: getActiveAgentsFromList(allAgents)
@@ -2070,7 +2083,6 @@ async function run(): Promise<CommanderCommand> {
 
       // Look up main thread agent from CLI flag or settings
       const agentSetting = agentCli ?? getInitialSettings().agent;
-      let mainThreadAgentDefinition: (typeof agentDefinitions.activeAgents)[number] | undefined;
       if (agentSetting) {
         mainThreadAgentDefinition = agentDefinitions.activeAgents.find(agent => agent.agentType === agentSetting);
         if (!mainThreadAgentDefinition) {
@@ -2122,7 +2134,7 @@ async function run(): Promise<CommanderCommand> {
 
       // Compute effective model early so hooks can run in parallel with MCP
       // If user didn't specify a model but agent has one, use the agent's model
-      let effectiveModel = userSpecifiedModel;
+      effectiveModel = userSpecifiedModel;
       if (!effectiveModel && mainThreadAgentDefinition?.model && mainThreadAgentDefinition.model !== 'inherit') {
         effectiveModel = parseUserSpecifiedModel(mainThreadAgentDefinition.model);
       }
@@ -2130,9 +2142,9 @@ async function run(): Promise<CommanderCommand> {
 
       // Compute resolved model for hooks (use user-specified model at launch)
       setInitialMainLoopModel(getUserSpecifiedModelSetting() || null);
-      const initialMainLoopModel = getInitialMainLoopModel();
-      const resolvedInitialModel = parseUserSpecifiedModel(initialMainLoopModel ?? getDefaultMainLoopModel());
-      let advisorModel: string | undefined;
+      initialMainLoopModel = getInitialMainLoopModel();
+      resolvedInitialModel = parseUserSpecifiedModel(initialMainLoopModel ?? getDefaultMainLoopModel());
+      advisorModel = undefined;
       if (isAdvisorEnabled()) {
         const advisorOption = canUserConfigureAdvisor() ? (options as {
           advisor?: string;
@@ -2228,12 +2240,6 @@ async function run(): Promise<CommanderCommand> {
       appendSystemPrompt = appendSystemPrompt ? `${appendSystemPrompt}\n\n${assistantAddendum}` : assistantAddendum;
       }
       logForDebugging('[STARTUP] Pre-render startup configuration complete');
-
-      // Ink root is only needed for interactive sessions — patchConsole in the
-      // Ink constructor would swallow console output in headless mode.
-      let root!: Root;
-      let getFpsMetrics!: () => FpsMetrics | undefined;
-      let stats!: StatsStore;
 
       // Show setup screens after commands are loaded
       if (!isNonInteractiveSession) {

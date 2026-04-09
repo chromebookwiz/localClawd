@@ -126,6 +126,9 @@ Use this tool to:
   • Visually inspect webpage layouts
   • Read content from JavaScript-heavy pages
   • Capture dashboards or charts`,
+  async prompt() {
+    return 'Capture a webpage as a screenshot image for visual analysis, or fetch its text content if no browser is available.'
+  },
 
   inputSchema: z.object({
     url: z.string().describe('The URL to screenshot or fetch'),

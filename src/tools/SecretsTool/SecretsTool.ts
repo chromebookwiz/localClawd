@@ -31,6 +31,9 @@ export const SecretSetTool = buildTool({
       ? 'persisted to disk (LOCALCLAWD_SECRET_KEY is set).'
       : 'kept in memory only this session (set LOCALCLAWD_SECRET_KEY to persist).'
   } Use this for API keys, passwords, wallet private keys, etc. The value is NEVER stored as plaintext.`,
+  async prompt() {
+    return 'Store a named secret securely (encrypted). Use for API keys, passwords, private keys, etc.'
+  },
   inputSchema: z.object({
     name: z
       .string()
@@ -68,6 +71,9 @@ export const SecretGetTool = buildTool({
   name: 'secret_get',
   description:
     'Retrieve a stored secret by name. Returns the decrypted value. Only call this when you actually need to use the value.',
+  async prompt() {
+    return 'Retrieve a stored secret by name. Returns the decrypted value.'
+  },
   inputSchema: z.object({
     name: z.string().describe('The secret name to retrieve.'),
   }),
@@ -96,6 +102,7 @@ export const SecretGetTool = buildTool({
 export const SecretDeleteTool = buildTool({
   name: 'secret_delete',
   description: 'Delete a stored secret permanently.',
+  async prompt() { return 'Delete a stored secret permanently.' },
   inputSchema: z.object({
     name: z.string().describe('The secret name to delete.'),
   }),
@@ -117,6 +124,7 @@ export const SecretDeleteTool = buildTool({
 export const SecretListTool = buildTool({
   name: 'secret_list',
   description: 'List all stored secret names. Values are never shown in the list.',
+  async prompt() { return 'List all stored secret names. Values are never shown in the list.' },
   inputSchema: z.object({}),
   isReadOnly: () => true,
   async call() {

@@ -33,6 +33,7 @@ export const EthAddressTool = buildTool({
   description:
     'Derive the Ethereum address from the stored private key (secret "eth_private_key"). ' +
     'Use this to find out what address to receive ETH at.',
+  async prompt() { return 'Derive the Ethereum address from the stored private key.' },
   inputSchema: z.object({}),
   isReadOnly: () => true,
   async call() {
@@ -56,6 +57,7 @@ export const EthBalanceTool = buildTool({
   description:
     'Get the ETH balance of any Ethereum address. ' +
     'If no address is provided, uses the address derived from stored private key.',
+  async prompt() { return 'Get the ETH balance of any Ethereum address.' },
   inputSchema: z.object({
     address: z
       .string()
@@ -96,6 +98,7 @@ export const EthSendTool = buildTool({
     'Sign and broadcast an ETH transfer using the stored private key ("eth_private_key"). ' +
     'Returns the transaction hash. The RPC endpoint defaults to Cloudflare Ethereum ' +
     'but can be overridden by storing "eth_rpc_endpoint" as a secret.',
+  async prompt() { return 'Sign and broadcast an ETH transfer using the stored private key.' },
   inputSchema: z.object({
     to: z.string().describe('Recipient Ethereum address (0x...)'),
     amount_eth: z

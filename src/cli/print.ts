@@ -1192,7 +1192,7 @@ function runHeadlessStreaming(
   }
 
   const modelOptions = getModelOptions()
-  const modelInfos = modelOptions.map(option => {
+  const modelInfos = modelOptions.filter(option => option.value !== undefined).map(option => {
     const modelId = option.value === null ? 'default' : option.value
     const resolvedModel =
       modelId === 'default'

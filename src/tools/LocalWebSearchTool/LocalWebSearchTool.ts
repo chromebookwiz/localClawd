@@ -210,6 +210,9 @@ Providers (in priority):
   3. DuckDuckGo — always available, no setup required
 
 After answering with search results, always include a Sources section with markdown links.`,
+  async prompt() {
+    return 'Search the web for current information, news, documentation, and research. Returns titles, URLs, and snippets from top results.'
+  },
 
   inputSchema: z.object({
     query: z.string().min(2).describe('The search query'),

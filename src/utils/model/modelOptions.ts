@@ -323,6 +323,11 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
     return standardOptions
   }
 
+  // Local LLM provider: show the configured model name (or "Default" if not set)
+  if (getAPIProvider() === 'local') {
+    return [getDefaultOptionForUser(fastMode)]
+  }
+
   // PAYG 1P API: Default (Sonnet) + Sonnet 1M + Opus 4.6 + Opus 1M + Haiku
   if (getAPIProvider() === 'firstParty') {
     const payg1POptions = [getDefaultOptionForUser(fastMode)]

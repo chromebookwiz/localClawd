@@ -23,9 +23,12 @@ export type ModelStrings = Record<ModelKey, string>
 const MODEL_KEYS = Object.keys(ALL_MODEL_CONFIGS) as ModelKey[]
 
 function getBuiltinModelStrings(provider: APIProvider): ModelStrings {
+  // 'local' provider uses the same model ID strings as firstParty —
+  // local LLM users configure their own model name separately.
+  const resolvedProvider = provider === 'local' ? 'firstParty' : provider
   const out = {} as ModelStrings
   for (const key of MODEL_KEYS) {
-    out[key] = ALL_MODEL_CONFIGS[key][provider]
+    out[key] = ALL_MODEL_CONFIGS[key][resolvedProvider]
   }
   return out
 }
