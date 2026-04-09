@@ -1,3 +1,5 @@
+***BROKEN ATM, I NEED MORE TOKENS!***
+
 # localclawd
 
 localclawd is a local-first fork of the upstream hosted coding CLI focused on self-hosted inference. It preserves the terminal-first coding loop, tool orchestration, agents, and computer-use workflow, while replacing the hosted model dependency with user-controlled backends such as vLLM, Ollama, and OpenAI-compatible gateways.
