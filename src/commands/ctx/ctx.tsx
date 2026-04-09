@@ -1,5 +1,5 @@
 /**
- * /ctx — Context window management for localClawd.
+ * /ctx — Context window management for localclawd.
  *
  * /ctx                — show current context window, usage, thresholds
  * /ctx set 200k       — set context window cap (200k / 1m / plain number)

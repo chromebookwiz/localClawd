@@ -1,5 +1,5 @@
 /**
- * CryptoTool — Ethereum send/receive for localClawd.
+ * CryptoTool — Ethereum send/receive for localclawd.
  *
  * Tools:
  *   eth_address  — derive Ethereum address from stored private key

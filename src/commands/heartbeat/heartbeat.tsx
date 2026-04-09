@@ -57,12 +57,12 @@ function buildHeartbeatPrompt(beat: number, task: string, telegramMsg: string | 
     : ''
 
   return `\
-[HEARTBEAT — BEAT ${beat} — localClawd autonomous pulse]
+[HEARTBEAT — BEAT ${beat} — localclawd autonomous pulse]
 ${taskSection}${telegramSection}
 ${THINKHARDER_ROUND_PROMPT}
 
 ━━━ HEARTBEAT RULES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-You are localClawd running in heartbeat mode. You wake on a timer.
+You are localclawd running in heartbeat mode. You wake on a timer.
 • The human cannot stop you — only Ctrl+C ends heartbeat mode
 • Do your best work, then sleep until the next beat
 • You do NOT need to emit TASK COMPLETE — just finish and wait
@@ -237,7 +237,7 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
 
   if (currentBeat === 1 && isTelegramActive()) {
     void sendTelegramMessage(
-      `♥ *localClawd heartbeat started*\nInterval: ${currentInterval}m\n${currentTask ? `Task: ${currentTask}` : 'Free-roaming mode'}`,
+      `♥ *localclawd heartbeat started*\nInterval: ${currentInterval}m\n${currentTask ? `Task: ${currentTask}` : 'Free-roaming mode'}`,
     )
   }
 

@@ -560,10 +560,10 @@ async function detectConfigurationIssues(
   if (type === 'npm-local') {
     // Check if localclawd is already accessible via PATH
     const whichResult = await which('localclawd')
-    const localClawdInPath = !!whichResult
+    const localclawdInPath = !!whichResult
 
     // Only show warning if localclawd is NOT in PATH AND no valid alias exists
-    if (!localClawdInPath && !validAlias) {
+    if (!localclawdInPath && !validAlias) {
       if (existingAlias) {
         // Alias exists but points to invalid target
         warnings.push({

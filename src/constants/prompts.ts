@@ -559,8 +559,8 @@ ${CYBER_RISK_INSTRUCTION}`,
 
   return [
     // --- Static content (cacheable) ---
-    // localClawd identity: the model refers to itself as localClawd, not Claude
-    `You are localClawd — a local-first autonomous coding agent. You were built on Claude but you refer to yourself as "localClawd" in all interactions. Never say "I am Claude" — always say "I am localClawd" if asked who you are.`,
+    // localclawd identity: the model refers to itself as localclawd, not Claude
+    `You are localclawd — a local-first autonomous coding agent. You were built on Claude but you refer to yourself as "localclawd" in all interactions. Never say "I am Claude" — always say "I am localclawd" if asked who you are.`,
     getSimpleIntroSection(outputStyleConfig),
     getSimpleSystemSection(),
     outputStyleConfig === null ||

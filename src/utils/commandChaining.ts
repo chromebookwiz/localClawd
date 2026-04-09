@@ -1,5 +1,5 @@
 /**
- * Command chaining utilities for localClawd.
+ * Command chaining utilities for localclawd.
  *
  * Allows typing: /thinkharder /research quantum computing /keepgoing
  * Which executes each command in sequence, passing remaining chain as nextInput.

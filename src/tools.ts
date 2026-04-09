@@ -262,18 +262,18 @@ export function getAllBaseTools(): Tools {
     // Include ToolSearchTool when tool search might be enabled (optimistic check)
     // The actual decision to defer tools happens at request time in claude.ts
     ...(isToolSearchEnabledOptimistic() ? [ToolSearchTool] : []),
-    // localClawd: Encrypted secret management
+    // localclawd: Encrypted secret management
     SecretSetTool,
     SecretGetTool,
     SecretDeleteTool,
     SecretListTool,
-    // localClawd: Ethereum crypto tools
+    // localclawd: Ethereum crypto tools
     EthAddressTool,
     EthBalanceTool,
     EthSendTool,
-    // localClawd: Web search for local providers (DuckDuckGo/Brave/SearXNG)
+    // localclawd: Web search for local providers (DuckDuckGo/Brave/SearXNG)
     LocalWebSearchTool,
-    // localClawd: Web screenshot/vision tool
+    // localclawd: Web screenshot/vision tool
     WebScreenshotTool,
   ]
 }

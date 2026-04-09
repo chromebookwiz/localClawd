@@ -93,7 +93,7 @@ async function screenshotViaApi(url: string, apiBase: string): Promise<Buffer | 
 async function fetchPageText(url: string): Promise<string> {
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; localClawd/1.0)' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; localclawd/1.0)' },
       signal: AbortSignal.timeout(15_000),
     })
     const html = await res.text()

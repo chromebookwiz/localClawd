@@ -73,7 +73,7 @@ export function TrustDialog({ onDone }: Props): React.ReactNode {
           If not, take a moment to review what{"'"}s in this folder first.
         </Text>
 
-        <Text>{"localClawd'll be able to read, edit, and execute files here."}</Text>
+        <Text>{"localclawd'll be able to read, edit, and execute files here."}</Text>
 
         <Box flexDirection="column">
           {OPTIONS.map((opt, i) => (

@@ -30,7 +30,12 @@
       "Bash(sed -n '40,55p' C:/code/vllmclawd/src/commands/ctx/ctx.tsx)",
       "Bash(sed -n '20,35p' C:/code/vllmclawd/src/commands/sysprompt/sysprompt.tsx)",
       "Bash(git push:*)",
-      "Bash(ls /c/code/vllmclawd/src/components/*.tsx)"
+      "Bash(ls /c/code/vllmclawd/src/components/*.tsx)",
+      "Bash(grep -n \"^    try {$\\\\|^    } catch\\\\|^    } finally\" src/main.tsx)",
+      "Bash(git show:*)",
+      "Bash(python3 -)",
+      "Bash(cat tsconfig.*.json)",
+      "Bash(awk -F: '{if\\($1>=520960 && $1<=522500\\) print}')"
     ]
   }
 }

@@ -224,7 +224,7 @@ export async function handlePromptSubmit(
   )
   logEvent('tengu_paste_text', { pastedTextCount, pastedTextBytes })
 
-  // ── Command chain validation (localClawd) ─────────────────────────────────
+  // ── Command chain validation (localclawd) ─────────────────────────────────
   // If the input contains multiple slash commands, validate compatibility early
   // and show a warning before any command executes.
   if (!skipSlashCommands && finalInput.trim().startsWith('/')) {
