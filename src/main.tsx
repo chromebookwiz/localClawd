@@ -2039,6 +2039,7 @@ async function run(): Promise<CommanderCommand> {
     let root!: Root
     let getFpsMetrics!: () => FpsMetrics | undefined
     let stats!: StatsStore
+    let cliAgents: AgentDefinition[] = []
 
     try {
       // Special case the default model with the null keyword
@@ -2060,7 +2061,6 @@ async function run(): Promise<CommanderCommand> {
     profileCheckpoint('action_commands_loaded');
 
       // Parse CLI agents if provided via --agents flag
-      let cliAgents: typeof agentDefinitionsResult.activeAgents = [];
       if (agentsJson) {
         try {
           const parsedAgents = safeParseJSON(agentsJson);

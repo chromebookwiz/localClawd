@@ -173,9 +173,10 @@ If you want to use the Anthropic API directly, set `ANTHROPIC_API_KEY` in your e
 
 ## Release status
 
-`v1.1.19` is live on npm. Install globally with `npm install -g localclawd` or run without installing with `npx localclawd`.
+`v1.1.20` is live on npm. Install globally with `npm install -g localclawd` or run without installing with `npx localclawd`.
 
 **Changelog**
+- `1.1.20` — Fix interactive startup crash: hoist `cliAgents` variable to outer scope so it is in scope when building `resumeContext` after the try block; this caused a ReferenceError on every interactive launch.
 - `1.1.19` — Fix all startup crashes: hoist all try-block-scoped variables (effectiveModel, agentDefinitions, root, etc.) to outer scope; fix undefined model strings for local provider; add missing prompt() methods to custom tools (Secrets, Crypto, LocalWebSearch, WebScreenshot).
 - `1.1.18` — Fix `commands is not defined` crash: moved commands/agentDefinitions declarations outside try block to fix block-scoping issue; purge remaining mixed-case branding.
 - `1.1.17` — Fix startup crash: Command.hideHelp() not available in Commander.js v14 — use { hidden: true } option instead.
