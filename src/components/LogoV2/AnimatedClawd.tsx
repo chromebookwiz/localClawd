@@ -3,7 +3,7 @@ import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Box } from '../../ink.js';
 import { getInitialSettings } from '../../utils/settings/settings.js';
-import { Clawd, type ClawdPose } from './Clawd.js';
+import { CLAWD_HEIGHT, Clawd, type ClawdPose } from './Clawd.js';
 type Frame = {
   pose: ClawdPose;
   offset: number;
@@ -44,8 +44,6 @@ const IDLE: Frame = {
 };
 const FRAME_MS = 60;
 const incrementFrame = (i: number) => i + 1;
-const CLAWD_HEIGHT = 3;
-
 /**
  * Clawd with click-triggered animations (crouch-jump with arms up, or
  * look-around). Container height is fixed at CLAWD_HEIGHT — same footprint

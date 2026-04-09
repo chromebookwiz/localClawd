@@ -3,23 +3,24 @@ import { Box, Text } from '../../ink.js'
 import { env } from '../../utils/env.js'
 
 export type ClawdPose = 'default' | 'arms-up' | 'look-left' | 'look-right'
+export const CLAWD_HEIGHT = 4
 
 type Props = {
   pose?: ClawdPose
 }
 
 const POSES: Record<ClawdPose, string[]> = {
-  default: ['  ◇  ', ' ◇◆◇ ', '  ◇  '],
-  'arms-up': [' ◇ ◇ ', '  ◆  ', ' ◇ ◇ '],
-  'look-left': ['  ◈  ', ' ◇◆◇ ', '  ◇  '],
-  'look-right': ['  ◇  ', ' ◇◆◈ ', '  ◇  '],
+  default: ['  .~~~. ', ' (o   o)', '  \\___/ ', ' /|\\ /|\\'],
+  'arms-up': [' \\o   o/', '  .~~~. ', '  (____)', '   |  | '],
+  'look-left': ['  .~~~. ', ' (O   o)', '  \\___/ ', ' /|\\ /|\\'],
+  'look-right': ['  .~~~. ', ' (o   O)', '  \\___/ ', ' /|\\ /|\\'],
 }
 
 const APPLE_TERMINAL_POSES: Record<ClawdPose, string[]> = {
-  default: ['  ▗▖  ', ' ▗█▖ ', '  ▝▘  '],
-  'arms-up': [' ▗ ▖ ', '  █  ', ' ▝ ▘ '],
-  'look-left': ['  ▗▖  ', ' ▐█▖ ', '  ▝▘  '],
-  'look-right': ['  ▗▖  ', ' ▗█▌ ', '  ▝▘  '],
+  default: ['  .~~~. ', ' (o   o)', '  \\___/ ', ' /|\\ /|\\'],
+  'arms-up': [' \\o   o/', '  .~~~. ', '  (____)', '   |  | '],
+  'look-left': ['  .~~~. ', ' (O   o)', '  \\___/ ', ' /|\\ /|\\'],
+  'look-right': ['  .~~~. ', ' (o   O)', '  \\___/ ', ' /|\\ /|\\'],
 }
 
 export function Clawd({ pose = 'default' }: Props) {

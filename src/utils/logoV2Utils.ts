@@ -1,7 +1,6 @@
 import { getDirectConnectServerUrl, getSessionId } from '../bootstrap/state.js'
 import { stringWidth } from '../ink/stringWidth.js'
 import type { LogOption } from '../types/logs.js'
-import { getSubscriptionName, isClaudeAISubscriber } from './auth.js'
 import { getCwd } from './cwd.js'
 import { getDisplayPath } from './file.js'
 import {
@@ -9,6 +8,11 @@ import {
   truncateToWidth,
   truncateToWidthNoEllipsis,
 } from './format.js'
+import {
+  getAPIProvider,
+  getLocalLLMProvider,
+  getLocalLLMProviderLabel,
+} from './model/providers.js'
 import { getStoredChangelogFromMemory, parseChangelog } from './releaseNotes.js'
 import { gt } from './semver.js'
 import { loadMessageLogs } from './sessionStorage.js'
@@ -99,6 +103,26 @@ export function formatWelcomeMessage(username: string | null): string {
     return 'Welcome back!'
   }
   return `Welcome back ${username}!`
+}
+
+export function getStartupWelcomeMessage(): string {
+  return formatWelcomeMessage(null)
+}
+
+export function getStartupIdentityLabel(): string {
+  if (getAPIProvider() === 'local') {
+    return `${getLocalLLMProviderLabel(getLocalLLMProvider())} instance`
+  }
+
+  return 'Local instance'
+}
+
+export function getStartupBillingLabel(): string {
+  if (getAPIProvider() === 'local') {
+    return `${getLocalLLMProviderLabel(getLocalLLMProvider())} backend`
+  }
+
+  return 'Local backend'
 }
 
 /**
@@ -253,9 +277,7 @@ export function getLogoDisplayData(): {
   const cwd = serverUrl
     ? `${displayPath} in ${serverUrl.replace(/^https?:\/\//, '')}`
     : displayPath
-  const billingType = isClaudeAISubscriber()
-    ? getSubscriptionName()
-    : 'API Usage Billing'
+  const billingType = getStartupBillingLabel()
   const agentName = getInitialSettings().agent
 
   return {

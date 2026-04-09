@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Box, Text, color } from '../../ink.js';
 import { useTerminalSize } from '../../hooks/useTerminalSize.js';
 import { stringWidth } from '../../ink/stringWidth.js';
-import { getLayoutMode, calculateLayoutDimensions, calculateOptimalLeftWidth, formatWelcomeMessage, truncatePath, getRecentActivitySync, getRecentReleaseNotesSync, getLogoDisplayData } from '../../utils/logoV2Utils.js';
+import { getLayoutMode, calculateLayoutDimensions, calculateOptimalLeftWidth, getStartupIdentityLabel, getStartupWelcomeMessage, truncatePath, getRecentActivitySync, getRecentReleaseNotesSync, getLogoDisplayData } from '../../utils/logoV2Utils.js';
 import { truncate } from '../../utils/format.js';
 import { getDisplayPath } from '../../utils/file.js';
 import { Clawd } from './Clawd.js';
@@ -47,7 +47,6 @@ const LEFT_PANEL_MAX_WIDTH = 50;
 export function LogoV2() {
   const $ = _c(94);
   const activities = getRecentActivitySync();
-  const username = getGlobalConfig().oauthAccount?.displayName ?? "";
   const {
     columns
   } = useTerminalSize();
@@ -158,6 +157,8 @@ export function LogoV2() {
   useEffect(t7, t8);
   const model = useMainLoopModel();
   const fullModelDisplayName = renderModelSetting(model);
+  const startupWelcomeMessage = getStartupWelcomeMessage();
+  const startupIdentityLabel = getStartupIdentityLabel();
   const {
     version,
     cwd,
@@ -209,10 +210,9 @@ export function LogoV2() {
       t17 = $[21];
     }
     let t18;
-    if ($[22] !== announcement || $[23] !== config) {
-      t18 = announcement && <Box paddingLeft={2} flexDirection="column">{!process.env.IS_DEMO && config.oauthAccount?.organizationName && <Text dimColor={true}>Message from {config.oauthAccount.organizationName}:</Text>}<Text>{announcement}</Text></Box>;
+    if ($[22] !== announcement) {
+      t18 = announcement && <Box paddingLeft={2} flexDirection="column"><Text>{announcement}</Text></Box>;
       $[22] = announcement;
-      $[23] = config;
       $[24] = t18;
     } else {
       t18 = $[24];
@@ -251,17 +251,7 @@ export function LogoV2() {
   const borderTitle = ` ${color("claude", userTheme)("localclawd")} ${color("inactive", userTheme)(`v${version}`)} `;
   const compactBorderTitle = color("claude", userTheme)(" localclawd ");
   if (layoutMode === "compact") {
-    let welcomeMessage = formatWelcomeMessage(username);
-    if (stringWidth(welcomeMessage) > columns - 4) {
-      let t11;
-      if ($[31] === Symbol.for("react.memo_cache_sentinel")) {
-        t11 = formatWelcomeMessage(null);
-        $[31] = t11;
-      } else {
-        t11 = $[31];
-      }
-      welcomeMessage = t11;
-    }
+    const welcomeMessage = startupWelcomeMessage;
     const cwdAvailableWidth = agentName ? columns - 4 - 1 - stringWidth(agentName) - 3 : columns - 4;
     const truncatedCwd = truncatePath(cwd, Math.max(cwdAvailableWidth, 10));
     let t11;
@@ -326,10 +316,10 @@ export function LogoV2() {
       t18 = $[42];
       t19 = $[43];
     }
-    return <><OffscreenFreeze><Box flexDirection="column" borderStyle="round" borderColor="claude" borderText={t11} paddingX={1} paddingY={1} alignItems="center" width={columns}><Text bold={true}>{welcomeMessage}</Text>{t12}{t13}<Text dimColor={true}>{billingType}</Text><Text dimColor={true}>{agentName ? `@${agentName} · ${truncatedCwd}` : truncatedCwd}</Text></Box></OffscreenFreeze>{t14}{t15}{t16}{t17}{t18}{t19}</>;
+    return <><OffscreenFreeze><Box flexDirection="column" borderStyle="round" borderColor="claude" borderText={t11} paddingX={1} paddingY={1} alignItems="center" width={columns}><Text bold={true}>{welcomeMessage}</Text>{t12}<Text dimColor={true}>{startupIdentityLabel}</Text>{t13}<Text dimColor={true}>{billingType}</Text><Text dimColor={true}>{agentName ? `@${agentName} · ${truncatedCwd}` : truncatedCwd}</Text></Box></OffscreenFreeze>{t14}{t15}{t16}{t17}{t18}{t19}</>;
   }
-  const welcomeMessage_0 = formatWelcomeMessage(username);
-  const modelLine = !process.env.IS_DEMO && config.oauthAccount?.organizationName ? `${modelDisplayName} · ${billingType} · ${config.oauthAccount.organizationName}` : `${modelDisplayName} · ${billingType}`;
+  const welcomeMessage_0 = startupWelcomeMessage;
+  const modelLine = `${modelDisplayName} · ${billingType}`;
   const cwdAvailableWidth_0 = agentName ? LEFT_PANEL_MAX_WIDTH - 1 - stringWidth(agentName) - 3 : LEFT_PANEL_MAX_WIDTH;
   const truncatedCwd_0 = truncatePath(cwd, Math.max(cwdAvailableWidth_0, 10));
   const cwdLine = agentName ? `@${agentName} · ${truncatedCwd_0}` : truncatedCwd_0;
@@ -376,9 +366,10 @@ export function LogoV2() {
     t19 = $[48];
   }
   let t20;
-  if ($[49] !== modelLine) {
-    t20 = <Text dimColor={true}>{modelLine}</Text>;
+  if ($[49] !== modelLine || $[50] !== startupIdentityLabel) {
+    t20 = <><Text dimColor={true}>{modelLine}</Text><Text dimColor={true}>{startupIdentityLabel}</Text></>;
     $[49] = modelLine;
+    $[50] = startupIdentityLabel;
     $[50] = t20;
   } else {
     t20 = $[50];
@@ -478,10 +469,9 @@ export function LogoV2() {
     t34 = $[80];
   }
   let t35;
-  if ($[81] !== announcement || $[82] !== config) {
-    t35 = announcement && <Box paddingLeft={2} flexDirection="column">{!process.env.IS_DEMO && config.oauthAccount?.organizationName && <Text dimColor={true}>Message from {config.oauthAccount.organizationName}:</Text>}<Text>{announcement}</Text></Box>;
+  if ($[81] !== announcement) {
+    t35 = announcement && <Box paddingLeft={2} flexDirection="column"><Text>{announcement}</Text></Box>;
     $[81] = announcement;
-    $[82] = config;
     $[83] = t35;
   } else {
     t35 = $[83];

@@ -11,6 +11,7 @@ import {
   type MemoryHeader,
   scanMemoryFiles,
 } from './memoryScan.js'
+import type { MemoryType } from './memoryTypes.js'
 
 export type RelevantMemory = {
   path: string
@@ -137,13 +138,17 @@ async function selectRelevantMemories(
     const parsed: { selected_memories: string[] } = jsonParse(textBlock.text)
     const sonnetSelected = parsed.selected_memories.filter(f => validFilenames.has(f))
 
-    // In thinkharder mode: merge Sonnet + lattice results (union, up to 8).
-    // The lattice captures structural/algebraic similarity that Sonnet may miss.
+    // In thinkharder mode: merge Sonnet + lattice results and reserve a small
+    // amount of space for fresher project/feedback/user memories so the mode
+    // adds explicit episodic + procedural recall, not only semantic recall.
     if (isThinkHarderMode) {
       const latticeSelected = await latticePromise
-      const merged = [...new Set([...sonnetSelected, ...latticeSelected])]
-        .filter(f => validFilenames.has(f))
-        .slice(0, 8)
+      const merged = mergeThinkHarderSelections(
+        memories,
+        validFilenames,
+        sonnetSelected,
+        latticeSelected,
+      )
       if (merged.length > sonnetSelected.length) {
         logForDebugging(
           `[memdir] thinkharder: lattice added ${merged.length - sonnetSelected.length} extra memories`,
@@ -168,11 +173,56 @@ async function selectRelevantMemories(
       () => topLatticeMemories(query, memories).map(m => m.filename),
     )
     if (latticeResults.length > 0) {
+      const merged = isThinkHarderMode
+        ? mergeThinkHarderSelections(memories, validFilenames, [], latticeResults)
+        : latticeResults.filter(f => validFilenames.has(f))
       logForDebugging(
-        `[memdir] lattice fallback selected ${latticeResults.length} memories`,
+        `[memdir] lattice fallback selected ${merged.length} memories`,
       )
-      return latticeResults
+      return merged
     }
     return []
   }
+}
+
+function mergeThinkHarderSelections(
+  memories: MemoryHeader[],
+  validFilenames: ReadonlySet<string>,
+  sonnetSelected: readonly string[],
+  latticeSelected: readonly string[],
+): string[] {
+  const baseMerged = [...new Set([...sonnetSelected, ...latticeSelected])].filter(
+    filename => validFilenames.has(filename),
+  )
+
+  const layeredAdditions = pickLayeredMemoryAdditions(memories, baseMerged)
+  const reservedBaseSlots = Math.max(0, 8 - layeredAdditions.length)
+
+  return [...baseMerged.slice(0, reservedBaseSlots), ...layeredAdditions].slice(
+    0,
+    8,
+  )
+}
+
+function pickLayeredMemoryAdditions(
+  memories: readonly MemoryHeader[],
+  existing: readonly string[],
+): string[] {
+  const selected = new Set(existing)
+  const additions: string[] = []
+  const priorityTypes: readonly MemoryType[] = ['project', 'feedback', 'user']
+
+  for (const type of priorityTypes) {
+    const candidate = memories.find(
+      memory => memory.type === type && !selected.has(memory.filename),
+    )
+    if (!candidate) {
+      continue
+    }
+
+    selected.add(candidate.filename)
+    additions.push(candidate.filename)
+  }
+
+  return additions
 }

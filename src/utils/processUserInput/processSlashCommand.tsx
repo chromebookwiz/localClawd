@@ -45,6 +45,7 @@ import { buildPluginCommandTelemetryFields } from '../telemetry/pluginTelemetry.
 import { getAssistantMessageContentLength } from '../tokens.js';
 import { createAgentId } from '../uuid.js';
 import { getWorkload } from '../workloadContext.js';
+import { extractChain } from '../commandChaining.js';
 import type { ProcessUserInputBaseResult, ProcessUserInputContext } from './processUserInput.js';
 type SlashCommandResult = ProcessUserInputBaseResult & {
   command: Command;
@@ -327,6 +328,7 @@ export async function processSlashCommand(inputString: string, precedingInputBlo
     args: parsedArgs,
     isMcp
   } = parsed;
+  const { ownArgs, nextCmd } = extractChain(parsedArgs);
   const sanitizedCommandName = isMcp ? 'mcp' : !builtInCommandNames().has(commandName) ? 'custom' : commandName;
 
   // Check if it's a real command before processing
@@ -392,7 +394,11 @@ export async function processSlashCommand(inputString: string, precedingInputBlo
     resultText,
     nextInput,
     submitNextInput
-  } = await getMessagesForSlashCommand(commandName, parsedArgs, setToolJSX, context, precedingInputBlocks, imageContentBlocks, isAlreadyProcessing, canUseTool, uuid);
+  } = await getMessagesForSlashCommand(commandName, ownArgs, setToolJSX, context, precedingInputBlocks, imageContentBlocks, isAlreadyProcessing, canUseTool, uuid);
+
+  const chainedNextInput = nextInput ?? nextCmd ?? undefined;
+  const shouldSubmitChainedInput =
+    submitNextInput ?? (nextInput === undefined && nextCmd ? true : undefined);
 
   // Local slash commands that skip messages
   if (newMessages.length === 0) {
@@ -444,8 +450,8 @@ export async function processSlashCommand(inputString: string, precedingInputBlo
       messages: [],
       shouldQuery: false,
       model,
-      nextInput,
-      submitNextInput
+      nextInput: chainedNextInput,
+      submitNextInput: shouldSubmitChainedInput
     };
   }
 
@@ -518,8 +524,8 @@ export async function processSlashCommand(inputString: string, precedingInputBlo
     model,
     effort,
     resultText,
-    nextInput,
-    submitNextInput
+    nextInput: chainedNextInput,
+    submitNextInput: shouldSubmitChainedInput
   };
 }
 async function getMessagesForSlashCommand(commandName: string, args: string, setToolJSX: SetToolJSXFn, context: ProcessUserInputContext, precedingInputBlocks: ContentBlockParam[], imageContentBlocks: ContentBlockParam[], _isAlreadyProcessing?: boolean, canUseTool?: CanUseToolFn, uuid?: string): Promise<SlashCommandResult> {

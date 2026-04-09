@@ -1168,12 +1168,13 @@ function runHeadlessStreaming(
 
   // Auto-resume interrupted turns on restart so CC continues from where it
   // left off without requiring the SDK to re-send the prompt.
-  const resumeInterruptedTurnEnv =
-    process.env.CLAUDE_CODE_RESUME_INTERRUPTED_TURN
+  const shouldResumeInterruptedTurn = !isEnvDefinedFalsy(
+    process.env.CLAUDE_CODE_RESUME_INTERRUPTED_TURN,
+  )
   if (
     turnInterruptionState &&
     turnInterruptionState.kind !== 'none' &&
-    resumeInterruptedTurnEnv
+    shouldResumeInterruptedTurn
   ) {
     logForDebugging(
       `[print.ts] Auto-resuming interrupted turn (kind: ${turnInterruptionState.kind})`,

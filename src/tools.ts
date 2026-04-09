@@ -78,18 +78,6 @@ import { ListMcpResourcesTool } from './tools/ListMcpResourcesTool/ListMcpResour
 import { ReadMcpResourceTool } from './tools/ReadMcpResourceTool/ReadMcpResourceTool.js'
 import { ToolSearchTool } from './tools/ToolSearchTool/ToolSearchTool.js'
 import { EnterPlanModeTool } from './tools/EnterPlanModeTool/EnterPlanModeTool.js'
-import {
-  SecretSetTool,
-  SecretGetTool,
-  SecretDeleteTool,
-  SecretListTool,
-} from './tools/SecretsTool/SecretsTool.js'
-import {
-  EthAddressTool,
-  EthBalanceTool,
-  EthSendTool,
-} from './tools/CryptoTool/CryptoTool.js'
-import { LocalWebSearchTool } from './tools/LocalWebSearchTool/LocalWebSearchTool.js'
 import { WebScreenshotTool } from './tools/WebScreenshotTool/WebScreenshotTool.js'
 import { EnterWorktreeTool } from './tools/EnterWorktreeTool/EnterWorktreeTool.js'
 import { ExitWorktreeTool } from './tools/ExitWorktreeTool/ExitWorktreeTool.js'
@@ -262,18 +250,7 @@ export function getAllBaseTools(): Tools {
     // Include ToolSearchTool when tool search might be enabled (optimistic check)
     // The actual decision to defer tools happens at request time in claude.ts
     ...(isToolSearchEnabledOptimistic() ? [ToolSearchTool] : []),
-    // localclawd: Encrypted secret management
-    SecretSetTool,
-    SecretGetTool,
-    SecretDeleteTool,
-    SecretListTool,
-    // localclawd: Ethereum crypto tools
-    EthAddressTool,
-    EthBalanceTool,
-    EthSendTool,
-    // localclawd: Web search for local providers (DuckDuckGo/Brave/SearXNG)
-    LocalWebSearchTool,
-    // localclawd: Web screenshot/vision tool
+    // localclawd: Web screenshot/vision tool for UI verification
     WebScreenshotTool,
   ]
 }

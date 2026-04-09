@@ -3,14 +3,14 @@
  *
  * Uses (in order):
  *  1. System Chromium/Chrome with --headless --screenshot (no install needed)
- *  2. SCREENSHOT_API_URL secret — any endpoint accepting ?url=<url> and returning PNG
+ *  2. SCREENSHOT_API_URL env var or configured secret — any endpoint accepting ?url=<url> and returning PNG
  *
  * Without a browser or API key, falls back to returning the page as
  * markdown text (same as WebFetchTool) so the model still gets content.
  *
  * Setup:
  *  - Chromium: ensure `chromium`, `chromium-browser`, or `google-chrome` is in PATH
- *  - API: secret_set screenshot_api_url https://yourapi.com/screenshot
+ *  - API: set SCREENSHOT_API_URL=https://yourapi.com/screenshot
  */
 
 import { execFile } from 'child_process'
@@ -120,7 +120,7 @@ Returns:
 
 Setup for screenshots:
   • Install Chromium/Chrome and add to PATH, OR
-  • Store a screenshot API URL: secret_set screenshot_api_url https://yourapiurl.com
+  • Set SCREENSHOT_API_URL to a screenshot endpoint if Chrome is unavailable
 
 Use this tool to:
   • Visually inspect webpage layouts
@@ -145,7 +145,10 @@ Use this tool to:
 
   async call({ url, width = 1280, height = 800, text_fallback = true }) {
     // Try screenshot API secret first
-    const apiUrl = getSecret('screenshot_api_url') ?? getSecret('SCREENSHOT_API_URL')
+    const apiUrl =
+      process.env.SCREENSHOT_API_URL ??
+      getSecret('screenshot_api_url') ??
+      getSecret('SCREENSHOT_API_URL')
     if (apiUrl) {
       const buf = await screenshotViaApi(url, apiUrl)
       if (buf) {
@@ -170,13 +173,13 @@ Use this tool to:
       const text = await fetchPageText(url)
       return {
         type: 'text' as const,
-        text: `Screenshot unavailable (no browser found). Page text content:\n\nURL: ${url}\n\n${text}\n\n---\nTo enable screenshots: install Chromium and add to PATH, or set "screenshot_api_url" via secret_set.`,
+        text: `Screenshot unavailable (no browser found). Page text content:\n\nURL: ${url}\n\n${text}\n\n---\nTo enable screenshots: install Chromium and add to PATH, or set SCREENSHOT_API_URL.`,
       }
     }
 
     return {
       type: 'text' as const,
-      text: `Screenshot failed. Install Chromium/Chrome in PATH or set "screenshot_api_url" via secret_set.`,
+      text: `Screenshot failed. Install Chromium/Chrome in PATH or set SCREENSHOT_API_URL.`,
     }
   },
 

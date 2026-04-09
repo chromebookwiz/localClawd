@@ -208,12 +208,18 @@ export const SandboxViolationStore = null;
 export const SandboxManager = new Proxy({}, { get: () => noop });
 export const SandboxRuntimeConfigSchema = { parse: () => ({}) };
 export const BROWSER_TOOLS = [];
+export const CLI_CU_CAPABILITIES = { screenshotFiltering: 'native', platform: 'darwin' };
 export const getMcpConfigForManifest = noop;
 export const ColorDiff = null;
 export const ColorFile = null;
 export const getSyntaxTheme = noop;
 export const plot = noop;
 export const createClaudeForChromeMcpServer = noop;
+export const buildComputerUseTools = () => [];
+export const createComputerUseMcpServer = noop;
+export const bindSessionContext = noop;
+export const DEFAULT_GRANT_FLAGS = {};
+export const getSentinelCategory = noop;
 export const ExportResultCode = { SUCCESS: 0, FAILED: 1 };
 export const resourceFromAttributes = noop;
 export const Resource = noopClass;
@@ -373,6 +379,11 @@ const result = await Bun.build({
           'sharp',
           '@anthropic-ai/mcpb',
           '@ant/claude-for-chrome-mcp',
+          '@ant/computer-use-mcp',
+          '@ant/computer-use-mcp/types',
+          '@ant/computer-use-mcp/sentinelApps',
+          '@ant/computer-use-input',
+          '@ant/computer-use-swift',
           '@anthropic-ai/sandbox-runtime',
           'asciichart',
           'plist',

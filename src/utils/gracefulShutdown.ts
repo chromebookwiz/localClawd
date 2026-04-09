@@ -299,6 +299,10 @@ export const setupGracefulShutdown = memoize(() => {
   // Log uncaught exceptions for container observability and analytics
   // Error names (e.g., "TypeError") are not sensitive - safe to log
   process.on('uncaughtException', error => {
+    logForDebugging(
+      `uncaughtException: ${error.stack ?? error.message}`,
+      { level: 'error' },
+    )
     logForDiagnosticsNoPII('error', 'uncaught_exception', {
       error_name: error.name,
       error_message: error.message.slice(0, 2000),
@@ -311,6 +315,12 @@ export const setupGracefulShutdown = memoize(() => {
 
   // Log unhandled promise rejections for container observability and analytics
   process.on('unhandledRejection', reason => {
+    logForDebugging(
+      `unhandledRejection: ${
+        reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)
+      }`,
+      { level: 'error' },
+    )
     const errorName =
       reason instanceof Error
         ? reason.name

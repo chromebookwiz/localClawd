@@ -58,6 +58,7 @@ import { SLEEP_TOOL_NAME } from '../tools/SleepTool/prompt.js'
 import { TICK_TAG } from './xml.js'
 import { logForDebugging } from '../utils/debug.js'
 import { loadMemoryPrompt } from '../memdir/memdir.js'
+import { isThinkHarderMode } from '../commands/thinkharder/thinkharder.js'
 import { isUndercover } from '../utils/undercover.js'
 import { isMcpInstructionsDeltaEnabled } from '../utils/mcpInstructionsDelta.js'
 
@@ -162,6 +163,16 @@ function getMcpInstructionsSection(
 ): string | null {
   if (!mcpClients || mcpClients.length === 0) return null
   return getMcpInstructions(mcpClients)
+}
+
+function getThinkHarderSection(): string | null {
+  if (!isThinkHarderMode) return null
+
+  return `# Think harder mode
+Think harder mode is active.
+- Before major edits, silently anchor four layers: working goal, this session's recent progress, surfaced memory files, and standing project/user constraints.
+- When memory attachments include mixed memory types, deliberately use at least one recent project or user memory and one feedback memory before editing.
+- Keep the extra reasoning mostly internal unless the user asks for detail; the goal is better decisions, not more verbose replies.`
 }
 
 export function prependBullets(items: Array<string | string[]>): string[] {
@@ -505,6 +516,7 @@ ${CYBER_RISK_INSTRUCTION}`,
     systemPromptSection('output_style', () =>
       getOutputStyleSection(outputStyleConfig),
     ),
+    systemPromptSection('thinkharder', () => getThinkHarderSection()),
     // When delta enabled, instructions are announced via persisted
     // mcp_instructions_delta attachments (attachments.ts) instead of this
     // per-turn recompute, which busts the prompt cache on late MCP connect.

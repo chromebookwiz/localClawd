@@ -2036,6 +2036,7 @@ async function run(): Promise<CommanderCommand> {
     let initialMainLoopModel!: ReturnType<typeof getInitialMainLoopModel>
     let resolvedInitialModel!: string
     let advisorModel: string | undefined
+    let selectedAgentSetting: string | undefined
     let root!: Root
     let getFpsMetrics!: () => FpsMetrics | undefined
     let stats!: StatsStore
@@ -2082,11 +2083,11 @@ async function run(): Promise<CommanderCommand> {
       logForDebugging('[STARTUP] Agent definitions merged');
 
       // Look up main thread agent from CLI flag or settings
-      const agentSetting = agentCli ?? getInitialSettings().agent;
-      if (agentSetting) {
-        mainThreadAgentDefinition = agentDefinitions.activeAgents.find(agent => agent.agentType === agentSetting);
+      selectedAgentSetting = agentCli ?? getInitialSettings().agent;
+      if (selectedAgentSetting) {
+        mainThreadAgentDefinition = agentDefinitions.activeAgents.find(agent => agent.agentType === selectedAgentSetting);
         if (!mainThreadAgentDefinition) {
-          logForDebugging(`Warning: agent "${agentSetting}" not found. ` + `Available agents: ${agentDefinitions.activeAgents.map(a => a.agentType).join(', ')}. ` + `Using default behavior.`);
+          logForDebugging(`Warning: agent "${selectedAgentSetting}" not found. ` + `Available agents: ${agentDefinitions.activeAgents.map(a => a.agentType).join(', ')}. ` + `Using default behavior.`);
         }
       }
 
@@ -2913,7 +2914,7 @@ async function run(): Promise<CommanderCommand> {
       env_var: process.env.ANTHROPIC_MODEL as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       settings_file: (getInitialSettings() || {}).model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       subscriptionType: getSubscriptionType() as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      agent: agentSetting as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
+      agent: selectedAgentSetting as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
     });
 
     // Get deprecation warning for the initial model (resolvedInitialModel computed earlier for hooks parallelization)

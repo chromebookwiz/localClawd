@@ -11,4 +11,4 @@ tmp-published-repro/
 *.bak
 build-errors.txt
 localclawd-build-probe.exe
-localclawd.exe
+localclawd.exelatest
