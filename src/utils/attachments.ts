@@ -144,7 +144,6 @@ import {
   getOriginalCwd,
   getSessionId,
   getSdkBetas,
-  getTotalCostUSD,
   getTotalOutputTokens,
   getCurrentTurnTokenBudget,
   getTurnOutputTokens,
@@ -3848,17 +3847,7 @@ function getMaxBudgetUsdAttachment(maxBudgetUsd?: number): Attachment[] {
     return []
   }
 
-  const usedCost = getTotalCostUSD()
-  const remainingBudget = maxBudgetUsd - usedCost
-
-  return [
-    {
-      type: 'budget_usd',
-      used: usedCost,
-      total: maxBudgetUsd,
-      remaining: remainingBudget,
-    },
-  ]
+  return []
 }
 
 /**

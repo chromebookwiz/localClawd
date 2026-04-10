@@ -485,12 +485,8 @@ export async function setup(
 
   // Log tengu_exit event from the last session?
   const projectConfig = getCurrentProjectConfig()
-  if (
-    projectConfig.lastCost !== undefined &&
-    projectConfig.lastDuration !== undefined
-  ) {
+  if (projectConfig.lastDuration !== undefined) {
     logEvent('tengu_exit', {
-      last_session_cost: projectConfig.lastCost,
       last_session_api_duration: projectConfig.lastAPIDuration,
       last_session_tool_duration: projectConfig.lastToolDuration,
       last_session_duration: projectConfig.lastDuration,

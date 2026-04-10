@@ -555,16 +555,15 @@ export function resetTotalDurationStateAndCost_FOR_TESTS_ONLY(): void {
 }
 
 export function addToTotalCostState(
-  cost: number,
+  _cost: number,
   modelUsage: ModelUsage,
   model: string,
 ): void {
   STATE.modelUsage[model] = modelUsage
-  STATE.totalCostUSD += cost
 }
 
 export function getTotalCostUSD(): number {
-  return STATE.totalCostUSD
+  return 0
 }
 
 export function getTotalAPIDuration(): number {
@@ -743,11 +742,11 @@ export function incrementBudgetContinuationCount(): void {
 }
 
 export function setHasUnknownModelCost(): void {
-  STATE.hasUnknownModelCost = true
+  return
 }
 
 export function hasUnknownModelCost(): boolean {
-  return STATE.hasUnknownModelCost
+  return false
 }
 
 export function getLastMainRequestId(): string | undefined {
@@ -966,9 +965,9 @@ export function setMeter(
     description: 'Number of git commits created',
   })
   STATE.costCounter = createCounter('claude_code.cost.usage', {
-    description: 'Cost of the localclawd session',
-    unit: 'USD',
+    description: 'Disabled legacy pricing counter',
   })
+  STATE.costCounter = null
   STATE.tokenCounter = createCounter('claude_code.token.usage', {
     description: 'Number of tokens used',
     unit: 'tokens',
@@ -1007,7 +1006,7 @@ export function getCommitCounter(): AttributedCounter | null {
 }
 
 export function getCostCounter(): AttributedCounter | null {
-  return STATE.costCounter
+  return null
 }
 
 export function getTokenCounter(): AttributedCounter | null {

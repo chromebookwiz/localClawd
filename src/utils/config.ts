@@ -80,7 +80,6 @@ export type ProjectConfig = {
   lastAPIDuration?: number
   lastAPIDurationWithoutRetries?: number
   lastToolDuration?: number
-  lastCost?: number
   lastDuration?: number
   lastLinesAdded?: number
   lastLinesRemoved?: number
@@ -100,7 +99,6 @@ export type ProjectConfig = {
       cacheReadInputTokens: number
       cacheCreationInputTokens: number
       webSearchRequests: number
-      costUSD: number
     }
   >
   lastSessionMetrics?: Record<string, number>

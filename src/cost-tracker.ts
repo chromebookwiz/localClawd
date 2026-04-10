@@ -3,7 +3,6 @@ import chalk from 'chalk'
 import {
   addToTotalCostState,
   addToTotalLinesChanged,
-  getCostCounter,
   getModelUsage,
   getSdkBetas,
   getSessionId,
@@ -12,7 +11,6 @@ import {
   getTotalAPIDurationWithoutRetries,
   getTotalCacheCreationInputTokens,
   getTotalCacheReadInputTokens,
-  getTotalCostUSD,
   getTotalDuration,
   getTotalInputTokens,
   getTotalLinesAdded,
@@ -21,13 +19,10 @@ import {
   getTotalToolDuration,
   getTotalWebSearchRequests,
   getUsageForModel,
-  hasUnknownModelCost,
   resetCostState,
   resetStateForTests,
   setCostStateForRestore,
-  setHasUnknownModelCost,
 } from './bootstrap/state.js'
-import type { ModelUsage } from './entrypoints/agentSdkTypes.js'
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
@@ -46,8 +41,19 @@ import { formatDuration, formatNumber } from './utils/format.js'
 import type { FpsMetrics } from './utils/fpsTracker.js'
 import { getCanonicalName } from './utils/model/model.js'
 import { calculateUSDCost } from './utils/modelCost.js'
+
+type ModelUsage = {
+  inputTokens: number
+  outputTokens: number
+  cacheReadInputTokens: number
+  cacheCreationInputTokens: number
+  webSearchRequests: number
+  costUSD: number
+  contextWindow: number
+  maxOutputTokens: number
+}
+
 export {
-  getTotalCostUSD as getTotalCost,
   getTotalDuration,
   getTotalAPIDuration,
   getTotalAPIDurationWithoutRetries,
@@ -59,13 +65,14 @@ export {
   getTotalCacheReadInputTokens,
   getTotalCacheCreationInputTokens,
   getTotalWebSearchRequests,
-  formatCost,
-  hasUnknownModelCost,
   resetStateForTests,
   resetCostState,
-  setHasUnknownModelCost,
   getModelUsage,
   getUsageForModel,
+}
+
+export function getTotalCost(): number {
+  return 0
 }
 
 type StoredCostState = {
@@ -102,6 +109,7 @@ export function getStoredSessionCosts(
         model,
         {
           ...usage,
+          costUSD: 0,
           contextWindow: getContextWindowForModel(model, getSdkBetas()),
           maxOutputTokens: getModelMaxOutputTokens(model).default,
         },
@@ -110,7 +118,7 @@ export function getStoredSessionCosts(
   }
 
   return {
-    totalCostUSD: projectConfig.lastCost ?? 0,
+    totalCostUSD: 0,
     totalAPIDuration: projectConfig.lastAPIDuration ?? 0,
     totalAPIDurationWithoutRetries:
       projectConfig.lastAPIDurationWithoutRetries ?? 0,
@@ -143,7 +151,6 @@ export function restoreCostStateForSession(sessionId: string): boolean {
 export function saveCurrentSessionCosts(fpsMetrics?: FpsMetrics): void {
   saveCurrentProjectConfig(current => ({
     ...current,
-    lastCost: getTotalCostUSD(),
     lastAPIDuration: getTotalAPIDuration(),
     lastAPIDurationWithoutRetries: getTotalAPIDurationWithoutRetries(),
     lastToolDuration: getTotalToolDuration(),
@@ -166,16 +173,11 @@ export function saveCurrentSessionCosts(fpsMetrics?: FpsMetrics): void {
           cacheReadInputTokens: usage.cacheReadInputTokens,
           cacheCreationInputTokens: usage.cacheCreationInputTokens,
           webSearchRequests: usage.webSearchRequests,
-          costUSD: usage.costUSD,
         },
       ]),
     ),
     lastSessionId: getSessionId(),
   }))
-}
-
-function formatCost(cost: number, maxDecimalPlaces: number = 4): string {
-  return `$${cost > 0.5 ? round(cost, 100).toFixed(2) : cost.toFixed(maxDecimalPlaces)}`
 }
 
 function formatModelUsage(): string {
@@ -206,7 +208,6 @@ function formatModelUsage(): string {
     accumulated.cacheReadInputTokens += usage.cacheReadInputTokens
     accumulated.cacheCreationInputTokens += usage.cacheCreationInputTokens
     accumulated.webSearchRequests += usage.webSearchRequests
-    accumulated.costUSD += usage.costUSD
   }
 
   let result = 'Usage by model:'
@@ -218,24 +219,32 @@ function formatModelUsage(): string {
       `${formatNumber(usage.cacheCreationInputTokens)} cache write` +
       (usage.webSearchRequests > 0
         ? `, ${formatNumber(usage.webSearchRequests)} web search`
-        : '') +
-      ` (${formatCost(usage.costUSD)})`
+        : '')
     result += `\n` + `${shortName}:`.padStart(21) + usageString
   }
   return result
 }
 
 export function formatTotalCost(): string {
-  const costDisplay =
-    formatCost(getTotalCostUSD()) +
-    (hasUnknownModelCost()
-      ? ' (costs may be inaccurate due to usage of unknown models)'
-      : '')
-
   const modelUsageDisplay = formatModelUsage()
+  const totalInputTokens = getTotalInputTokens()
+  const totalOutputTokens = getTotalOutputTokens()
+  const totalCacheReadTokens = getTotalCacheReadInputTokens()
+  const totalCacheWriteTokens = getTotalCacheCreationInputTokens()
+  const totalWebSearchRequests = getTotalWebSearchRequests()
+  const totalTrackedTokens =
+    totalInputTokens +
+    totalOutputTokens +
+    totalCacheReadTokens +
+    totalCacheWriteTokens
 
   return chalk.dim(
-    `Total cost:            ${costDisplay}\n` +
+    `Total tracked tokens:  ${formatNumber(totalTrackedTokens)}\n` +
+      `Input tokens:         ${formatNumber(totalInputTokens)}\n` +
+      `Output tokens:        ${formatNumber(totalOutputTokens)}\n` +
+      `Cache read tokens:    ${formatNumber(totalCacheReadTokens)}\n` +
+      `Cache write tokens:   ${formatNumber(totalCacheWriteTokens)}\n` +
+      `Web search requests:  ${formatNumber(totalWebSearchRequests)}\n` +
       `Total duration (API):  ${formatDuration(getTotalAPIDuration())}
 Total duration (wall): ${formatDuration(getTotalDuration())}
 Total code changes:    ${getTotalLinesAdded()} ${getTotalLinesAdded() === 1 ? 'line' : 'lines'} added, ${getTotalLinesRemoved()} ${getTotalLinesRemoved() === 1 ? 'line' : 'lines'} removed
@@ -243,12 +252,8 @@ ${modelUsageDisplay}`,
   )
 }
 
-function round(number: number, precision: number): number {
-  return Math.round(number * precision) / precision
-}
-
 function addToTotalModelUsage(
-  cost: number,
+  _cost: number,
   usage: Usage,
   model: string,
 ): ModelUsage {
@@ -269,7 +274,6 @@ function addToTotalModelUsage(
   modelUsage.cacheCreationInputTokens += usage.cache_creation_input_tokens ?? 0
   modelUsage.webSearchRequests +=
     usage.server_tool_use?.web_search_requests ?? 0
-  modelUsage.costUSD += cost
   modelUsage.contextWindow = getContextWindowForModel(model, getSdkBetas())
   modelUsage.maxOutputTokens = getModelMaxOutputTokens(model).default
   return modelUsage
@@ -288,7 +292,6 @@ export function addToTotalSessionCost(
       ? { model, speed: 'fast' }
       : { model }
 
-  getCostCounter()?.add(cost, attrs)
   getTokenCounter()?.add(usage.input_tokens, { ...attrs, type: 'input' })
   getTokenCounter()?.add(usage.output_tokens, { ...attrs, type: 'output' })
   getTokenCounter()?.add(usage.cache_read_input_tokens ?? 0, {
