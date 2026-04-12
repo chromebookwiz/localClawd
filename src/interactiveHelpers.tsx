@@ -108,7 +108,7 @@ export async function showSetupScreens(root: Root, permissionMode: PermissionMod
     return false;
   }
   // Skip startup screens — go straight to dashboard using saved settings.
-  // Use /setup to configure the backend at any time.
+  // Use /provider to configure the backend at any time.
   const onboardingShown = false;
 
   // Always show the trust dialog in interactive sessions, regardless of permission mode.

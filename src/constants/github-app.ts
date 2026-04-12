@@ -93,7 +93,7 @@ Once the workflow is triggered, the configured action will analyze the comment a
 allowed_tools: Bash(npm install),Bash(npm run build),Bash(npm run lint),Bash(npm run test)
 \`\`\`
 
-There's more information in the [Claude Code action repo](https://github.com/anthropics/claude-code-action).
+There's more information in the [localclawd action repo](https://github.com/anthropics/claude-code-action).
 
 After merging this PR, let's try mentioning @claude in a comment on any PR to get started!`
 

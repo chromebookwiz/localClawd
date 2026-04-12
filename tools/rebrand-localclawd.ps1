@@ -14,7 +14,7 @@ $skipExtensions = @(
 $replacementTable = @(
     @{ From = 'localClawd'; To = 'localclawd' },
     @{ From = '.localClawd'; To = '.localclawd' },
-    @{ From = 'Claude Code'; To = 'localclawd' },
+    @{ From = 'localclawd'; To = 'localclawd' },
     @{ From = 'Claude Desktop'; To = 'localclawd Desktop' },
     @{ From = 'Claude in Chrome'; To = 'localclawd in Chrome' },
     @{ From = 'Claude app'; To = 'localclawd app' }

@@ -33,7 +33,7 @@ import { plural } from '../utils/stringUtils.js';
 import { renderableSearchText } from '../utils/transcriptSearch.js';
 import { Divider } from './design-system/Divider.js';
 import type { UnseenDivider } from './FullscreenLayout.js';
-import { LogoV2 } from './LogoV2/LogoV2.js';
+import { Logo } from './Logo/Logo.js';
 import { StreamingMarkdown } from './Markdown.js';
 import { hasContentAfterIndex, MessageRow } from './MessageRow.js';
 import { InVirtualListContext, type MessageActionsNav, MessageActionsSelectedContext, type MessageActionsState } from './messageActions.js';
@@ -50,7 +50,7 @@ import type { JumpHandle } from './VirtualMessageList.js';
 // ALL subsequent siblings — every MessageRow re-writes from scratch instead
 // of blitting. In long sessions (~2800 messages) this is 150K+ writes/frame
 // and pegs CPU at 100%. Memo on agentDefinitions so a new messages array
-// doesn't invalidate the logo subtree. LogoV2/StatusNotices internally
+// doesn't invalidate the logo subtree. Logo/StatusNotices internally
 // subscribe to useAppState/useSettings for their own updates.
 const LogoHeader = React.memo(function LogoHeader(t0) {
   const $ = _c(3);
@@ -59,7 +59,7 @@ const LogoHeader = React.memo(function LogoHeader(t0) {
   } = t0;
   let t1;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
-    t1 = <LogoV2 />;
+    t1 = <Logo />;
     $[0] = t1;
   } else {
     t1 = $[0];

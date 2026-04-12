@@ -1,10 +1,10 @@
 import React from 'react'
 import { Box, Text, useTheme } from 'src/ink.js'
-import { Clawd } from './Clawd.js'
+import { AnimatedClawd } from './AnimatedClawd.js'
 
 const WELCOME_V2_WIDTH = 58
 
-export function WelcomeV2() {
+export function WelcomeLogo() {
   const [theme] = useTheme()
   const isLightTheme = ['light', 'light-daltonized', 'light-ansi'].includes(theme)
   const accentColor = isLightTheme ? 'blue' : '#6366f1'
@@ -17,7 +17,7 @@ export function WelcomeV2() {
       </Box>
       <Text dimColor>{'─'.repeat(48)}</Text>
       <Box marginTop={1}>
-        <Clawd />
+        <AnimatedClawd />
       </Box>
     </Box>
   )

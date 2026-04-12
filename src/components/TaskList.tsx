@@ -27,7 +27,7 @@ function byIdAsc(a: Task, b: Task): number {
   }
   return a.id.localeCompare(b.id);
 }
-export function TaskListV2({
+export function TaskList({
   tasks,
   isStandalone = false
 }: Props): React.ReactNode {

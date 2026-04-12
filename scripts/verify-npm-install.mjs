@@ -15,6 +15,22 @@ const STARTUP_MARKERS = [
   '[STARTUP] Ink root created',
 ]
 
+function getNpmInvocation() {
+  if (process.platform !== 'win32') {
+    return {
+      command: 'npm',
+      argsPrefix: [],
+    }
+  }
+
+  return {
+    command: process.execPath,
+    argsPrefix: [
+      path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    ],
+  }
+}
+
 function getTempFilePath(fileName) {
   return path.join(tempRoot, fileName)
 }
@@ -23,7 +39,7 @@ function run(command, args, cwd, extraOptions = {}) {
   const result = spawnSync(command, args, {
     cwd,
     encoding: 'utf8',
-    shell: process.platform === 'win32',
+    shell: false,
     ...extraOptions,
   })
 
@@ -31,15 +47,25 @@ function run(command, args, cwd, extraOptions = {}) {
     throw new Error(
       [
         `Command failed: ${command} ${args.join(' ')}`,
-        result.stdout.trim(),
-        result.stderr.trim(),
+        result.stdout?.trim() ?? '',
+        result.stderr?.trim() ?? '',
       ]
         .filter(Boolean)
         .join('\n'),
     )
   }
 
-  return result.stdout.trim()
+  return result.stdout?.trim() ?? ''
+}
+
+function runNpm(args, cwd, extraOptions = {}) {
+  const npmInvocation = getNpmInvocation()
+  return run(
+    npmInvocation.command,
+    [...npmInvocation.argsPrefix, ...args],
+    cwd,
+    extraOptions,
+  )
 }
 
 function sleep(ms) {
@@ -187,7 +213,7 @@ async function verifyInteractiveStartup(command, args) {
 let tarballPath = null
 
 try {
-  const packOutput = run('npm', ['pack'], repoRoot)
+  const packOutput = runNpm(['pack'], repoRoot)
   const tarballName = packOutput.split(/\r?\n/).pop()
   if (!tarballName) {
     throw new Error('npm pack did not produce a tarball name')
@@ -197,8 +223,8 @@ try {
   ensureVerifierDirectories()
   seedVerifierHomeConfig()
 
-  run('npm', ['init', '-y'], installRoot)
-  run('npm', ['install', tarballPath], installRoot)
+  runNpm(['init', '-y'], installRoot)
+  runNpm(['install', tarballPath], installRoot)
 
   const installedEntrypoint = path.join(
     installRoot,

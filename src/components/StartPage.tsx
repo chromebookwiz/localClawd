@@ -3,7 +3,7 @@ import { Box, Text, useInput } from '../ink.js'
 import { gracefulShutdownSync } from '../utils/gracefulShutdown.js'
 import type { LocalLLMConfig } from '../utils/model/providers.js'
 import { getLocalLLMProviderLabel } from '../utils/model/providers.js'
-import { WelcomeV2 } from './LogoV2/WelcomeV2.js'
+import { WelcomeLogo } from './Logo/WelcomeLogo.js'
 
 export type StartPageAction = 'continue' | 'configure-backend'
 
@@ -48,7 +48,7 @@ export function StartPage({ currentConfig, onDone }: Props): React.ReactNode {
 
   return (
     <Box flexDirection="column" gap={1}>
-      <WelcomeV2 />
+      <WelcomeLogo />
 
       <Box flexDirection="column" gap={1} paddingLeft={1} width={78}>
         {hasSavedConfig ? (

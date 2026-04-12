@@ -31,25 +31,6 @@ const textExtensions = new Set([
   '.yml',
 ])
 
-const allowlistedClaudeCodePaths = [
-  /^src\/commands\/init\.ts$/,
-  /^src\/commands\/insights\.ts$/,
-  /^src\/components\/DesktopUpsell\//,
-  /^src\/components\/Feedback/,
-  /^src\/components\/ManagedSettingsSecurityDialog\//,
-  /^src\/components\/Passes\//,
-  /^src\/components\/Teleport/,
-  /^src\/components\/TrustDialog\//,
-  /^src\/components\/mcp\//,
-  /^src\/components\/permissions\//,
-  /^src\/components\/tasks\//,
-  /^src\/constants\/oauth\.ts$/,
-  /^src\/constants\/product\.ts$/,
-  /^src\/entrypoints\/agentSdkTypes\.ts$/,
-  /^src\/entrypoints\/sandboxTypes\.ts$/,
-  /^src\/tools\//,
-]
-
 const rules = [
   {
     name: 'legacy localClawd casing',
@@ -67,10 +48,9 @@ const rules = [
     isAllowed: () => false,
   },
   {
-    name: 'upstream Claude Code branding',
+    name: 'legacy Claude Code branding',
     regex: /\bClaude Code\b/g,
-    isAllowed: relativePath =>
-      allowlistedClaudeCodePaths.some(pattern => pattern.test(relativePath)),
+    isAllowed: () => false,
   },
 ]
 
@@ -119,7 +99,6 @@ function getLineText(source, lineNumber) {
 }
 
 const unexpected = []
-const allowlisted = []
 
 for (const absolutePath of walk(repoRoot)) {
   const relativePath = path.relative(repoRoot, absolutePath).replace(/\\/g, '/')
@@ -143,38 +122,21 @@ for (const absolutePath of walk(repoRoot)) {
         text: getLineText(source, line),
       }
 
-      if (rule.isAllowed(relativePath, record.text)) {
-        allowlisted.push(record)
-      } else {
+      if (!rule.isAllowed(relativePath, record.text)) {
         unexpected.push(record)
       }
     }
   }
 }
 
-const hardFailures = unexpected.filter(finding => finding.rule !== 'upstream Claude Code branding')
-const upstreamFindings = unexpected.filter(
-  finding => finding.rule === 'upstream Claude Code branding',
-)
-
-if (hardFailures.length > 0) {
+if (unexpected.length > 0) {
   console.error('Branding audit failed. Unexpected matches:')
-  for (const finding of hardFailures) {
+  for (const finding of unexpected) {
     console.error(
       `${finding.path}:${finding.line}:${finding.column} [${finding.rule}] ${finding.text}`,
     )
-  }
-  if (upstreamFindings.length > 0) {
-    console.error(`Informational upstream Claude Code matches: ${upstreamFindings.length}`)
-  }
-  if (allowlisted.length > 0) {
-    console.error(`Allowlisted Claude Code matches: ${allowlisted.length}`)
   }
   process.exit(1)
 }
 
 console.log('Branding audit passed.')
-if (upstreamFindings.length > 0) {
-  console.log(`Informational upstream Claude Code matches: ${upstreamFindings.length}`)
-}
-console.log(`Allowlisted Claude Code matches: ${allowlisted.length}`)

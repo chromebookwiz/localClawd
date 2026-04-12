@@ -1,7 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -n \"description.*Claude Code\\\\|Claude Code.*description\" src/commands/*.ts src/commands/*.tsx)",
+      "Bash(grep -n \"description.*localclawd\\\\|localclawd.*description\" src/commands/*.ts src/commands/*.tsx)",
       "Bash(grep -n -i \"claude\" src/components/memory/*.tsx)",
       "Bash(node scripts/audit-branding.mjs)",
       "Bash(bun run:*)",
@@ -35,7 +35,9 @@
       "Bash(git show:*)",
       "Bash(python3 -)",
       "Bash(cat tsconfig.*.json)",
-      "Bash(awk -F: '{if\\($1>=520960 && $1<=522500\\) print}')"
+      "Bash(awk -F: '{if\\($1>=520960 && $1<=522500\\) print}')",
+      "Bash(ls /c/code/vllmclawd/node_modules/@anthropic-ai/sdk/*.js)",
+      "Bash(npm run:*)"
     ]
   }
 }

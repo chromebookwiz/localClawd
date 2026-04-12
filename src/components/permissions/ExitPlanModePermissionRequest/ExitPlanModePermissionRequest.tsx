@@ -12,8 +12,8 @@ import type { KeyboardEvent } from '../../../ink/events/keyboard-event.js';
 import { Box, Text } from '../../../ink.js';
 import type { AppState } from '../../../state/AppStateStore.js';
 import { AGENT_TOOL_NAME } from '../../../tools/AgentTool/constants.js';
-import { EXIT_PLAN_MODE_V2_TOOL_NAME } from '../../../tools/ExitPlanModeTool/constants.js';
-import type { AllowedPrompt } from '../../../tools/ExitPlanModeTool/ExitPlanModeV2Tool.js';
+import { EXIT_PLAN_MODE_TOOL_NAME } from '../../../tools/ExitPlanModeTool/constants.js';
+import type { AllowedPrompt } from '../../../tools/ExitPlanModeTool/ExitPlanModeTool.js';
 import { TEAM_CREATE_TOOL_NAME } from '../../../tools/TeamCreateTool/constants.js';
 import { isAgentSwarmsEnabled } from '../../../utils/agentSwarmsEnabled.js';
 import { calculateContextPercentages, getContextWindowForModel } from '../../../utils/context.js';
@@ -28,7 +28,7 @@ import { createPromptRuleContent, isClassifierPermissionsEnabled, PROMPT_PREFIX 
 import { type PermissionMode, toExternalPermissionMode } from '../../../utils/permissions/PermissionMode.js';
 import type { PermissionUpdate } from '../../../utils/permissions/PermissionUpdateSchema.js';
 import { isAutoModeGateEnabled, restoreDangerousPermissions, stripDangerousPermissionsForAutoMode } from '../../../utils/permissions/permissionSetup.js';
-import { getPewterLedgerVariant, isPlanModeInterviewPhaseEnabled } from '../../../utils/planModeV2.js';
+import { getPewterLedgerVariant, isPlanModeInterviewPhaseEnabled } from '../../../utils/planMode.js';
 import { getPlan, getPlanFilePath } from '../../../utils/plans.js';
 import { editFileInEditor, editPromptInEditor } from '../../../utils/promptEditor.js';
 import { getCurrentSessionTitle, getTranscriptPath, saveAgentName, saveCustomTitle } from '../../../utils/sessionStorage.js';
@@ -189,7 +189,7 @@ export function ExitPlanModePermissionRequest({
   // Use tool name to detect V2 instead of checking input.plan, because PR #10394
   // injects plan content into input.plan for hooks/SDK, which broke the old detection
   // (see issue #10878)
-  const isV2 = toolUseConfirm.tool.name === EXIT_PLAN_MODE_V2_TOOL_NAME;
+  const isExitPlanMode = toolUseConfirm.tool.name === EXIT_PLAN_MODE_TOOL_NAME;
   const inputPlan = isV2 ? undefined : toolUseConfirm.input.plan as string | undefined;
   const planFilePath = isV2 ? getPlanFilePath() : undefined;
 
@@ -738,7 +738,7 @@ export function buildPlanApprovalOptions({
     type: 'input',
     label: 'No, keep planning',
     value: 'no',
-    placeholder: 'Tell Claude what to change',
+    placeholder: 'Tell localclawd what to change',
     description: 'shift+tab to approve with this feedback',
     onChange: onFeedbackChange
   });

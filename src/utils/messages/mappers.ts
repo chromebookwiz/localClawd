@@ -12,7 +12,7 @@ import type {
   SDKRateLimitInfo,
 } from 'src/entrypoints/agentSdkTypes.js'
 import type { ClaudeAILimits } from 'src/services/claudeAiLimits.js'
-import { EXIT_PLAN_MODE_V2_TOOL_NAME } from 'src/tools/ExitPlanModeTool/constants.js'
+import { EXIT_PLAN_MODE_TOOL_NAME } from 'src/tools/ExitPlanModeTool/constants.js'
 import type {
   AssistantMessage,
   CompactMetadata,
@@ -253,7 +253,7 @@ export function toSDKRateLimitInfo(
 
 /**
  * Normalizes tool inputs in assistant message content for SDK consumption.
- * Specifically injects plan content into ExitPlanModeV2 tool inputs since
+ * Specifically injects plan content into ExitPlanModeTool inputs since
  * the V2 tool reads plan from file instead of input, but SDK users expect
  * tool_input.plan to exist.
  */
@@ -270,7 +270,7 @@ function normalizeAssistantMessageForSDK(
       return block
     }
 
-    if (block.name === EXIT_PLAN_MODE_V2_TOOL_NAME) {
+    if (block.name === EXIT_PLAN_MODE_TOOL_NAME) {
       const plan = getPlan()
       if (plan) {
         return {

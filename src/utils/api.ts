@@ -32,7 +32,7 @@ import { roughTokenCountEstimation } from '../services/tokenEstimation.js'
 import type { Tool, ToolPermissionContext, Tools } from '../Tool.js'
 import { AGENT_TOOL_NAME } from '../tools/AgentTool/constants.js'
 import type { AgentDefinition } from '../tools/AgentTool/loadAgentsDir.js'
-import { EXIT_PLAN_MODE_V2_TOOL_NAME } from '../tools/ExitPlanModeTool/constants.js'
+import { EXIT_PLAN_MODE_TOOL_NAME } from '../tools/ExitPlanModeTool/constants.js'
 import { TASK_OUTPUT_TOOL_NAME } from '../tools/TaskOutputTool/constants.js'
 import type { Message } from '../types/message.js'
 import { isAgentSwarmsEnabled } from './agentSwarmsEnabled.js'
@@ -85,7 +85,7 @@ export type SystemPromptBlock = {
 
 // Fields to filter from tool schemas when swarms are not enabled
 const SWARM_FIELDS_BY_TOOL: Record<string, string[]> = {
-  [EXIT_PLAN_MODE_V2_TOOL_NAME]: ['launchSwarm', 'teammateCount'],
+  [EXIT_PLAN_MODE_TOOL_NAME]: ['launchSwarm', 'teammateCount'],
   [AGENT_TOOL_NAME]: ['name', 'team_name', 'mode'],
 }
 
@@ -569,8 +569,8 @@ export function normalizeToolInput<T extends Tool>(
   agentId?: AgentId,
 ): z.infer<T['inputSchema']> {
   switch (tool.name) {
-    case EXIT_PLAN_MODE_V2_TOOL_NAME: {
-      // Always inject plan content and file path for ExitPlanModeV2 so hooks/SDK get the plan.
+    case EXIT_PLAN_MODE_TOOL_NAME: {
+      // Always inject plan content and file path for ExitPlanModeTool so hooks/SDK get the plan.
       // The V2 tool reads plan from file instead of input, but hooks/SDK
       const plan = getPlan(agentId)
       const planFilePath = getPlanFilePath(agentId)
@@ -681,13 +681,13 @@ export function normalizeToolInput<T extends Tool>(
 }
 
 // Strips fields that were added by normalizeToolInput before sending to API
-// (e.g., plan field from ExitPlanModeV2 which has an empty input schema)
+// (e.g., plan field from ExitPlanModeTool which has an empty input schema)
 export function normalizeToolInputForAPI<T extends Tool>(
   tool: T,
   input: z.infer<T['inputSchema']>,
 ): z.infer<T['inputSchema']> {
   switch (tool.name) {
-    case EXIT_PLAN_MODE_V2_TOOL_NAME: {
+    case EXIT_PLAN_MODE_TOOL_NAME: {
       // Strip injected fields before sending to API (schema expects empty object)
       if (
         input &&

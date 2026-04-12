@@ -41,7 +41,7 @@ import {
 import { hasWorktreeCreateHook } from './utils/hooks.js'
 import { checkAndRestoreITerm2Backup } from './utils/iTermBackup.js'
 import { logError } from './utils/log.js'
-import { getRecentActivity } from './utils/logoV2Utils.js'
+import { getRecentActivity } from './utils/logoUtils.js'
 import { lockCurrentVersion } from './utils/nativeInstaller/index.js'
 import type { PermissionMode } from './utils/permissions/PermissionMode.js'
 import { getPlanSlug } from './utils/plans.js'
@@ -457,7 +457,7 @@ export async function setup(
       // (trusted Anthropic-managed launcher intentionally pre-approving everything).
       // Precedent: permissionSetup.ts:861, applySettingsChange.ts:55 (PR #19116)
       process.env.CLAUDE_CODE_ENTRYPOINT !== 'local-agent' &&
-      // Same for CCD (Claude Code in Desktop) — apps#29127 passes the flag
+      // Same for CCD (localclawd in Desktop) — apps#29127 passes the flag
       // unconditionally to unlock mid-session bypass switching
       process.env.CLAUDE_CODE_ENTRYPOINT !== 'claude-desktop'
     ) {

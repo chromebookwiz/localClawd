@@ -27,7 +27,7 @@ export async function call(onDone: LocalJSXCommandOnDone, context: LocalJSXComma
     setTimeout(onDone, 0, 'Opened the Claude Max upgrade page in your browser. localclawd no longer runs a separate in-terminal login flow; use /provider to configure the backend you want after any browser-side account changes.');
   } catch (error) {
     logError(error as Error);
-    setTimeout(onDone, 0, 'Failed to open browser. /upgrade is a cloud-only feature — use /setup to configure a local backend instead.');
+    setTimeout(onDone, 0, 'Failed to open browser. /upgrade is a cloud-only feature — use /provider to configure a local backend instead.');
   }
   return null;
 }

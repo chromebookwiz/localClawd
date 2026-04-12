@@ -43,7 +43,7 @@ export async function execAgentHook(
   toolUseID: string | undefined,
   // Kept for signature stability with the other exec*Hook functions.
   // Was used by hook.prompt(messages) before the .transform() was removed
-  // (CC-79) — the only consumer of that was ExitPlanModeV2Tool's
+  // (CC-79) — the only consumer of that was ExitPlanModeTool's
   // programmatic construction, since refactored into VerifyPlanExecutionTool.
   _messages: Message[],
   agentName?: string,
@@ -105,7 +105,7 @@ export async function execAgentHook(
       ]
 
       const systemPrompt = asSystemPrompt([
-        `You are verifying a stop condition in Claude Code. Your task is to verify that the agent completed the given plan. The conversation transcript is available at: ${transcriptPath}\nYou can read this file to analyze the conversation history if needed.
+        `You are verifying a stop condition in localclawd. Your task is to verify that the agent completed the given plan. The conversation transcript is available at: ${transcriptPath}\nYou can read this file to analyze the conversation history if needed.
 
 Use the available tools to inspect the codebase and verify the condition.
 Use as few steps as possible - be efficient and direct.

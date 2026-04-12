@@ -17,7 +17,7 @@ type Props = {
   }) => void;
   commands: Command[];
 };
-export function HelpV2(t0) {
+export function Help(t0) {
   const $ = _c(44);
   const {
     onClose,
@@ -146,7 +146,7 @@ export function HelpV2(t0) {
   }
   let t7;
   if ($[33] === Symbol.for("react.memo_cache_sentinel")) {
-    t7 = <Box marginTop={1}><Text>For more help:{" "}<Link url="https://code.claude.com/docs/en/overview" /></Text></Box>;
+    t7 = <Box marginTop={1}><Text>For more help:{" "}<Link url="https://github.com/chromebookwiz/localclawd" /></Text></Box>;
     $[33] = t7;
   } else {
     t7 = $[33];

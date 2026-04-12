@@ -530,7 +530,7 @@ function renderNodeToOutput(
     //
     // The sibling-overlap check is load-bearing: Yoga's pixel-grid rounding
     // can give a box h=0 while still leaving a row for it (next sibling at
-    // y+1, not y). HelpV2's third shortcuts column hits this — skipping
+    // y+1, not y). Help's third shortcuts column hits this — skipping
     // unconditionally drops "ctrl + z to suspend" from /help output.
     if (height === 0 && siblingSharesY(node, yogaNode)) {
       nodeCache.set(node, { x, y, width, height, top: yogaTop })
@@ -1305,7 +1305,7 @@ function clipsBothAxes(node: DOMElement): boolean {
 // lands at the same computed top — then both write to that row and the
 // shorter content leaves the longer's tail visible. Yoga's pixel-grid
 // rounding can give h=0 while still advancing the next sibling's top
-// (HelpV2's third shortcuts column), so h=0 alone isn't sufficient.
+// (Help's third shortcuts column), so h=0 alone isn't sufficient.
 function siblingSharesY(node: DOMElement, yogaNode: LayoutNode): boolean {
   const parent = node.parentNode
   if (!parent) return false

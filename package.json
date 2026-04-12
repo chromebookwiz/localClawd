@@ -1,6 +1,6 @@
 {
   "name": "localclawd",
-  "version": "1.1.24",
+  "version": "1.1.25",
   "description": "Local-first coding CLI for vLLM, Ollama, and OpenAI-compatible backends.",
   "private": false,
   "type": "module",
@@ -31,6 +31,7 @@
     "build:probe": "bun build ./src/entrypoints/source-cli.ts --compile --outfile ./localclawd-build-probe.exe",
     "build:native": "bun run build && bun build ./dist/cli.mjs --compile --outfile ./localclawd.exe",
     "dev": "bun run build && node dist/cli.mjs",
+    "lint": "node scripts/lint.mjs",
     "prepack": "bun run build",
     "smoke": "bun run build && node dist/cli.mjs --version",
     "audit:branding": "node scripts/audit-branding.mjs",

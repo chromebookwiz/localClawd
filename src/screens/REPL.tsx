@@ -152,9 +152,9 @@ import { useMergedCommands } from '../hooks/useMergedCommands.js';
 import { useSkillsChange } from '../hooks/useSkillsChange.js';
 import { useManagePlugins } from '../hooks/useManagePlugins.js';
 import { Messages } from '../components/Messages.js';
-import { TaskListV2 } from '../components/TaskListV2.js';
+import { TaskList } from '../components/TaskList.js';
 import { TeammateViewHeader } from '../components/TeammateViewHeader.js';
-import { useTasksV2WithCollapseEffect } from '../hooks/useTasksV2.js';
+import { useTasksWithCollapseEffect } from '../hooks/useTasks.js';
 import { maybeMarkProjectOnboardingComplete } from '../projectOnboardingState.js';
 import type { MCPServerConnection } from '../services/mcp/types.js';
 import type { ScopedMcpServerConfig } from '../services/mcp/types.js';
@@ -784,7 +784,7 @@ export function REPL({
   useManagePlugins({
     enabled: !isRemoteSession
   });
-  const tasksV2 = useTasksV2WithCollapseEffect();
+  const todoTasks = useTasksWithCollapseEffect();
 
   // Start background plugin installations
 
@@ -2680,7 +2680,7 @@ export function REPL({
     // which was broken by SessionStart hook messages (prepended via
     // useDeferredHookMessages) and attachment messages (appended by
     // processTextPrompt) — both pushed length past 1 on turn one, so the
-    // title silently fell through to the "Claude Code" default.
+    // title silently fell through to the "localclawd" default.
     if (!titleDisabled && !sessionTitle && !agentTitle && !haikuTitleAttemptedRef.current) {
       const firstUserMessage = newMessages.find(m => m.type === 'user' && !m.isMeta);
       const text = firstUserMessage?.type === 'user' ? getContentText(firstUserMessage.message.content) : null;
@@ -2756,7 +2756,7 @@ export function REPL({
 
     // Scope the skill's effort override to this turn's context only —
     // wrapping getAppState keeps the override out of the global store so
-    // background agents and UI subscribers (Spinner, LogoV2) never see it.
+    // background agents and UI subscribers (Spinner, Logo) never see it.
     if (effort !== undefined) {
       const previousGetAppState = toolUseContext.getAppState;
       toolUseContext.getAppState = () => ({
@@ -4603,8 +4603,8 @@ export function REPL({
                 {toolJSX?.isLocalJSXCommand && toolJSX.isImmediate && !toolJsxCentered && <Box flexDirection="column" width="100%">
                       {toolJSX.jsx}
                     </Box>}
-                {!showSpinner && !toolJSX?.isLocalJSXCommand && showExpandedTodos && tasksV2 && tasksV2.length > 0 && <Box width="100%" flexDirection="column">
-                      <TaskListV2 tasks={tasksV2} isStandalone={true} />
+                    {!showSpinner && !toolJSX?.isLocalJSXCommand && showExpandedTodos && todoTasks && todoTasks.length > 0 && <Box width="100%" flexDirection="column">
+                      <TaskList tasks={todoTasks} isStandalone={true} />
                     </Box>}
                 {focusedInputDialog === 'sandbox-permission' && <SandboxPermissionRequest key={sandboxPermissionRequestQueue[0]!.hostPattern.host} hostPattern={sandboxPermissionRequestQueue[0]!.hostPattern} onUserResponse={(response: {
             allow: boolean;

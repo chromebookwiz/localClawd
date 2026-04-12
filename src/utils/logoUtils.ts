@@ -42,7 +42,7 @@ export function getLayoutMode(columns: number): LayoutMode {
 }
 
 /**
- * Calculates layout dimensions for the LogoV2 component
+ * Calculates layout dimensions for the logo component
  */
 export function calculateLayoutDimensions(
   columns: number,
@@ -261,7 +261,7 @@ export function formatReleaseNoteForDisplay(
 }
 
 /**
- * Gets the common logo display data used by both LogoV2 and CondensedLogo
+ * Gets the common logo display data used by both Logo and CondensedLogo
  */
 export function getLogoDisplayData(): {
   version: string

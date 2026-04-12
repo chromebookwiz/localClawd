@@ -2,7 +2,7 @@ import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growt
 import { getRateLimitTier, getSubscriptionType } from './auth.js'
 import { isEnvDefinedFalsy, isEnvTruthy } from './envUtils.js'
 
-export function getPlanModeV2AgentCount(): number {
+export function getPlanModeAgentCount(): number {
   // Environment variable override takes precedence
   if (process.env.CLAUDE_CODE_PLAN_V2_AGENT_COUNT) {
     const count = parseInt(process.env.CLAUDE_CODE_PLAN_V2_AGENT_COUNT, 10)
@@ -28,7 +28,7 @@ export function getPlanModeV2AgentCount(): number {
   return 1
 }
 
-export function getPlanModeV2ExploreAgentCount(): number {
+export function getPlanModeExploreAgentCount(): number {
   if (process.env.CLAUDE_CODE_PLAN_V2_EXPLORE_AGENT_COUNT) {
     const count = parseInt(
       process.env.CLAUDE_CODE_PLAN_V2_EXPLORE_AGENT_COUNT,

@@ -306,7 +306,7 @@ export async function getAnthropicClient({
   // Determine authentication method based on available tokens
   const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
     apiKey: localProviderEnabled
-      ? getLocalLLMApiKey()
+      ? (getLocalLLMApiKey() || 'local-no-key-required')
       : isClaudeAISubscriber()
         ? null
         : apiKey || getAnthropicApiKey(),

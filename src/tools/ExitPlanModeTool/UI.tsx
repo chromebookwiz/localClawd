@@ -10,7 +10,7 @@ import type { ProgressMessage } from '../../types/message.js';
 import { getDisplayPath } from '../../utils/file.js';
 import { getPlan } from '../../utils/plans.js';
 import type { ThemeName } from '../../utils/theme.js';
-import type { Output } from './ExitPlanModeV2Tool.js';
+import type { Output } from './ExitPlanModeTool.js';
 export function renderToolUseMessage(): React.ReactNode {
   return null;
 }
@@ -55,7 +55,7 @@ export function renderToolResultMessage(output: Output, _progressMessagesForMess
   return <Box flexDirection="column" marginTop={1}>
       <Box flexDirection="row">
         <Text color={getModeColor('plan')}>{BLACK_CIRCLE}</Text>
-        <Text> User approved Claude&apos;s plan</Text>
+        <Text> User approved localclawd&apos;s plan</Text>
       </Box>
       <MessageResponse>
         <Box flexDirection="column">

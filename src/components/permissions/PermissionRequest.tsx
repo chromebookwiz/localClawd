@@ -2,7 +2,7 @@ import { c as _c } from "react/compiler-runtime";
 import { feature } from 'bun:bundle';
 import * as React from 'react';
 import { EnterPlanModeTool } from 'src/tools/EnterPlanModeTool/EnterPlanModeTool.js';
-import { ExitPlanModeV2Tool } from 'src/tools/ExitPlanModeTool/ExitPlanModeV2Tool.js';
+import { ExitPlanModeTool } from 'src/tools/ExitPlanModeTool/ExitPlanModeTool.js';
 import { useNotifyAfterTimeout } from '../../hooks/useNotifyAfterTimeout.js';
 import { useKeybinding } from '../../keybindings/useKeybinding.js';
 import type { AnyObject, Tool, ToolUseContext } from '../../Tool.js';
@@ -60,7 +60,7 @@ function permissionComponentForTool(tool: Tool): React.ComponentType<PermissionR
       return WebFetchPermissionRequest;
     case NotebookEditTool:
       return NotebookEditPermissionRequest;
-    case ExitPlanModeV2Tool:
+    case ExitPlanModeTool:
       return ExitPlanModePermissionRequest;
     case EnterPlanModeTool:
       return EnterPlanModePermissionRequest;
@@ -127,7 +127,7 @@ export type ToolUseConfirm<Input extends AnyObject = AnyObject> = {
 };
 function getNotificationMessage(toolUseConfirm: ToolUseConfirm): string {
   const toolName = toolUseConfirm.tool.userFacingName(toolUseConfirm.input as never);
-  if (toolUseConfirm.tool === ExitPlanModeV2Tool) {
+  if (toolUseConfirm.tool === ExitPlanModeTool) {
     return 'localclawd needs your approval for the plan';
   }
   if (toolUseConfirm.tool === EnterPlanModeTool) {

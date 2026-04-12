@@ -21,7 +21,6 @@ import ctx_viz from './commands/ctx_viz/index.js'
 import doctor from './commands/doctor/index.js'
 import buddy from './commands/buddy/index.js'
 import keepgoing from './commands/keepgoing/index.js'
-import setup from './commands/setup/index.js'
 import telegram from './commands/telegram/index.js'
 import heartbeat from './commands/heartbeat/index.js'
 import sysprompt from './commands/sysprompt/index.js'
@@ -324,7 +323,6 @@ const COMMANDS = memoize((): Command[] => [
   usage,
   usageReport,
   vim,
-  setup,
   buddy,
   telegram,
   heartbeat,

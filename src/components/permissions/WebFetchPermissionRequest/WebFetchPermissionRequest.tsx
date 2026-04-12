@@ -101,7 +101,7 @@ export function WebFetchPermissionRequest(t0) {
     let t5;
     if ($[9] === Symbol.for("react.memo_cache_sentinel")) {
       t5 = {
-        label: <Text>No, and tell Claude what to do differently <Text bold={true}>(esc)</Text></Text>,
+        label: <Text>No, and tell localclawd what to do differently <Text bold={true}>(esc)</Text></Text>,
         value: "no"
       };
       $[9] = t5;

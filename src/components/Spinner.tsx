@@ -15,8 +15,8 @@ import type { Theme } from 'src/utils/theme.js';
 import { activityManager } from '../utils/activityManager.js';
 import { getSpinnerVerbs } from '../constants/spinnerVerbs.js';
 import { MessageResponse } from './MessageResponse.js';
-import { TaskListV2 } from './TaskListV2.js';
-import { useTasksV2 } from '../hooks/useTasksV2.js';
+import { TaskList } from './TaskList.js';
+import { useTasks } from '../hooks/useTasks.js';
 import type { Task } from '../utils/tasks.js';
 import { useAppState } from '../state/AppState.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -118,7 +118,7 @@ function SpinnerWithVerbInner({
   const {
     columns
   } = useTerminalSize();
-  const tasksV2 = useTasksV2();
+  const todoTasks = useTasks();
 
   // Track thinking status: 'thinking' | number (duration in ms) | null
   // Shows each state for minimum 2s to avoid UI jank
@@ -159,8 +159,8 @@ function SpinnerWithVerbInner({
   }, [mode]);
 
   // Find the current in-progress task and next pending task
-  const currentTodo = tasksV2?.find(task => task.status !== 'pending' && task.status !== 'completed');
-  const nextTask = findNextPendingTask(tasksV2);
+  const currentTodo = todoTasks?.find(task => task.status !== 'pending' && task.status !== 'completed');
+  const nextTask = findNextPendingTask(todoTasks);
 
   // Use useState with initializer to pick a random verb once on mount
   const [randomVerb] = useState(() => sample(getSpinnerVerbs()));
@@ -279,9 +279,9 @@ function SpinnerWithVerbInner({
   }
   return <Box flexDirection="column" width="100%" alignItems="flex-start">
       <SpinnerAnimationRow mode={mode} reducedMotion={reducedMotion} hasActiveTools={hasActiveTools} responseLengthRef={responseLengthRef} message={message} messageColor={messageColor} shimmerColor={shimmerColor} overrideColor={overrideColor} loadingStartTimeRef={loadingStartTimeRef} totalPausedMsRef={totalPausedMsRef} pauseStartTimeRef={pauseStartTimeRef} spinnerSuffix={spinnerSuffix} verbose={verbose} columns={columns} hasRunningTeammates={hasRunningTeammates} teammateTokens={teammateTokens} foregroundedTeammate={foregroundedTeammate} leaderIsIdle={leaderIsIdle} thinkingStatus={thinkingStatus} effortSuffix={effortSuffix} />
-      {showSpinnerTree && hasRunningTeammates ? <TeammateSpinnerTree selectedIndex={selectedIPAgentIndex} isInSelectionMode={viewSelectionMode === 'selecting-agent'} allIdle={allIdle} leaderVerb={leaderIsIdle ? undefined : leaderVerb} leaderIdleText={leaderIsIdle ? 'Idle' : undefined} leaderTokenCount={leaderTokenCount} /> : showExpandedTodos && tasksV2 && tasksV2.length > 0 ? <Box width="100%" flexDirection="column">
+      {showSpinnerTree && hasRunningTeammates ? <TeammateSpinnerTree selectedIndex={selectedIPAgentIndex} isInSelectionMode={viewSelectionMode === 'selecting-agent'} allIdle={allIdle} leaderVerb={leaderIsIdle ? undefined : leaderVerb} leaderIdleText={leaderIsIdle ? 'Idle' : undefined} leaderTokenCount={leaderTokenCount} /> : showExpandedTodos && todoTasks && todoTasks.length > 0 ? <Box width="100%" flexDirection="column">
           <MessageResponse>
-            <TaskListV2 tasks={tasksV2} />
+            <TaskList tasks={todoTasks} />
           </MessageResponse>
         </Box> : nextTask || effectiveTip || budgetText ?
     // IMPORTANT: we need this width="100%" to avoid an Ink bug where the

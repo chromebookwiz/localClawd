@@ -17,7 +17,7 @@ import {
 } from '../utils/model/providers.js'
 import { THEME_SETTINGS, type ThemeSetting } from '../utils/theme.js'
 import { LocalBackendSetup } from './LocalBackendSetup.js'
-import { WelcomeV2 } from './LogoV2/WelcomeV2.js'
+import { WelcomeLogo } from './Logo/WelcomeLogo.js'
 import { OrderedList } from './ui/OrderedList.js'
 
 // ─── Simple hand-rolled menu (no Select, no KeybindingSetup) ─────────────────
@@ -286,7 +286,7 @@ export function Onboarding({ onDone, showWelcome = true }: Props): React.ReactNo
 
   return (
     <Box flexDirection="column">
-      {showWelcome ? <WelcomeV2 /> : null}
+      {showWelcome ? <WelcomeLogo /> : null}
       <Box flexDirection="column" marginTop={1}>
         {currentStep?.component(isActive)}
       </Box>

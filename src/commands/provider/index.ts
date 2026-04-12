@@ -6,7 +6,7 @@ export default {
   type: 'local-jsx',
   name: 'provider',
   get description() {
-    return `Configure the local backend provider (currently ${getLocalLLMProviderLabel(getLocalLLMProvider())})`
+    return `Configure the backend pipeline (currently ${getLocalLLMProviderLabel(getLocalLLMProvider())})`
   },
   get immediate() {
     return shouldInferenceConfigCommandBeImmediate()

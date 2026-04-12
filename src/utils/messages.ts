@@ -82,7 +82,7 @@ import {
 } from './attachments.js'
 import { quote } from './bash/shellQuote.js'
 import { formatNumber, formatTokens } from './format.js'
-import { getPewterLedgerVariant } from './planModeV2.js'
+import { getPewterLedgerVariant } from './planMode.js'
 import { jsonStringify } from './slowOperations.js'
 
 // Hook attachments that have a hookName field (excludes HookPermissionDecisionAttachment)
@@ -109,7 +109,7 @@ import { areExplorePlanAgentsEnabled } from 'src/tools/AgentTool/builtInAgents.j
 import { AGENT_TOOL_NAME } from 'src/tools/AgentTool/constants.js'
 import { ASK_USER_QUESTION_TOOL_NAME } from 'src/tools/AskUserQuestionTool/prompt.js'
 import { BashTool } from 'src/tools/BashTool/BashTool.js'
-import { ExitPlanModeV2Tool } from 'src/tools/ExitPlanModeTool/ExitPlanModeV2Tool.js'
+import { ExitPlanModeTool } from 'src/tools/ExitPlanModeTool/ExitPlanModeTool.js'
 import { FileEditTool } from 'src/tools/FileEditTool/FileEditTool.js'
 import {
   FILE_READ_TOOL_NAME,
@@ -155,10 +155,10 @@ import { safeParseJSON } from './json.js'
 import { logError, logMCPDebug } from './log.js'
 import { normalizeLegacyToolName } from './permissions/permissionRuleParser.js'
 import {
-  getPlanModeV2AgentCount,
-  getPlanModeV2ExploreAgentCount,
+  getPlanModeAgentCount,
+  getPlanModeExploreAgentCount,
   isPlanModeInterviewPhaseEnabled,
-} from './planModeV2.js'
+} from './planMode.js'
 import { escapeRegExp } from './stringUtils.js'
 import { isTodoV2Enabled } from './tasks.js'
 
@@ -235,7 +235,7 @@ export function AUTO_REJECT_MESSAGE(toolName: string): string {
   return `Permission to use ${toolName} has been denied. ${DENIAL_WORKAROUND_GUIDANCE}`
 }
 export function DONT_ASK_REJECT_MESSAGE(toolName: string): string {
-  return `Permission to use ${toolName} has been denied because Claude Code is running in don't ask mode. ${DENIAL_WORKAROUND_GUIDANCE}`
+  return `Permission to use ${toolName} has been denied because localclawd is running in don't ask mode. ${DENIAL_WORKAROUND_GUIDANCE}`
 }
 export const NO_RESPONSE_REQUESTED = 'No response requested.'
 
@@ -2199,7 +2199,7 @@ export function normalizeMessagesForAPI(
           return
         }
         case 'assistant': {
-          // Normalize tool inputs for API (strip fields like plan from ExitPlanModeV2)
+          // Normalize tool inputs for API (strip fields like plan from ExitPlanModeTool)
           // When tool search is NOT enabled, we must strip tool_search-specific fields
           // like 'caller' from tool_use blocks, as these are only valid with the
           // tool search beta header
@@ -3140,12 +3140,12 @@ function getPlanModeInstructions(attachment: {
   planExists: boolean
 }): UserMessage[] {
   if (attachment.isSubAgent) {
-    return getPlanModeV2SubAgentInstructions(attachment)
+    return getPlanModeSubAgentInstructions(attachment)
   }
   if (attachment.reminderType === 'sparse') {
-    return getPlanModeV2SparseInstructions(attachment)
+    return getPlanModeSparseInstructions(attachment)
   }
-  return getPlanModeV2Instructions(attachment)
+  return getPlanModeInstructionsFull(attachment)
 }
 
 // --
@@ -3204,7 +3204,7 @@ function getPlanPhase4Section(): string {
   }
 }
 
-function getPlanModeV2Instructions(attachment: {
+function getPlanModeInstructionsFull(attachment: {
   isSubAgent?: boolean
   planFilePath?: string
   planExists?: boolean
@@ -3218,8 +3218,8 @@ function getPlanModeV2Instructions(attachment: {
     return getPlanModeInterviewInstructions(attachment)
   }
 
-  const agentCount = getPlanModeV2AgentCount()
-  const exploreAgentCount = getPlanModeV2ExploreAgentCount()
+  const agentCount = getPlanModeAgentCount()
+  const exploreAgentCount = getPlanModeExploreAgentCount()
   const planFileInfo = attachment.planExists
     ? `A plan file already exists at ${attachment.planFilePath}. You can read it and make incremental edits using the ${FileEditTool.name} tool.`
     : `No plan file exists yet. You should create your plan at ${attachment.planFilePath} using the ${FileWriteTool.name} tool.`
@@ -3283,11 +3283,11 @@ Goal: Review the plan(s) from Phase 2 and ensure alignment with the user's inten
 
 ${getPlanPhase4Section()}
 
-### Phase 5: Call ${ExitPlanModeV2Tool.name}
-At the very end of your turn, once you have asked the user questions and are happy with your final plan file - you should always call ${ExitPlanModeV2Tool.name} to indicate to the user that you are done planning.
-This is critical - your turn should only end with either using the ${ASK_USER_QUESTION_TOOL_NAME} tool OR calling ${ExitPlanModeV2Tool.name}. Do not stop unless it's for these 2 reasons
+### Phase 5: Call ${ExitPlanModeTool.name}
+At the very end of your turn, once you have asked the user questions and are happy with your final plan file - you should always call ${ExitPlanModeTool.name} to indicate to the user that you are done planning.
+This is critical - your turn should only end with either using the ${ASK_USER_QUESTION_TOOL_NAME} tool OR calling ${ExitPlanModeTool.name}. Do not stop unless it's for these 2 reasons
 
-**Important:** Use ${ASK_USER_QUESTION_TOOL_NAME} ONLY to clarify requirements or choose between approaches. Use ${ExitPlanModeV2Tool.name} to request plan approval. Do NOT ask about plan approval in any other way - no text questions, no AskUserQuestion. Phrases like "Is this plan okay?", "Should I proceed?", "How does this plan look?", "Any changes before we start?", or similar MUST use ${ExitPlanModeV2Tool.name}.
+**Important:** Use ${ASK_USER_QUESTION_TOOL_NAME} ONLY to clarify requirements or choose between approaches. Use ${ExitPlanModeTool.name} to request plan approval. Do NOT ask about plan approval in any other way - no text questions, no AskUserQuestion. Phrases like "Is this plan okay?", "Should I proceed?", "How does this plan look?", "Any changes before we start?", or similar MUST use ${ExitPlanModeTool.name}.
 
 NOTE: At any point in time through this workflow you should feel free to ask the user questions or clarifications using the ${ASK_USER_QUESTION_TOOL_NAME} tool. Don't make large assumptions about user intent. The goal is to present a well researched plan to the user, and tie any loose ends before implementation begins.`
 
@@ -3367,36 +3367,36 @@ Your plan file should be divided into clear sections using markdown headers, bas
 
 ### When to Converge
 
-Your plan is ready when you've addressed all ambiguities and it covers: what to change, which files to modify, what existing code to reuse (with file paths), and how to verify the changes. Call ${ExitPlanModeV2Tool.name} when the plan is ready for approval.
+Your plan is ready when you've addressed all ambiguities and it covers: what to change, which files to modify, what existing code to reuse (with file paths), and how to verify the changes. Call ${ExitPlanModeTool.name} when the plan is ready for approval.
 
 ### Ending Your Turn
 
 Your turn should only end by either:
 - Using ${ASK_USER_QUESTION_TOOL_NAME} to gather more information
-- Calling ${ExitPlanModeV2Tool.name} when the plan is ready for approval
+- Calling ${ExitPlanModeTool.name} when the plan is ready for approval
 
-**Important:** Use ${ExitPlanModeV2Tool.name} to request plan approval. Do NOT ask about plan approval via text or AskUserQuestion.`
+**Important:** Use ${ExitPlanModeTool.name} to request plan approval. Do NOT ask about plan approval via text or AskUserQuestion.`
 
   return wrapMessagesInSystemReminder([
     createUserMessage({ content, isMeta: true }),
   ])
 }
 
-function getPlanModeV2SparseInstructions(attachment: {
+function getPlanModeSparseInstructions(attachment: {
   planFilePath: string
 }): UserMessage[] {
   const workflowDescription = isPlanModeInterviewPhaseEnabled()
     ? 'Follow iterative workflow: explore codebase, interview user, write to plan incrementally.'
     : 'Follow 5-phase workflow.'
 
-  const content = `Plan mode still active (see full instructions earlier in conversation). Read-only except plan file (${attachment.planFilePath}). ${workflowDescription} End turns with ${ASK_USER_QUESTION_TOOL_NAME} (for clarifications) or ${ExitPlanModeV2Tool.name} (for plan approval). Never ask about plan approval via text or AskUserQuestion.`
+  const content = `Plan mode still active (see full instructions earlier in conversation). Read-only except plan file (${attachment.planFilePath}). ${workflowDescription} End turns with ${ASK_USER_QUESTION_TOOL_NAME} (for clarifications) or ${ExitPlanModeTool.name} (for plan approval). Never ask about plan approval via text or AskUserQuestion.`
 
   return wrapMessagesInSystemReminder([
     createUserMessage({ content, isMeta: true }),
   ])
 }
 
-function getPlanModeV2SubAgentInstructions(attachment: {
+function getPlanModeSubAgentInstructions(attachment: {
   planFilePath: string
   planExists: boolean
 }): UserMessage[] {
@@ -3837,7 +3837,7 @@ You are returning to plan mode after having previously exited it. A plan file ex
 3. Decide how to proceed:
    - **Different task**: If the user's request is for a different task—even if it's similar or related—start fresh by overwriting the existing plan
    - **Same task, continuing**: If this is explicitly a continuation or refinement of the exact same task, modify the existing plan while cleaning up outdated or irrelevant sections
-4. Continue on with the plan process and most importantly you should always edit the plan file one way or the other before calling ${ExitPlanModeV2Tool.name}
+4. Continue on with the plan process and most importantly you should always edit the plan file one way or the other before calling ${ExitPlanModeTool.name}
 
 Treat this as a fresh planning session. Do not assume the existing plan is relevant without evaluating it first.`
 

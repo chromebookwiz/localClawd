@@ -40,7 +40,7 @@ import {
 import { writeToMailbox } from '../../utils/teammateMailbox.js'
 import { AGENT_TOOL_NAME } from '../AgentTool/constants.js'
 import { TEAM_CREATE_TOOL_NAME } from '../TeamCreateTool/constants.js'
-import { EXIT_PLAN_MODE_V2_TOOL_NAME } from './constants.js'
+import { EXIT_PLAN_MODE_TOOL_NAME } from './constants.js'
 import { EXIT_PLAN_MODE_V2_TOOL_PROMPT } from './prompt.js'
 import {
   renderToolResultMessage,
@@ -144,8 +144,8 @@ type OutputSchema = ReturnType<typeof outputSchema>
 
 export type Output = z.infer<OutputSchema>
 
-export const ExitPlanModeV2Tool: Tool<InputSchema, Output> = buildTool({
-  name: EXIT_PLAN_MODE_V2_TOOL_NAME,
+export const ExitPlanModeTool: Tool<InputSchema, Output> = buildTool({
+  name: EXIT_PLAN_MODE_TOOL_NAME,
   searchHint: 'present plan for approval and start coding (plan mode only)',
   maxResultSizeChars: 100_000,
   async description() {
@@ -338,7 +338,7 @@ export const ExitPlanModeV2Tool: Tool<InputSchema, Output> = buildTool({
           permissionSetupModule?.getAutoModeUnavailableNotification(reason) ??
           'auto mode unavailable'
         logForDebugging(
-          `[auto-mode gate @ ExitPlanModeV2Tool] prePlanMode=${prePlanRaw} ` +
+          `[auto-mode gate @ ExitPlanModeTool] prePlanMode=${prePlanRaw} ` +
             `but gate is off (reason=${reason}) — falling back to default on plan exit`,
           { level: 'warn' },
         )

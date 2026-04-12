@@ -1,5 +1,5 @@
 /**
- * Main entrypoint for Claude Code Agent SDK types.
+ * Main entrypoint for localclawd Agent SDK types.
  *
  * This file re-exports the public SDK API from:
  * - sdk/coreTypes.ts - Common serializable types (messages, configs)
@@ -109,6 +109,8 @@ export type {
   ForkSessionResult,
   SDKSessionInfo,
 }
+
+export type SDKStatus = 'compacting' | null
 
 export function tool<Schema extends AnyZodRawShape>(
   _name: string,
