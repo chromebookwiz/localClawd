@@ -1,10 +1,5 @@
 import { feature } from 'bun:bundle'
-import {
-  isClaudeInChromeSupported,
-  shouldAutoEnableClaudeInChrome,
-} from 'src/utils/browserIntegration/setup.js'
 import { registerBatchSkill } from './batch.js'
-import { registerClaudeInChromeSkill } from './browserIntegration.js'
 import { registerDebugSkill } from './debug.js'
 import { registerKeybindingsSkill } from './keybindings.js'
 import { registerLoremIpsumSkill } from './loremIpsum.js'
@@ -69,9 +64,6 @@ export function initBundledSkills(): void {
     const { registerClaudeApiSkill } = require('./llmApi.js')
     /* eslint-enable @typescript-eslint/no-require-imports */
     registerClaudeApiSkill()
-  }
-  if (isClaudeInChromeSupported() && shouldAutoEnableClaudeInChrome()) {
-    registerClaudeInChromeSkill()
   }
   if (feature('RUN_SKILL_GENERATOR')) {
     /* eslint-disable @typescript-eslint/no-require-imports */

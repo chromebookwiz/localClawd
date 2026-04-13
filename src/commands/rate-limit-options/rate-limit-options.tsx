@@ -12,8 +12,6 @@ import { getOauthAccountInfo, getRateLimitTier, getSubscriptionType } from '../.
 import { hasClaudeAiBillingAccess } from '../../utils/billing.js';
 import { call as extraUsageCall } from '../extra-usage/extra-usage.js';
 import { extraUsage } from '../extra-usage/index.js';
-import upgrade from '../upgrade/index.js';
-import { call as upgradeCall } from '../upgrade/upgrade.js';
 type RateLimitOptionsMenuOptionType = 'upgrade' | 'extra-usage' | 'cancel';
 type RateLimitOptionsMenuProps = {
   onDone: (result?: string, options?: {
@@ -81,7 +79,8 @@ function RateLimitOptionsMenu(t0) {
           actionOptions.push(t4);
         }
       }
-      if (!isMax20x && !isTeamOrEnterprise && upgrade.isEnabled()) {
+      if (false) {
+        // upgrade option removed (localclawd is local-first)
         let t4;
         if ($[7] === Symbol.for("react.memo_cache_sentinel")) {
           t4 = {
@@ -151,26 +150,15 @@ function RateLimitOptionsMenu(t0) {
   let t5;
   if ($[15] !== context || $[16] !== handleCancel || $[17] !== onDone) {
     t5 = function handleSelect(value) {
-      if (value === "upgrade") {
-        logEvent("tengu_rate_limit_options_menu_select_upgrade", {});
-        upgradeCall(onDone, context).then(jsx => {
-          if (jsx) {
-            setSubCommandJSX(jsx);
+      if (value === "extra-usage") {
+        logEvent("tengu_rate_limit_options_menu_select_extra_usage", {});
+        extraUsageCall(onDone, context).then(jsx_0 => {
+          if (jsx_0) {
+            setSubCommandJSX(jsx_0);
           }
         });
-      } else {
-        if (value === "extra-usage") {
-          logEvent("tengu_rate_limit_options_menu_select_extra_usage", {});
-          extraUsageCall(onDone, context).then(jsx_0 => {
-            if (jsx_0) {
-              setSubCommandJSX(jsx_0);
-            }
-          });
-        } else {
-          if (value === "cancel") {
-            handleCancel();
-          }
-        }
+      } else if (value === "cancel") {
+        handleCancel();
       }
     };
     $[15] = context;

@@ -43,7 +43,9 @@
       "Bash(xargs sed:*)",
       "Bash(grep -v \"node_modules\\\\|types/generated\\\\|//.*Claude\\\\|import \\\\|auth\\\\.ts\\\\|claude\\\\.ai\\\\|\\\\.claude\\\\.\")",
       "Bash(sed -i \"s/# localclawd in Chrome browser automation/# localclawd in Chrome browser automation/g; s/localclawd in Chrome skill availability/localclawd in Chrome skill availability/g\" src/utils/browserIntegration/prompt.ts)",
-      "Bash(sed -i \"s/localclawd in Chrome extension/localclawd in Chrome extension/g\" src/utils/browserIntegration/setupPortable.ts)"
+      "Bash(sed -i \"s/localclawd in Chrome extension/localclawd in Chrome extension/g\" src/utils/browserIntegration/setupPortable.ts)",
+      "Bash(grep -v \"node_modules\\\\|//.* claude\\\\|import \")",
+      "Bash(git mv:*)"
     ]
   }
 }

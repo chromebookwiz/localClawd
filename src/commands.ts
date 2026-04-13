@@ -3,14 +3,12 @@ import addDir from './commands/add-dir/index.js'
 import autofixPr from './commands/autofix-pr/index.js'
 import backfillSessions from './commands/backfill-sessions/index.js'
 import btw from './commands/btw/index.js'
-import goodClaude from './commands/good-claude/index.js'
 import issue from './commands/issue/index.js'
 import feedback from './commands/feedback/index.js'
 import clear from './commands/clear/index.js'
 import color from './commands/color/index.js'
 import commit from './commands/commit.js'
 import copy from './commands/copy/index.js'
-import desktop from './commands/desktop/index.js'
 import commitPushPr from './commands/commit-push-pr.js'
 import compact from './commands/compact/index.js'
 import config from './commands/config/index.js'
@@ -35,10 +33,8 @@ import init from './commands/init.js'
 import initVerifiers from './commands/init-verifiers.js'
 import keybindings from './commands/keybindings/index.js'
 import logout from './commands/logout/index.js'
-import installSlackApp from './commands/install-slack-app/index.js'
 import breakCache from './commands/break-cache/index.js'
 import mcp from './commands/mcp/index.js'
-import mobile from './commands/mobile/index.js'
 import pr_comments from './commands/pr_comments/index.js'
 import releaseNotes from './commands/release-notes/index.js'
 import rename from './commands/rename/index.js'
@@ -148,8 +144,6 @@ import {
 import antTrace from './commands/ant-trace/index.js'
 import perfIssue from './commands/perf-issue/index.js'
 import sandboxToggle from './commands/sandbox-toggle/index.js'
-import chrome from './commands/chrome/index.js'
-import stickers from './commands/stickers/index.js'
 import advisor from './commands/advisor.js'
 import { logError } from './utils/log.js'
 import { toError } from './utils/errors.js'
@@ -178,7 +172,6 @@ import tag from './commands/tag/index.js'
 import outputStyle from './commands/output-style/index.js'
 import provider from './commands/provider/index.js'
 import remoteEnv from './commands/remote-env/index.js'
-import upgrade from './commands/upgrade/index.js'
 import {
   extraUsage,
   extraUsageNonInteractive,
@@ -262,13 +255,11 @@ const COMMANDS = memoize((): Command[] => [
   agents,
   branch,
   btw,
-  chrome,
   clear,
   color,
   compact,
   config,
   copy,
-  desktop,
   context,
   contextNonInteractive,
   cost,
@@ -286,10 +277,8 @@ const COMMANDS = memoize((): Command[] => [
   keybindings,
   thinkharder,
   thinknormal,
-  installSlackApp,
   mcp,
   memory,
-  mobile,
   model,
   outputStyle,
   provider,
@@ -305,7 +294,6 @@ const COMMANDS = memoize((): Command[] => [
   stats,
   status,
   statusline,
-  stickers,
   tag,
   theme,
   feedback,
@@ -314,7 +302,6 @@ const COMMANDS = memoize((): Command[] => [
   rewind,
   securityReview,
   terminalSetup,
-  upgrade,
   extraUsage,
   extraUsageNonInteractive,
   rateLimitOptions,
