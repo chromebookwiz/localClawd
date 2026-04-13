@@ -8,29 +8,29 @@ type Props = {
   pose?: ClawdPose
 }
 
-// Claude-style asterisk — 5 rows × 9 chars, symmetric top↔bottom and left↔right.
+// localclawd logo — 5 rows × 9 chars, symmetric left↔right.
 //
-// Row 0: upper arm tips  ▖▖     ▗▗  (lower quads at top of cell = tips of upward arms)
-// Row 1: upper body      ▗▟█████▙▖
-// Row 2: waist           ·▐▛███▜▌·
-// Row 3: lower body      ▝▜█████▛▘
-// Row 4: lower arm tips  ▘▘     ▝▝  (upper quads at bottom of cell = tips of downward arms)
+// Row 0: upper body      ▗▟█████▙▗
+// Row 1: waist           ·▐▛███▜▌·
+// Row 2: lower body      ▝▜█████▛▘
+// Row 3: hip/connector   ··▐█·█▌··
+// Row 4: legs            ··▐▌·▐▌··
 
 const ROWS: readonly string[] = [
-  '▖▖     ▗▗',
-  '▗▟█████▙▖',
+  '▗▟█████▙▗',
   ' ▐▛███▜▌ ',
   '▝▜█████▛▘',
-  '▘▘     ▝▝',
+  '  ▐█ █▌  ',
+  '  ▐▌ ▐▌  ',
 ]
 
 // Indigo palette matching the app accent color (#6366f1)
 const ROW_COLORS: readonly string[] = [
-  '#818cf8',   // lighter indigo for arm tips
   '#6366f1',   // main indigo
   '#6366f1',
   '#6366f1',
-  '#818cf8',   // lighter indigo for arm tips
+  '#818cf8',   // lighter indigo for legs
+  '#818cf8',
 ]
 
 export function Clawd({ pose: _pose = 'default' }: Props) {

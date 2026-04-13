@@ -1,9 +1,9 @@
-import { BASE_CHROME_PROMPT } from '../../utils/claudeInChrome/prompt.js'
+import { BASE_CHROME_PROMPT } from '../../utils/browserIntegration/prompt.js'
 import {
   getClaudeInChromeAllowedTools,
   isClaudeInChromeSupported,
   shouldAutoEnableClaudeInChrome,
-} from '../../utils/claudeInChrome/setup.js'
+} from '../../utils/browserIntegration/setup.js'
 import { registerBundledSkill } from '../bundledSkills.js'
 
 const SKILL_ACTIVATION_MESSAGE = `

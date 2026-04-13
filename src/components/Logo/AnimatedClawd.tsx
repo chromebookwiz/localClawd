@@ -9,7 +9,7 @@ import { CLAWD_HEIGHT, Clawd } from './Clawd.js'
  */
 export function AnimatedClawd(): React.ReactNode {
   return (
-    <Box height={CLAWD_HEIGHT} flexDirection="column">
+    <Box height={CLAWD_HEIGHT} flexDirection="column" width={10}>
       <Clawd />
     </Box>
   )

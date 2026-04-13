@@ -13,7 +13,7 @@ This repository is ready for a source-first `v1.0.0` GitHub release. The univers
 
 - Branding and publish-surface verification are currently green from this checkout.
 - `npm run lint` passes locally, covering build, branding audit, installed binary verification, and interactive startup verification.
-- High-signal `Claude Code` / `Claude Desktop` source references have been removed from the live `src/**` tree. Remaining references are intentional compatibility surfaces, audit rules, or migration helpers.
+- High-signal legacy branding source references have been removed from the live `src/**` tree. Remaining references are intentional compatibility surfaces, audit rules, or migration helpers.
 - The working tree also contains a broader V2-to-non-V2 consolidation (`LogoV2`, `TaskListV2`, `useTasksV2`, `ExitPlanModeV2Tool`, `planModeV2`) that is mechanically consistent but larger than the minimal branding publish pass.
 - One adjacent runtime change merits explicit review in any release PR: `src/services/api/client.ts` now falls back to `local-no-key-required` for local-provider SDK configuration.
 

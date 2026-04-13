@@ -2,9 +2,9 @@ import { readdir } from 'fs/promises'
 import { getCwd } from '../../utils/cwd.js'
 import { registerBundledSkill } from '../bundledSkills.js'
 
-// claudeApiContent.js bundles 247KB of .md strings. Lazy-load inside
+// llmApiContent.js bundles 247KB of .md strings. Lazy-load inside
 // getPromptForCommand so they only enter memory when /claude-api is invoked.
-type SkillContent = typeof import('./claudeApiContent.js')
+type SkillContent = typeof import('./llmApiContent.js')
 
 type DetectedLanguage =
   | 'python'
@@ -187,7 +187,7 @@ export function registerClaudeApiSkill(): void {
     allowedTools: ['Read', 'Grep', 'Glob', 'WebFetch'],
     userInvocable: true,
     async getPromptForCommand(args) {
-      const content = await import('./claudeApiContent.js')
+      const content = await import('./llmApiContent.js')
       const lang = await detectLanguage()
       const prompt = buildPrompt(lang, args, content)
       return [{ type: 'text', text: prompt }]

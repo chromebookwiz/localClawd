@@ -37,7 +37,10 @@
       "Bash(cat tsconfig.*.json)",
       "Bash(awk -F: '{if\\($1>=520960 && $1<=522500\\) print}')",
       "Bash(ls /c/code/vllmclawd/node_modules/@anthropic-ai/sdk/*.js)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(grep -rn \"timeout\\\\|Timeout\\\\|TIMEOUT\" src/services/api/ src/screens/ src/components/Spinner* --include=\"*.tsx\" --include=\"*.ts\")",
+      "Bash(grep -rn \"Brewing\\\\|brewing\\\\|spinner\\\\|Spinner\\\\|✻\\\\|✽\" src/components/Spinner* src/screens/ src/components/InterruptedByUser* --include=\"*.tsx\" --include=\"*.ts\")",
+      "Bash(xargs sed:*)"
     ]
   }
 }
