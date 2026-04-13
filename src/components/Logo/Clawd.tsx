@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Box, Text } from '../../ink.js'
 
 export type ClawdPose = 'default'
-export const CLAWD_HEIGHT = 5
+export const CLAWD_HEIGHT = 4
 
 type Props = {
   pose?: ClawdPose
@@ -20,8 +20,7 @@ const ROWS: readonly string[] = [
   '▗▟█████▙▗',
   ' ▐▛███▜▌ ',
   '▝▜█████▛▘',
-  '  ▐█ █▌  ',
-  '  ▐▌ ▐▌  ',
+  '  ▄▄ ▄▄  ',
 ]
 
 // Indigo palette matching the app accent color (#6366f1)
@@ -29,8 +28,7 @@ const ROW_COLORS: readonly string[] = [
   '#6366f1',   // main indigo
   '#6366f1',
   '#6366f1',
-  '#818cf8',   // lighter indigo for legs
-  '#818cf8',
+  '#818cf8',   // lighter indigo for stub feet
 ]
 
 export function Clawd({ pose: _pose = 'default' }: Props) {
