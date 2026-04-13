@@ -939,7 +939,7 @@ export const SettingsSchema = lazySchema(() =>
         .boolean()
         .optional()
         .describe(
-          'Enable auto-memory for this project. When false, Claude will not read from or write to the auto-memory directory.',
+          'Enable auto-memory for this project. When false, localclawd will not read from or write to the auto-memory directory.',
         ),
       autoMemoryDirectory: z
         .string()

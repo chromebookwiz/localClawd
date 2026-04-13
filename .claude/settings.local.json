@@ -40,7 +40,10 @@
       "Bash(npm run:*)",
       "Bash(grep -rn \"timeout\\\\|Timeout\\\\|TIMEOUT\" src/services/api/ src/screens/ src/components/Spinner* --include=\"*.tsx\" --include=\"*.ts\")",
       "Bash(grep -rn \"Brewing\\\\|brewing\\\\|spinner\\\\|Spinner\\\\|✻\\\\|✽\" src/components/Spinner* src/screens/ src/components/InterruptedByUser* --include=\"*.tsx\" --include=\"*.ts\")",
-      "Bash(xargs sed:*)"
+      "Bash(xargs sed:*)",
+      "Bash(grep -v \"node_modules\\\\|types/generated\\\\|//.*Claude\\\\|import \\\\|auth\\\\.ts\\\\|claude\\\\.ai\\\\|\\\\.claude\\\\.\")",
+      "Bash(sed -i \"s/# localclawd in Chrome browser automation/# localclawd in Chrome browser automation/g; s/localclawd in Chrome skill availability/localclawd in Chrome skill availability/g\" src/utils/browserIntegration/prompt.ts)",
+      "Bash(sed -i \"s/localclawd in Chrome extension/localclawd in Chrome extension/g\" src/utils/browserIntegration/setupPortable.ts)"
     ]
   }
 }
