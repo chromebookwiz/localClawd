@@ -172,11 +172,7 @@ import tag from './commands/tag/index.js'
 import outputStyle from './commands/output-style/index.js'
 import provider from './commands/provider/index.js'
 import remoteEnv from './commands/remote-env/index.js'
-import {
-  extraUsage,
-  extraUsageNonInteractive,
-} from './commands/extra-usage/index.js'
-import rateLimitOptions from './commands/rate-limit-options/index.js'
+import goodClawd from './commands/good-clawd/index.js'
 import statusline from './commands/statusline.js'
 import effort from './commands/effort/index.js'
 import stats from './commands/stats/index.js'
@@ -224,7 +220,7 @@ export const INTERNAL_ONLY_COMMANDS = [
   commit,
   commitPushPr,
   ctx_viz,
-  goodClaude,
+  goodClawd,
   issue,
   initVerifiers,
   ...(forceSnip ? [forceSnip] : []),
@@ -302,9 +298,6 @@ const COMMANDS = memoize((): Command[] => [
   rewind,
   securityReview,
   terminalSetup,
-  extraUsage,
-  extraUsageNonInteractive,
-  rateLimitOptions,
   usage,
   usageReport,
   vim,
