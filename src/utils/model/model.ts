@@ -169,9 +169,9 @@ export function getRuntimeMainLoopModel(params: {
 /**
  * Get the default main loop model setting.
  *
- * This handles the built-in default:
- * - Opus for Max and Team Premium users
- * - Sonnet 4.6 for all other users (including Team Standard, Pro, Enterprise)
+ * localclawd: models come from the user's provider configuration.
+ * - Local providers (vLLM/Ollama/OpenAI): use configured local model
+ * - API key users: default to Sonnet
  *
  * @returns The default model setting to use
  */
@@ -190,18 +190,7 @@ export function getDefaultMainLoopModelSetting(): ModelName | ModelAlias {
     )
   }
 
-  // Max users get Opus as default
-  if (isMaxSubscriber()) {
-    return getDefaultOpusModel() + (isOpus1mMergeEnabled() ? '[1m]' : '')
-  }
-
-  // Team Premium gets Opus (same as Max)
-  if (isTeamPremiumSubscriber()) {
-    return getDefaultOpusModel() + (isOpus1mMergeEnabled() ? '[1m]' : '')
-  }
-
-  // PAYG (1P and 3P), Enterprise, Team Standard, and Pro get Sonnet as default
-  // Note that PAYG (3P) may default to an older Sonnet model
+  // API key users default to Sonnet
   return getDefaultSonnetModel()
 }
 

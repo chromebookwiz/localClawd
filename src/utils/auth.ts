@@ -1566,11 +1566,8 @@ async function checkAndRefreshOAuthTokenIfNeededImpl(
 }
 
 export function isClaudeAISubscriber(): boolean {
-  if (!isAnthropicAuthEnabled()) {
-    return false
-  }
-
-  return shouldUseClaudeAIAuth(getClaudeAIOAuthTokens()?.scopes)
+  // localclawd: no Anthropic subscriptions — always false
+  return false
 }
 
 /**
@@ -1649,58 +1646,33 @@ export function isOverageProvisioningAllowed(): boolean {
 // Returns whether the user has Opus access at all, regardless of whether they
 // are a subscriber or PayG.
 export function hasOpusAccess(): boolean {
-  const subscriptionType = getSubscriptionType()
-
-  return (
-    subscriptionType === 'max' ||
-    subscriptionType === 'enterprise' ||
-    subscriptionType === 'team' ||
-    subscriptionType === 'pro' ||
-    // subscriptionType === null covers both API users and the case where
-    // subscribers do not have subscription type populated. For those
-    // subscribers, when in doubt, we should not limit their access to Opus.
-    subscriptionType === null
-  )
+  // localclawd: local users can use any model
+  return true
 }
 
 export function getSubscriptionType(): SubscriptionType | null {
-  // Check for mock subscription type first (ANT-only testing)
-  if (shouldUseMockSubscription()) {
-    return getMockSubscriptionType()
-  }
-
-  if (!isAnthropicAuthEnabled()) {
-    return null
-  }
-  const oauthTokens = getClaudeAIOAuthTokens()
-  if (!oauthTokens) {
-    return null
-  }
-
-  return oauthTokens.subscriptionType ?? null
+  // localclawd: no Anthropic subscriptions
+  return null
 }
 
 export function isMaxSubscriber(): boolean {
-  return getSubscriptionType() === 'max'
+  return false
 }
 
 export function isTeamSubscriber(): boolean {
-  return getSubscriptionType() === 'team'
+  return false
 }
 
 export function isTeamPremiumSubscriber(): boolean {
-  return (
-    getSubscriptionType() === 'team' &&
-    getRateLimitTier() === 'default_claude_max_5x'
-  )
+  return false
 }
 
 export function isEnterpriseSubscriber(): boolean {
-  return getSubscriptionType() === 'enterprise'
+  return false
 }
 
 export function isProSubscriber(): boolean {
-  return getSubscriptionType() === 'pro'
+  return false
 }
 
 export function getRateLimitTier(): string | null {
@@ -1716,20 +1688,7 @@ export function getRateLimitTier(): string | null {
 }
 
 export function getSubscriptionName(): string {
-  const subscriptionType = getSubscriptionType()
-
-  switch (subscriptionType) {
-    case 'enterprise':
-      return 'localclawd Enterprise'
-    case 'team':
-      return 'localclawd Team'
-    case 'max':
-      return 'localclawd Max'
-    case 'pro':
-      return 'localclawd Pro'
-    default:
-      return 'localclawd API'
-  }
+  return 'localclawd'
 }
 
 /** Check if using third-party services (Bedrock or Vertex or Foundry) */

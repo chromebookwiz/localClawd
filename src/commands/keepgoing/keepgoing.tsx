@@ -27,6 +27,7 @@ import {
   isTelegramActive,
   sendTelegramMessage,
 } from '../../services/telegram/telegramBot.js'
+import { globalStopSignal } from '../../services/telegram/telegramSignals.js'
 
 // ─── Module-level loop state ─────────────────────────────────────────────────
 
@@ -287,6 +288,12 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     const preview = lastText.slice(0, 1200)
     const suffix = lastText.length > 1200 ? '\n…(truncated)' : ''
     void sendTelegramMessage(`🤖 *Round ${sessionRound}*\n${preview}${suffix}`)
+  }
+
+  // Check global stop signal (from Telegram /stop)
+  if (globalStopSignal.get()) {
+    globalStopSignal.reset()
+    stopReason = 'stopped via Telegram /stop'
   }
 
   if (stopReason !== null) {

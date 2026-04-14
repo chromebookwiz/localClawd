@@ -1,19 +1,12 @@
 /**
- * /thinkharder — 4-layer human cognition loop + 5-phase formal refinement.
+ * /thinkharder — multi-layer verification pipeline.
  *
- * Architecture: mirrors the neuroscience model of human memory systems
- * (Baddeley, Tulving, Anderson) layered on top of a formal verification
- * pipeline. The lattice memory scoring system is ACTIVE in this mode —
- * semantic memory queries run on every task, not just as a fallback.
- *
- * Memory layers (pre-phase priming):
- *   Layer 0 — WORKING MEMORY   (Baddeley): active task context, ~7 items
- *   Layer 1 — EPISODIC MEMORY  (Tulving):  session history, recent actions
- *   Layer 2 — SEMANTIC MEMORY  (lattice):  long-term knowledge, memory files
- *   Layer 3 — PROCEDURAL MEMORY (implicit): CLAUDE.md rules, standing patterns
- *
- * Followed by 5-phase verification per change:
+ * Activates a 5-phase formal verification pipeline that checks work
+ * through layers before committing any changes:
  *   Phase 0 ORIENT → Phase 1 DRAFT → Phase 2 CRITIQUE → Phase 3 REFINE → Phase 4 VERIFY
+ *
+ * The lattice memory scoring system is ACTIVE in this mode for better
+ * memory retrieval quality (not just as a fallback).
  *
  * /thinknormal resets to default pipeline and deactivates lattice.
  */
@@ -33,54 +26,15 @@ export function setThinkHarderMode(value: boolean): void {
 // ─── Prompts ─────────────────────────────────────────────────────────────────
 
 const THINKHARDER_PROMPT = `\
-[THINK HARDER — HUMAN COGNITION LOOP + 5-PHASE FORMAL PIPELINE ACTIVE]
+[THINK HARDER — MULTI-LAYER VERIFICATION PIPELINE ACTIVE]
 
-══════════════════════════════════════════════════════════════════════
-PRE-PHASE — MEMORY PRIMING  (run before every task, not just per file)
-══════════════════════════════════════════════════════════════════════
-
-Your cognition is modelled on four neuroscientific memory systems.
-Prime each layer now before beginning any work:
-
-┌─────────────────────────────────────────────────────────────────────┐
-│  Layer 0 — WORKING MEMORY  (Baddeley's phonological + visuospatial) │
-│                                                                     │
-│  Capacity: ~7 ± 2 items. Decays in seconds without rehearsal.      │
-│  Action: State the CURRENT GOAL in one sentence. List the active   │
-│  files, pending decisions, and any open questions. Anything not     │
-│  listed here is at risk of being forgotten — be explicit.           │
-├─────────────────────────────────────────────────────────────────────┤
-│  Layer 1 — EPISODIC MEMORY  (Tulving's autonoetic consciousness)    │
-│                                                                     │
-│  Session-bound, time-indexed recall of personal experience.         │
-│  Action: What happened THIS SESSION? What was attempted and         │
-│  succeeded? What failed and why? What blockers were hit?           │
-│  Use this to avoid repeating mistakes and to build on progress.     │
-├─────────────────────────────────────────────────────────────────────┤
-│  Layer 2 — SEMANTIC MEMORY  (lattice-indexed long-term knowledge)   │
-│                                                                     │
-│  Conceptual knowledge decoupled from time. In this mode the        │
-│  geometric algebra lattice is ACTIVE — memory files are scored      │
-│  and recalled via Clifford algebra multivector similarity.          │
-│  Action: Read the memory files surfaced by the system. Extract      │
-│  architectural decisions, known invariants, and prior context       │
-│  relevant to this task. Treat memory files as your long-term brain. │
-├─────────────────────────────────────────────────────────────────────┤
-│  Layer 3 — PROCEDURAL MEMORY  (Anderson's ACT-R implicit skills)    │
-│                                                                     │
-│  Compiled habits that run without conscious attention.              │
-│  Action: Apply CLAUDE.md rules, project conventions, and standing   │
-│  style guides as automatic constraints — not as a checklist to      │
-│  consult, but as invariants that must hold by construction.         │
-└─────────────────────────────────────────────────────────────────────┘
-
-Write a MEMORY PRIME block (4 short bullet groups, one per layer)
-before Phase 0. This block is your cognitive anchor for the task.
+Every change must pass through all 5 phases before being written.
+This ensures correctness through layered self-review.
 
 ═══════════════════════════════════════════════════════════════════════
 PHASE 0 — ORIENT  (invariant mapping)
 ═══════════════════════════════════════════════════════════════════════
-Building on your Memory Prime, map the landscape formally:
+Before writing anything, map the landscape formally:
   • Public contracts: exported types, functions, constants this module exposes.
   • State invariants: conditions that must hold before AND after your change.
   • Composability: does this act as a morphism in a pipeline? Domain → codomain?
@@ -93,7 +47,7 @@ PHASE 1 — DRAFT
 ═══════════════════════════════════════════════════════════════════════
 Write the initial implementation in full inside a code block.
 Think aloud: describe approach, key decisions, tradeoffs.
-Reference invariants from Phase 0 and semantic memory from Layer 2.
+Reference invariants from Phase 0.
 Do NOT call any write tool yet.
 
 ═══════════════════════════════════════════════════════════════════════
@@ -136,33 +90,26 @@ Then confirm composition checks:
   ✓ MORPHISM    Change preserves function's role as a valid morphism in the
                 module graph — callers still type-check, contracts hold.
   ✓ INVARIANTS  All invariants from Phase 0 hold after this change.
-  ✓ MEMORY      Solution is consistent with semantic memory (Layer 2) — no
-                architectural decisions in memory files are violated.
 
 Only after ALL items are ✓ may you call Edit/Write/Bash to persist.
 If new issues surface during verification, loop back to Phase 3.
 
 ═══════════════════════════════════════════════════════════════════════
-STANDING RULES  (procedural memory — always active)
+STANDING RULES
 ═══════════════════════════════════════════════════════════════════════
 • READ every file before editing — never guess current contents.
-• CHECK memory files at task start for relevant architectural context.
 • After writing a change, READ back to confirm correctness.
 • Prefer small, focused edits over large sweeping rewrites.
 • Treat the type system as a proof assistant.
 • Run builds/tests after non-trivial changes.
-• Commit logical units of work with descriptive messages.
 
-Begin Memory Priming now, then proceed to Phase 0.`
+Begin with Phase 0 — ORIENT now.`
 
 export const THINKHARDER_ROUND_PROMPT = `\
 [THINK HARDER — ROUND CONTINUATION]
-Memory priming active. Before proceeding:
-  L0 Working: restate current goal and active context
-  L1 Episodic: what did the last round accomplish?
-  L2 Semantic: any memory files relevant to next step?
-  L3 Procedural: which CLAUDE.md rules apply here?
-Then continue with the 5-phase pipeline for the next change.`
+Review what the previous round accomplished before proceeding.
+Continue with the 5-phase pipeline (ORIENT → DRAFT → CRITIQUE → REFINE → VERIFY)
+for the next change.`
 
 const THINKNORMAL_PROMPT = `\
 [THINK HARDER DEACTIVATED — default pipeline restored]
@@ -184,10 +131,9 @@ function ThinkHarderBanner({ onReady }: { onReady: () => void }): React.ReactNod
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold color="#818cf8">
-        {'◆ Think Harder — Human Cognition Loop + 5-Phase Pipeline ACTIVE'}
+        {'◆ Think Harder — Multi-Layer Verification Pipeline ACTIVE'}
       </Text>
       <Box flexDirection="column" marginLeft={2}>
-        <Text dimColor>{'L0 Working · L1 Episodic · L2 Semantic (lattice ON) · L3 Procedural'}</Text>
         <Text dimColor>{'ORIENT → DRAFT → CRITIQUE → REFINE → VERIFY before every write.'}</Text>
         <Text dimColor>{'Use /thinknormal to return to default.'}</Text>
       </Box>

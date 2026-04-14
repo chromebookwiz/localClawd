@@ -13,6 +13,8 @@
  */
 
 import { logForDebugging } from '../../utils/debug.js'
+import { globalStopSignal } from './telegramSignals.js'
+import { killAllIncludingSelf } from './telegramKill.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,9 +112,84 @@ export function getTelegramChatId(): number {
 
 // ─── Bot lifecycle ────────────────────────────────────────────────────────────
 
+/**
+ * Validate a Telegram bot token by calling getMe.
+ * Returns the bot username on success, or an error string on failure.
+ */
+export async function validateTelegramToken(
+  token: string,
+): Promise<{ ok: true; username: string } | { ok: false; error: string }> {
+  const url = `https://api.telegram.org/bot${token}/getMe`
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+      signal: AbortSignal.timeout(15_000),
+    })
+    const data = (await res.json()) as TelegramResponse<{ username: string; first_name: string }>
+    if (!data.ok) return { ok: false, error: data.description ?? 'Invalid token' }
+    return { ok: true, username: data.result.username }
+  } catch (e) {
+    return { ok: false, error: String(e) }
+  }
+}
+
+/**
+ * Initialize Telegram with explicit credentials (for interactive setup).
+ * Sets env vars so future calls to initTelegram() also work.
+ */
+export async function initTelegramWithCredentials(
+  token: string,
+  chatId: number,
+): Promise<{ ok: true; username: string } | { ok: false; error: string }> {
+  _token = token
+  _chatId = chatId
+
+  try {
+    const me = await api<{ username: string; first_name: string }>('getMe')
+    if (!me.ok) {
+      return { ok: false, error: me.description ?? 'getMe failed' }
+    }
+    // Set env vars so they persist for the session
+    process.env.TELEGRAM_BOT_TOKEN = token
+    process.env.TELEGRAM_CHAT_ID = String(chatId)
+
+    logForDebugging(`[telegram] Connected as @${me.result.username} (${me.result.first_name})`)
+    _polling = true
+    void pollLoop()
+    void sendTelegramMessage(`*localclawd online*\nReady to receive commands.`)
+    return { ok: true, username: me.result.username }
+  } catch (e) {
+    return { ok: false, error: String(e) }
+  }
+}
+
 export async function initTelegram(): Promise<void> {
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  const chatIdStr = process.env.TELEGRAM_CHAT_ID
+  let token = process.env.TELEGRAM_BOT_TOKEN
+  let chatIdStr = process.env.TELEGRAM_CHAT_ID
+
+  // Fallback: load from ~/.claude/telegram.json if env vars are not set
+  if (!token || !chatIdStr) {
+    try {
+      const { readFile } = await import('fs/promises')
+      const { join } = await import('path')
+      const { homedir } = await import('os')
+      const configPath = join(homedir(), '.claude', 'telegram.json')
+      const raw = await readFile(configPath, 'utf-8')
+      const config = JSON.parse(raw) as { token?: string; chatId?: number }
+      if (config.token && config.chatId) {
+        token = config.token
+        chatIdStr = String(config.chatId)
+        // Set env vars so other code can check isTelegramConfigured()
+        process.env.TELEGRAM_BOT_TOKEN = token
+        process.env.TELEGRAM_CHAT_ID = chatIdStr
+        logForDebugging('[telegram] Loaded credentials from ~/.claude/telegram.json')
+      }
+    } catch {
+      // No saved config — that's fine
+    }
+  }
 
   if (!token || !chatIdStr) return
 
@@ -134,7 +211,7 @@ export async function initTelegram(): Promise<void> {
     _polling = true
     void pollLoop()
     // Send startup notification
-    void sendTelegramMessage(`🤖 *localclawd online*\nReady to receive commands.`)
+    void sendTelegramMessage(`*localclawd online*\nReady to receive commands.`)
   } catch (e) {
     logForDebugging(`[telegram] Init failed: ${e}`, { level: 'warn' })
   }
@@ -188,6 +265,23 @@ function handleUpdate(update: TelegramUpdate): void {
   if (!text) return
 
   logForDebugging(`[telegram] Message from ${sender}: ${text.slice(0, 80)}`)
+
+  // Handle /stop command — signal current task to stop
+  if (text === '/stop') {
+    globalStopSignal.set(true)
+    void sendTelegramMessage('Stopping current task...')
+    return
+  }
+
+  // Handle /kill command — kill ALL localclawd instances
+  if (text === '/kill') {
+    void sendTelegramMessage('Killing ALL localclawd instances...').then(async () => {
+      const killed = await killAllIncludingSelf()
+      // This may not send if self is already dying, but try
+      void sendTelegramMessage(`Killed ${killed} instance(s). Self-terminating.`)
+    })
+    return
+  }
 
   // Enqueue and notify listeners
   _queue.push(text)
