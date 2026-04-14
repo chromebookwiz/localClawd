@@ -1394,7 +1394,7 @@ Include 3 friction categories with 2 examples each.`,
     prompt: `Analyze this localclawd usage data and suggest improvements.
 
 ## CC FEATURES REFERENCE (pick from these for features_to_try):
-1. **MCP Servers**: Connect Claude to external tools, databases, and APIs via Model Context Protocol.
+1. **MCP Servers**: Connect localclawd to external tools, databases, and APIs via Model Context Protocol.
    - How to use: Run \`claude mcp add <server-name> -- <command>\`
    - Good for: database queries, Slack integration, GitHub issue lookup, connecting to internal APIs
 

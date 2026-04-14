@@ -1720,15 +1720,15 @@ export function getSubscriptionName(): string {
 
   switch (subscriptionType) {
     case 'enterprise':
-      return 'Claude Enterprise'
+      return 'localclawd Enterprise'
     case 'team':
-      return 'Claude Team'
+      return 'localclawd Team'
     case 'max':
-      return 'Claude Max'
+      return 'localclawd Max'
     case 'pro':
-      return 'Claude Pro'
+      return 'localclawd Pro'
     default:
-      return 'Claude API'
+      return 'localclawd API'
   }
 }
 
