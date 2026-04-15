@@ -533,7 +533,9 @@ export function useTypeahead({
   const updateSuggestions = useCallback(async (value: string, inputCursorOffset?: number): Promise<void> => {
     // Use provided cursor offset or fall back to ref (avoids dependency on cursorOffset)
     const effectiveCursorOffset = inputCursorOffset ?? cursorOffsetRef.current;
-    if (suppressSuggestions) {
+    // Allow slash command suggestions through even when history browsing
+    // suppresses other suggestions — ensures "/" always shows the command menu
+    if (suppressSuggestions && !(mode === 'prompt' && isCommandInput(value))) {
       debouncedFetchFileSuggestions.cancel();
       clearSuggestions();
       return;

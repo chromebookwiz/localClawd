@@ -29,11 +29,13 @@ import {
   isDirectorActive,
   resetDirector,
   getChangeSummary,
+  sendDirectorNotification,
+  getNotifyMedium,
+  type NotifyMedium,
 } from '../../services/director/directorEngine.js'
 import {
   getPendingTelegramMessage,
   isTelegramActive,
-  sendTelegramMessage,
 } from '../../services/telegram/telegramBot.js'
 import { globalStopSignal } from '../../services/telegram/telegramSignals.js'
 import { getOriginalCwd } from '../../bootstrap/state.js'
@@ -68,10 +70,10 @@ function DirectorBanner({
 
   return (
     <Box flexDirection="column" marginTop={1}>
-      <Text bold color="#f59e0b">
+      <Text bold color="#818cf8">
         {`◆ Director  [round ${roundDisplay}]${badgeStr}`}
       </Text>
-      <Text dimColor color="#f59e0b">{`  ↳ Task: ${task.slice(0, 80)}${task.length > 80 ? '...' : ''}`}</Text>
+      <Text dimColor color="#818cf8">{`  ↳ Task: ${task.slice(0, 80)}${task.length > 80 ? '...' : ''}`}</Text>
     </Box>
   )
 }
@@ -124,7 +126,7 @@ function DirectorStatus({
 
   return (
     <Box flexDirection="column" marginTop={1}>
-      <Text bold color="#f59e0b">{'◆ Director Status'}</Text>
+      <Text bold color="#818cf8">{'◆ Director Status'}</Text>
       <Box flexDirection="column" marginLeft={2}>
         {statusText.split('\n').map((line, i) => (
           <Text key={i} dimColor={line.startsWith('  ')}>{line}</Text>
@@ -167,11 +169,11 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   // ── Starting a new task ───────────────────────────────────────────────
   if (task && !isDirectorActive()) {
     const cwd = getOriginalCwd()
-    const { prompt } = await startDirectorTask(task, cwd, DEFAULT_MAX_ROUNDS)
+    // Determine notification medium: Telegram if active, else desktop
+    const medium: NotifyMedium = isTelegramActive() ? 'telegram' : 'desktop'
+    const { prompt } = await startDirectorTask(task, cwd, DEFAULT_MAX_ROUNDS, medium)
 
-    if (isTelegramActive()) {
-      void sendTelegramMessage(`◆ Director starting task:\n${task.slice(0, 200)}`)
-    }
+    void sendDirectorNotification('Director', `Starting task:\n${task.slice(0, 200)}`)
 
     return (
       <DirectorBanner
@@ -199,11 +201,9 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     globalStopSignal.reset()
     const round = getDirectorRound()
     const changeSummary = await getChangeSummary()
+    const summaryMsg = changeSummary ? `\n\nChanges:\n${changeSummary}` : ''
+    void sendDirectorNotification('Director — Stopped', `Stopped via /stop after ${round} rounds${summaryMsg}`)
     resetDirector()
-    if (isTelegramActive()) {
-      const summaryMsg = changeSummary ? `\n\nChanges:\n${changeSummary}` : ''
-      void sendTelegramMessage(`Director stopped via /stop after ${round} rounds${summaryMsg}`)
-    }
     return (
       <DirectorDone
         round={round}
@@ -223,29 +223,31 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     return prev
   })
 
-  // Send last response to Telegram (fire-and-forget)
-  if (isTelegramActive() && lastText.trim()) {
+  // Send round progress update via correct medium
+  if (lastText.trim()) {
     const round = getDirectorRound()
     const preview = lastText.slice(0, 1200)
     const suffix = lastText.length > 1200 ? '\n...(truncated)' : ''
-    void sendTelegramMessage(`Director round ${round}:\n${preview}${suffix}`)
+    if (getNotifyMedium() === 'telegram' && isTelegramActive()) {
+      // Full round output to Telegram (user wants to see progress)
+      const { sendTelegramMessage } = await import('../../services/telegram/telegramBot.js')
+      void sendTelegramMessage(`Director round ${round}:\n${preview}${suffix}`)
+    }
   }
 
   // Check for incoming Telegram message
   const telegramMsg = getPendingTelegramMessage()
 
-  // Review and decide
+  // Review and decide — director re-prompts every turn until task is done
   const result = await reviewAndContinue(lastText, telegramMsg)
 
   if (result.done) {
     const round = getDirectorRound()
     const reason = result.reason ?? 'completed'
     const changeSummary = await getChangeSummary()
+    const summaryMsg = changeSummary ? `\n\nChanges:\n${changeSummary}` : ''
+    void sendDirectorNotification('Director — Complete', `Finished: ${reason} (${round} rounds)${summaryMsg}`)
     resetDirector()
-    if (isTelegramActive()) {
-      const summaryMsg = changeSummary ? `\n\nChanges:\n${changeSummary}` : ''
-      void sendTelegramMessage(`Director finished: ${reason} (${round} rounds)${summaryMsg}`)
-    }
     return (
       <DirectorDone
         round={round}
@@ -256,7 +258,7 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     )
   }
 
-  // Continue with review prompt
+  // Continue with review prompt — this re-prompt keeps the loop going
   const round = getDirectorRound()
   const currentTask = getDirectorTask()
 

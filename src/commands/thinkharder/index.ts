@@ -4,7 +4,7 @@ const thinkharder: Command = {
   type: 'local-jsx',
   name: 'thinkharder',
   aliases: ['th'],
-  description: 'Enable careful mode: model double-checks its work at each step and queries memory more frequently. Use /thinknormal to return to default.',
+  description: 'Enable careful mode: 5-phase verification pipeline (ORIENT → DRAFT → CRITIQUE → REFINE → VERIFY). Use /thinknormal to return to default.',
   load: () => import('./thinkharder.js'),
 }
 

@@ -15,10 +15,10 @@ type Props = {
   shimmerColor: keyof Theme;
   stalledIntensity?: number;
 };
-const ERROR_RED = {
-  r: 171,
-  g: 43,
-  b: 63
+const STALLED_DIM = {
+  r: 55,
+  g: 48,
+  b: 140
 };
 export function GlimmerMessage(t0) {
   const $ = _c(75);
@@ -88,7 +88,7 @@ export function GlimmerMessage(t0) {
         const baseColorStr = theme[messageColor];
         const baseRGB = baseColorStr ? parseRGB(baseColorStr) : null;
         if (baseRGB) {
-          const interpolated = interpolateColor(baseRGB, ERROR_RED, stalledIntensity);
+          const interpolated = interpolateColor(baseRGB, STALLED_DIM, stalledIntensity);
           const color = toRGBColor(interpolated);
           let t5;
           if ($[17] !== color) {

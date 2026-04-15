@@ -45,7 +45,11 @@ export function getEffectiveContextWindowSize(model: string): number {
     contextWindow = Math.min(contextWindow, autoCompactWindow)
   }
 
-  return contextWindow - reservedTokensForSummary
+  // Floor: ensure effective window never goes below 25% of the raw context
+  // window. Small-context models (8k-32k) can go negative after subtracting
+  // the summary reserve, causing immediate infinite autocompaction.
+  const MIN_EFFECTIVE_TOKENS = 4_000
+  return Math.max(contextWindow - reservedTokensForSummary, Math.max(Math.floor(contextWindow * 0.25), MIN_EFFECTIVE_TOKENS))
 }
 
 export type AutoCompactTrackingState = {

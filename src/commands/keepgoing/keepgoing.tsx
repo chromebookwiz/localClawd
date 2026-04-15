@@ -71,7 +71,7 @@ function parseMaxRounds(args: string): { maxRounds: number; focus: string } {
 const STOP_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /TASK[_ ]COMPLETE:/i,  label: 'task complete' },
   { pattern: /NEEDS[_ ]INPUT:/i,    label: 'paused — needs input' },
-  { pattern: /\bFINISHED\b/,        label: 'finished' },
+  { pattern: /\bFINISHED\b/i,       label: 'finished' },
   { pattern: /ALL[_ ]DONE\b/i,      label: 'all done' },
   { pattern: /WORK[_ ]COMPLETE:/i,  label: 'work complete' },
 ]

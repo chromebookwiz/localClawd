@@ -596,7 +596,7 @@ async function getMessagesForSlashCommand(commandName: string, args: string, set
               // output that must reach the transcript.
               const skipTranscript = isFullscreenEnvEnabled() && typeof result === 'string' && result.endsWith(' dismissed');
               void resolve({
-                messages: options?.display === 'system' ? skipTranscript ? metaMessages : [createCommandInputMessage(formatCommandInput(command, args)), createCommandInputMessage(`<local-command-stdout>${result}</local-command-stdout>`), ...metaMessages] : [createUserMessage({
+                messages: options?.display === 'system' ? skipTranscript ? metaMessages : [createCommandInputMessage(formatCommandInput(command, args)), ...(result ? [createCommandInputMessage(`<local-command-stdout>${result}</local-command-stdout>`)] : []), ...metaMessages] : [createUserMessage({
                   content: prepareUserContent({
                     inputString: formatCommandInput(command, args),
                     precedingInputBlocks

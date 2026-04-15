@@ -32,6 +32,7 @@ import {
   enqueuePendingNotification,
   hasCommandsInQueue,
 } from '../utils/messageQueueManager.js'
+import { globalStopSignal } from '../services/telegram/telegramSignals.js'
 import { emitTaskTerminatedSdk } from '../utils/sdkEventQueue.js'
 
 /** Time window in ms during which a second press kills all background agents. */
@@ -97,6 +98,10 @@ export function CancelRequestHandler(props: CancelRequestHandlerProps): null {
     if (abortSignal !== undefined && !abortSignal.aborted) {
       logEvent('tengu_cancel', cancelProps)
       setToolUseConfirmQueue(() => [])
+      // Signal /keepgoing and /director loops to stop on next round
+      if (hasCommandsInQueue()) {
+        globalStopSignal.set(true)
+      }
       onCancel()
       return
     }

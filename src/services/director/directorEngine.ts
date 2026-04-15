@@ -35,6 +35,10 @@ import {
   sendTelegramMessage,
 } from '../telegram/telegramBot.js'
 
+// ─── Notification medium ────────────────────────────────────────────────────
+
+export type NotifyMedium = 'telegram' | 'desktop'
+
 // ─── Module-level state ──────────────────────────────────────────────────────
 
 let _round = 0
@@ -45,10 +49,12 @@ let _startGitRef = ''
 let _projectPath = ''
 let _heartbeatTimer: ReturnType<typeof setInterval> | null = null
 let _taskStartTime = 0
+let _notifyMedium: NotifyMedium = 'desktop'
 
 export function getDirectorRound(): number { return _round }
 export function getDirectorTask(): string { return _task }
 export function isDirectorActive(): boolean { return _task !== '' }
+export function getNotifyMedium(): NotifyMedium { return _notifyMedium }
 
 export function resetDirector(): void {
   _round = 0
@@ -57,6 +63,7 @@ export function resetDirector(): void {
   _startGitRef = ''
   _projectPath = ''
   _taskStartTime = 0
+  _notifyMedium = 'desktop'
   stopHeartbeat()
 }
 
@@ -85,6 +92,7 @@ export async function startDirectorTask(
   task: string,
   projectPath: string,
   maxRounds?: number,
+  medium?: NotifyMedium,
 ): Promise<{ prompt: string; projectId: string }> {
   const state = await loadDirectorState()
 
@@ -107,6 +115,7 @@ export async function startDirectorTask(
   _projectId = project.id
   _maxRounds = maxRounds ?? 20
   _projectPath = projectPath
+  _notifyMedium = medium ?? (isTelegramActive() ? 'telegram' : 'desktop')
 
   // Capture git ref for change summary at completion
   _startGitRef = await captureGitRef(projectPath)
@@ -219,12 +228,20 @@ async function sendHeartbeatUpdate(): Promise<void> {
   const elapsed = Math.round((Date.now() - _taskStartTime) / (1000 * 60))
   const msg = `Director heartbeat — still working\nTask: ${_task.slice(0, 100)}\nRound: ${_round}/${isFinite(_maxRounds) ? _maxRounds : '∞'}\nElapsed: ${elapsed} min`
 
-  if (isTelegramActive()) {
-    void sendTelegramMessage(msg)
-  }
-  // Desktop notification (cross-platform, no React needed)
-  void sendDesktopNotification('localclawd Director', msg)
+  await sendDirectorNotification('localclawd Director — Heartbeat', msg)
   logForDebugging(`[director] Heartbeat sent at ${elapsed}min`)
+}
+
+/**
+ * Send a notification through the correct medium based on how the director was started.
+ * Telegram if started from Telegram; desktop notification if started from CLI.
+ */
+export async function sendDirectorNotification(title: string, message: string): Promise<void> {
+  if (_notifyMedium === 'telegram' && isTelegramActive()) {
+    void sendTelegramMessage(`*${title}*\n${message}`)
+  } else {
+    void sendDesktopNotification(title, message)
+  }
 }
 
 async function sendDesktopNotification(title: string, message: string): Promise<void> {

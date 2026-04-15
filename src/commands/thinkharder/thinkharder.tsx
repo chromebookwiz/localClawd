@@ -5,10 +5,7 @@
  * through layers before committing any changes:
  *   Phase 0 ORIENT → Phase 1 DRAFT → Phase 2 CRITIQUE → Phase 3 REFINE → Phase 4 VERIFY
  *
- * The lattice memory scoring system is ACTIVE in this mode for better
- * memory retrieval quality (not just as a fallback).
- *
- * /thinknormal resets to default pipeline and deactivates lattice.
+ * /thinknormal resets to default pipeline.
  */
 
 import * as React from 'react'
@@ -116,8 +113,7 @@ const THINKNORMAL_PROMPT = `\
 
 Resume standard operation:
 • Normal tool use and response pipeline.
-• Lattice memory scoring returns to fallback-only mode.
-• Memory priming and 5-phase refinement are no longer required,
+• 5-phase refinement is no longer required,
   though careful reasoning is always encouraged.`
 
 // ─── UI Components ───────────────────────────────────────────────────────────
@@ -150,7 +146,7 @@ function ThinkNormalBanner({ onReady }: { onReady: () => void }): React.ReactNod
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold color="cyan">{'◆ Normal mode restored'}</Text>
-      <Text dimColor>{'  Default pipeline. Lattice memory is fallback-only.'}</Text>
+      <Text dimColor>{'  Default pipeline restored.'}</Text>
     </Box>
   )
 }
@@ -182,7 +178,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       onReady={() =>
         onDone(undefined, {
           display: 'system',
-          shouldQuery: !nextCmd,
+          shouldQuery: false,
           metaMessages: [THINKHARDER_PROMPT],
           nextInput: nextCmd ?? undefined,
           submitNextInput: nextCmd ? true : undefined,
@@ -201,7 +197,7 @@ export const callNormal: LocalJSXCommandCall = async (onDone, _context, args) =>
       onReady={() =>
         onDone(undefined, {
           display: 'system',
-          shouldQuery: !nextCmd,
+          shouldQuery: false,
           metaMessages: [THINKNORMAL_PROMPT],
           nextInput: nextCmd ?? undefined,
           submitNextInput: nextCmd ? true : undefined,

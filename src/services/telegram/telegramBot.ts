@@ -15,6 +15,7 @@
 import { logForDebugging } from '../../utils/debug.js'
 import { globalStopSignal } from './telegramSignals.js'
 import { killAllIncludingSelf } from './telegramKill.js'
+import { isDirectorActive } from '../director/directorEngine.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -239,7 +240,7 @@ async function pollLoop(): Promise<void> {
 
       for (const update of resp.result) {
         _lastUpdateId = Math.max(_lastUpdateId, update.update_id)
-        handleUpdate(update)
+        await handleUpdate(update)
       }
     } catch (e) {
       if (_polling) {
@@ -250,7 +251,7 @@ async function pollLoop(): Promise<void> {
   }
 }
 
-function handleUpdate(update: TelegramUpdate): void {
+async function handleUpdate(update: TelegramUpdate): Promise<void> {
   const msg = update.message
   if (!msg?.text) return
 
@@ -283,8 +284,23 @@ function handleUpdate(update: TelegramUpdate): void {
     return
   }
 
-  // Enqueue and notify listeners
-  _queue.push(text)
+  // If director is active, queue for the director to consume
+  // If director is NOT active, auto-start director mode via command queue
+  if (isDirectorActive()) {
+    _queue.push(text)
+  } else {
+    // Auto-start director with this message as the task
+    void sendTelegramMessage(`Starting director mode: ${text.slice(0, 100)}...`)
+    try {
+      const { enqueue } = await import('../../utils/messageQueueManager.js')
+      enqueue({ value: `/director ${text}`, mode: 'prompt', priority: 'now' })
+    } catch (e) {
+      // Fallback: just queue it for manual consumption
+      _queue.push(text)
+      logForDebugging(`[telegram] Failed to auto-start director: ${e}`)
+    }
+  }
+
   for (const cb of _listeners) {
     try { cb(text) } catch { /* ignore listener errors */ }
   }
