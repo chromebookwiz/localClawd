@@ -10,10 +10,15 @@ export function buildDirectorTaskPrompt(
   projectContext: string,
   round: number,
   maxRounds: number,
+  medium?: 'telegram' | 'desktop',
 ): string {
   const roundInfo = isFinite(maxRounds)
     ? `Round ${round} of ${maxRounds}`
     : `Round ${round} (unlimited)`
+
+  const mediumNote = medium === 'telegram'
+    ? '\n- The user is connected via Telegram — progress updates and the final report are sent there automatically'
+    : '\n- The user is connected via CLI — progress updates are sent as desktop notifications'
 
   return `\
 [DIRECTOR MODE — Supervised Autonomous Operation — ${roundInfo}]
@@ -22,7 +27,7 @@ You are operating under director supervision. The director:
 - Assigned you a specific task
 - Will review your work after each step
 - May re-prompt if work is incomplete
-- Has persistent memory of this project and past tasks
+- Has persistent memory of this project and past tasks${mediumNote}
 
 ${projectContext}
 

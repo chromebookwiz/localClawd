@@ -124,7 +124,7 @@ export async function startDirectorTask(
   startHeartbeat()
 
   const context = getProjectContext(state, project.id)
-  const prompt = buildDirectorTaskPrompt(task, context, _round, _maxRounds)
+  const prompt = buildDirectorTaskPrompt(task, context, _round, _maxRounds, _notifyMedium)
 
   logForDebugging(`[director] Starting task in ${project.id}: ${task.slice(0, 80)}`)
   return { prompt, projectId: project.id }

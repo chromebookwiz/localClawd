@@ -36,6 +36,8 @@ import {
 import {
   getPendingTelegramMessage,
   isTelegramActive,
+  startTypingIndicator,
+  stopTypingIndicator,
 } from '../../services/telegram/telegramBot.js'
 import { globalStopSignal } from '../../services/telegram/telegramSignals.js'
 import { getOriginalCwd } from '../../bootstrap/state.js'
@@ -175,6 +177,9 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
 
     void sendDirectorNotification('Director', `Starting task:\n${task.slice(0, 200)}`)
 
+    // Start typing indicator so Telegram shows "typing..." while model works
+    if (isTelegramActive()) startTypingIndicator()
+
     return (
       <DirectorBanner
         round={1}
@@ -195,6 +200,9 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   }
 
   // ── Continuation round (director is active) ───────────────────────────
+
+  // Model just finished generating — stop typing indicator
+  if (isTelegramActive()) stopTypingIndicator()
 
   // Check global stop signal
   if (globalStopSignal.get()) {
@@ -242,6 +250,7 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const result = await reviewAndContinue(lastText, telegramMsg)
 
   if (result.done) {
+    if (isTelegramActive()) stopTypingIndicator()
     const round = getDirectorRound()
     const reason = result.reason ?? 'completed'
     const changeSummary = await getChangeSummary()
@@ -261,6 +270,9 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   // Continue with review prompt — this re-prompt keeps the loop going
   const round = getDirectorRound()
   const currentTask = getDirectorTask()
+
+  // Resume typing indicator for next model turn
+  if (isTelegramActive()) startTypingIndicator()
 
   return (
     <DirectorBanner

@@ -76,8 +76,12 @@ const MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES = 3
 export function getAutoCompactThreshold(model: string): number {
   const effectiveContextWindow = getEffectiveContextWindowSize(model)
 
+  // Scale buffer proportionally for smaller context windows.
+  // Large windows (200k+) use the full 13k buffer; smaller windows use 10%
+  // of effective size so compaction doesn't trigger too aggressively.
+  const scaledBuffer = Math.min(AUTOCOMPACT_BUFFER_TOKENS, Math.floor(effectiveContextWindow * 0.10))
   const autocompactThreshold =
-    effectiveContextWindow - AUTOCOMPACT_BUFFER_TOKENS
+    effectiveContextWindow - scaledBuffer
 
   // Override for easier testing of autocompact
   const envPercent = process.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE

@@ -4,10 +4,7 @@ const heartbeat: Command = {
   type: 'local-jsx',
   name: 'heartbeat',
   aliases: ['hb'],
-  description:
-    'Activate recurring autonomous mode: agent wakes every N minutes without stopping. ' +
-    'Only you can stop it (Ctrl+C). /thinkharder is auto-enabled. ' +
-    'Usage: /heartbeat <minutes>  e.g. /heartbeat 5',
+  description: 'Periodic autonomous mode — agent re-prompts every N minutes. Usage: /heartbeat 5',
   load: () => import('./heartbeat.js'),
 }
 

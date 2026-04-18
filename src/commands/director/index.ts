@@ -4,9 +4,7 @@ const director: Command = {
   type: 'local-jsx',
   name: 'director',
   aliases: ['dir'],
-  description: 'Director mode — persistent memory, supervised autonomous operation',
-  isEnabled: true,
-  isHidden: false,
+  description: 'Supervised autonomous mode with persistent project memory. Usage: /director <task>',
   source: 'builtin',
   load: () => import('./director.js'),
 }

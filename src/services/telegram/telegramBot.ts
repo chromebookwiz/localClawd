@@ -93,6 +93,33 @@ export async function sendTelegramMessage(text: string): Promise<void> {
   }
 }
 
+/** Send typing indicator — shows "typing..." in the chat. Expires after 5s. */
+export async function sendTypingIndicator(): Promise<void> {
+  if (!_polling || !_chatId) return
+  try {
+    await api('sendChatAction', { chat_id: _chatId, action: 'typing' })
+  } catch {
+    // Non-critical — ignore failures
+  }
+}
+
+let _typingInterval: ReturnType<typeof setInterval> | null = null
+
+/** Start sending typing indicators every 4s. Call stopTypingIndicator() when done. */
+export function startTypingIndicator(): void {
+  if (_typingInterval) return
+  void sendTypingIndicator()
+  _typingInterval = setInterval(() => void sendTypingIndicator(), 4000)
+}
+
+/** Stop the periodic typing indicator. */
+export function stopTypingIndicator(): void {
+  if (_typingInterval) {
+    clearInterval(_typingInterval)
+    _typingInterval = null
+  }
+}
+
 /** Consume the next queued message from Telegram, or null if none. */
 export function getPendingTelegramMessage(): string | null {
   return _queue.shift() ?? null
@@ -267,20 +294,32 @@ async function handleUpdate(update: TelegramUpdate): Promise<void> {
 
   logForDebugging(`[telegram] Message from ${sender}: ${text.slice(0, 80)}`)
 
-  // Handle /stop command — signal current task to stop
-  if (text === '/stop') {
-    globalStopSignal.set(true)
-    void sendTelegramMessage('Stopping current task...')
-    return
-  }
-
-  // Handle /kill command — kill ALL localclawd instances
-  if (text === '/kill') {
-    void sendTelegramMessage('Killing ALL localclawd instances...').then(async () => {
-      const killed = await killAllIncludingSelf()
-      // This may not send if self is already dying, but try
-      void sendTelegramMessage(`Killed ${killed} instance(s). Self-terminating.`)
-    })
+  // Handle Telegram bot commands
+  if (text.startsWith('/')) {
+    if (text === '/stop') {
+      globalStopSignal.set(true)
+      void sendTelegramMessage('Stopping current task...')
+      return
+    }
+    if (text === '/kill') {
+      void sendTelegramMessage('Killing ALL localclawd instances...').then(async () => {
+        const killed = await killAllIncludingSelf()
+        void sendTelegramMessage(`Killed ${killed} instance(s). Self-terminating.`)
+      })
+      return
+    }
+    if (text === '/start') {
+      void sendTelegramMessage('*localclawd ready*\nSend me a task and I\'ll start working on it.\n\nCommands:\n/stop — stop current task\n/kill — kill all instances\n/status — show current status')
+      return
+    }
+    if (text === '/status') {
+      const { getDirectorStatus } = await import('../director/directorEngine.js')
+      const status = await getDirectorStatus()
+      void sendTelegramMessage(`*Status*\n${status}`)
+      return
+    }
+    // Other / commands from Telegram — ignore unknown bot commands
+    void sendTelegramMessage(`Unknown command: ${text}\n\nAvailable: /stop /kill /status`)
     return
   }
 
@@ -289,13 +328,12 @@ async function handleUpdate(update: TelegramUpdate): Promise<void> {
   if (isDirectorActive()) {
     _queue.push(text)
   } else {
-    // Auto-start director with this message as the task
-    void sendTelegramMessage(`Starting director mode: ${text.slice(0, 100)}...`)
+    void sendTelegramMessage(`Starting director mode...`)
+    void sendTypingIndicator()
     try {
       const { enqueue } = await import('../../utils/messageQueueManager.js')
       enqueue({ value: `/director ${text}`, mode: 'prompt', priority: 'now' })
     } catch (e) {
-      // Fallback: just queue it for manual consumption
       _queue.push(text)
       logForDebugging(`[telegram] Failed to auto-start director: ${e}`)
     }
