@@ -22,6 +22,7 @@ import {
   pruneMemory,
   shouldPrune,
   getProjectContext,
+  setDirectorProjectRoot,
 } from './directorMemoryOps.js'
 import {
   buildDirectorTaskPrompt,
@@ -110,6 +111,9 @@ export async function startDirectorTask(
 
   await saveDirectorState(state)
 
+  // Set per-project memory root
+  setDirectorProjectRoot(projectPath)
+
   _round = 1
   _task = task
   _projectId = project.id
@@ -119,9 +123,6 @@ export async function startDirectorTask(
 
   // Capture git ref for change summary at completion
   _startGitRef = await captureGitRef(projectPath)
-
-  // Start 30-minute heartbeat timer
-  startHeartbeat()
 
   const context = getProjectContext(state, project.id)
   const prompt = buildDirectorTaskPrompt(task, context, _round, _maxRounds, _notifyMedium)
@@ -205,16 +206,26 @@ async function recordTaskOutcome(
   }
 }
 
-// ─── Heartbeat (30-minute updates) ──────────────────────────────────────────
+// ─── Per-turn status report ─────────────────────────────────────────────────
 
-const HEARTBEAT_INTERVAL_MS = 30 * 60 * 1000 // 30 minutes
+/**
+ * Send a concise status report after each director turn.
+ * This replaces the old 30-minute heartbeat — the user gets visibility every turn.
+ */
+export async function sendTurnStatus(lastText: string): Promise<void> {
+  const elapsed = Math.round((Date.now() - _taskStartTime) / (1000 * 60))
+  // Extract a short progress summary from the assistant's output
+  const completedLines = lastText
+    .split('\n')
+    .filter(l => /^Completed:/i.test(l.trim()))
+    .map(l => l.trim().slice(0, 120))
+  const progress = completedLines.length > 0
+    ? completedLines.join('\n')
+    : lastText.slice(0, 200).replace(/\n/g, ' ')
 
-function startHeartbeat(): void {
-  stopHeartbeat()
-  _taskStartTime = Date.now()
-  _heartbeatTimer = setInterval(() => {
-    void sendHeartbeatUpdate()
-  }, HEARTBEAT_INTERVAL_MS)
+  const msg = `Round ${_round}/${isFinite(_maxRounds) ? _maxRounds : '∞'} · ${elapsed}m elapsed\n${progress}`
+  await sendDirectorNotification('Director', msg)
+  logForDebugging(`[director] Turn status sent: round ${_round}`)
 }
 
 function stopHeartbeat(): void {
@@ -222,14 +233,6 @@ function stopHeartbeat(): void {
     clearInterval(_heartbeatTimer)
     _heartbeatTimer = null
   }
-}
-
-async function sendHeartbeatUpdate(): Promise<void> {
-  const elapsed = Math.round((Date.now() - _taskStartTime) / (1000 * 60))
-  const msg = `Director heartbeat — still working\nTask: ${_task.slice(0, 100)}\nRound: ${_round}/${isFinite(_maxRounds) ? _maxRounds : '∞'}\nElapsed: ${elapsed} min`
-
-  await sendDirectorNotification('localclawd Director — Heartbeat', msg)
-  logForDebugging(`[director] Heartbeat sent at ${elapsed}min`)
 }
 
 /**

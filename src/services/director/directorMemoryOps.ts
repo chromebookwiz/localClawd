@@ -18,15 +18,28 @@ import { createEmptyState } from './directorMemory.js'
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
 
-const DIRECTOR_DIR = join(homedir(), '.claude', 'director')
-const STATE_FILE = join(DIRECTOR_DIR, 'state.json')
-export const DIRECTOR_MEMORY_DIR = join(DIRECTOR_DIR, 'memory')
+// Per-project state: stored inside the project's .claude/ directory.
+// Falls back to ~/.claude/director/ for the global registry.
+const GLOBAL_DIRECTOR_DIR = join(homedir(), '.claude', 'director')
+export const DIRECTOR_MEMORY_DIR = join(GLOBAL_DIRECTOR_DIR, 'memory')
+
+let _projectStateDir = ''
+
+/** Set the project root so state is stored per-project. */
+export function setDirectorProjectRoot(projectPath: string): void {
+  _projectStateDir = join(projectPath, '.claude')
+}
+
+function getStatePath(): string {
+  if (_projectStateDir) return join(_projectStateDir, 'director-memory.json')
+  return join(GLOBAL_DIRECTOR_DIR, 'state.json')
+}
 
 // ─── State I/O ───────────────────────────────────────────────────────────────
 
 export async function loadDirectorState(): Promise<DirectorMemoryState> {
   try {
-    const raw = await readFile(STATE_FILE, 'utf-8')
+    const raw = await readFile(getStatePath(), 'utf-8')
     const parsed = JSON.parse(raw) as DirectorMemoryState
     if (parsed.version !== 1) return createEmptyState()
     return parsed
@@ -36,8 +49,9 @@ export async function loadDirectorState(): Promise<DirectorMemoryState> {
 }
 
 export async function saveDirectorState(state: DirectorMemoryState): Promise<void> {
-  await mkdir(DIRECTOR_DIR, { recursive: true })
-  await writeFile(STATE_FILE, JSON.stringify(state, null, 2), 'utf-8')
+  const dir = _projectStateDir || GLOBAL_DIRECTOR_DIR
+  await mkdir(dir, { recursive: true })
+  await writeFile(getStatePath(), JSON.stringify(state, null, 2), 'utf-8')
 }
 
 // ─── Project operations ──────────────────────────────────────────────────────

@@ -225,36 +225,63 @@ async function saveTelegramConfig(token: string, chatId: number): Promise<void> 
 
 // ─── Status display ──────────────────────────────────────────────────────────
 
-function TelegramStatus({ onReady }: { onReady: () => void }): React.ReactNode {
+function TelegramStatus({
+  onDone,
+}: {
+  onDone: (msg?: string) => void
+}): React.ReactNode {
   const active = isTelegramActive()
   const configured = isTelegramConfigured()
+  const [showSetup, setShowSetup] = React.useState(false)
 
-  React.useEffect(() => {
-    const id = setTimeout(onReady, 100)
-    return () => clearTimeout(id)
-  }, [onReady])
+  if (showSetup) {
+    return <TelegramSetup onDone={onDone} />
+  }
 
   if (active) {
     return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold color="#6366f1">{'◆ Telegram Bridge'}</Text>
-        <Text color="green">{'  ● Active — bot is polling'}</Text>
-        <Text dimColor>{`  Chat ID: ${getTelegramChatId()}`}</Text>
-        <Box flexDirection="column" marginLeft={2} marginTop={1}>
+      <Dialog title="Telegram Bridge" onCancel={() => onDone()} hideInputGuide>
+        <Box flexDirection="column">
+          <Text color="green">{'● Active — bot is polling'}</Text>
+          <Text dimColor>{`Chat ID: ${getTelegramChatId()}`}</Text>
+          <Text>{''}</Text>
           <Text dimColor>{'Messages from Telegram are injected into /keepgoing and /director rounds.'}</Text>
           <Text dimColor>{'Status updates sent to your phone after each round.'}</Text>
           <Text dimColor>{'Send /stop to stop current task, /kill to stop all instances.'}</Text>
         </Box>
-      </Box>
+        <Select
+          options={[
+            { label: 'OK', value: 'ok' },
+            { label: 'Reconfigure — run setup again', value: 'setup' },
+          ]}
+          onChange={(v: string) => {
+            if (v === 'setup') setShowSetup(true)
+            else onDone(undefined)
+          }}
+        />
+      </Dialog>
     )
   }
 
   if (configured) {
     return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold color="#6366f1">{'◆ Telegram Bridge'}</Text>
-        <Text color="yellow">{'  ◌ Configured but not active (init failed — check logs)'}</Text>
-      </Box>
+      <Dialog title="Telegram Bridge" onCancel={() => onDone()} hideInputGuide>
+        <Box flexDirection="column">
+          <Text color="yellow">{'◌ Configured but not active (init failed — check token/chat ID)'}</Text>
+          <Text>{''}</Text>
+          <Text dimColor>{'The saved credentials may be invalid or expired.'}</Text>
+        </Box>
+        <Select
+          options={[
+            { label: 'Reconfigure — run setup again', value: 'setup' },
+            { label: 'Cancel', value: 'cancel' },
+          ]}
+          onChange={(v: string) => {
+            if (v === 'setup') setShowSetup(true)
+            else onDone(undefined)
+          }}
+        />
+      </Dialog>
     )
   }
 
@@ -317,7 +344,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       // Not configured — start interactive setup
       return <TelegramSetup onDone={(msg) => onDone(msg)} />
     }
-    return <TelegramStatus onReady={() => onDone(undefined)} />
+    return <TelegramStatus onDone={(msg) => onDone(msg)} />
   }
 
   // /telegram <text> — send a message

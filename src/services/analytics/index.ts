@@ -84,42 +84,10 @@ const eventQueue: QueuedEvent[] = []
 let sink: AnalyticsSink | null = null
 
 /**
- * Attach the analytics sink that will receive all events.
- * Queued events are drained asynchronously via queueMicrotask to avoid
- * adding latency to the startup path.
- *
- * Idempotent: if a sink is already attached, this is a no-op. This allows
- * calling from both the preAction hook (for subcommands) and setup() (for
- * the default command) without coordination.
+ * Attach the analytics sink — disabled in localclawd (no telemetry).
  */
-export function attachAnalyticsSink(newSink: AnalyticsSink): void {
-  if (sink !== null) {
-    return
-  }
-  sink = newSink
-
-  // Drain the queue asynchronously to avoid blocking startup
-  if (eventQueue.length > 0) {
-    const queuedEvents = [...eventQueue]
-    eventQueue.length = 0
-
-    // Log queue size for ants to help debug analytics initialization timing
-    if (process.env.USER_TYPE === 'ant') {
-      sink.logEvent('analytics_sink_attached', {
-        queued_event_count: queuedEvents.length,
-      })
-    }
-
-    queueMicrotask(() => {
-      for (const event of queuedEvents) {
-        if (event.async) {
-          void sink!.logEventAsync(event.eventName, event.metadata)
-        } else {
-          sink!.logEvent(event.eventName, event.metadata)
-        }
-      }
-    })
-  }
+export function attachAnalyticsSink(_newSink: AnalyticsSink): void {
+  // localclawd: no telemetry. Sink is never attached so all events are dropped.
 }
 
 /**
@@ -131,16 +99,10 @@ export function attachAnalyticsSink(newSink: AnalyticsSink): void {
  * If no sink is attached, events are queued and drained when the sink attaches.
  */
 export function logEvent(
-  eventName: string,
-  // intentionally no strings unless AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-  // to avoid accidentally logging code/filepaths
-  metadata: LogEventMetadata,
+  _eventName: string,
+  _metadata: LogEventMetadata,
 ): void {
-  if (sink === null) {
-    eventQueue.push({ eventName, metadata, async: false })
-    return
-  }
-  sink.logEvent(eventName, metadata)
+  // localclawd: no telemetry — all events are silently dropped.
 }
 
 /**
@@ -152,15 +114,10 @@ export function logEvent(
  * If no sink is attached, events are queued and drained when the sink attaches.
  */
 export async function logEventAsync(
-  eventName: string,
-  // intentionally no strings, to avoid accidentally logging code/filepaths
-  metadata: LogEventMetadata,
+  _eventName: string,
+  _metadata: LogEventMetadata,
 ): Promise<void> {
-  if (sink === null) {
-    eventQueue.push({ eventName, metadata, async: true })
-    return
-  }
-  await sink.logEventAsync(eventName, metadata)
+  // localclawd: no telemetry — all events are silently dropped.
 }
 
 /**

@@ -94,24 +94,26 @@ export function CancelRequestHandler(props: CancelRequestHandlerProps): null {
     }
 
     // Priority 1: If there's an active task running, cancel it first
-    // This takes precedence over queue management so users can always interrupt Claude
+    // This takes precedence over queue management so users can always interrupt
     if (abortSignal !== undefined && !abortSignal.aborted) {
       logEvent('tengu_cancel', cancelProps)
       setToolUseConfirmQueue(() => [])
-      // Signal /keepgoing and /director loops to stop on next round
+      // Stop keepgoing/director loops: set signal AND clear the queue so
+      // no re-queued command can fire after the abort completes.
       if (hasCommandsInQueue()) {
         globalStopSignal.set(true)
+        clearCommandQueue()
       }
       onCancel()
       return
     }
 
-    // Priority 2: Pop queue when Claude is idle (no running task to cancel)
+    // Priority 2: Pop queue when idle (no running task to cancel)
     if (hasCommandsInQueue()) {
-      if (popCommandFromQueue) {
-        popCommandFromQueue()
-        return
-      }
+      // If it looks like a loop command, kill the whole queue
+      globalStopSignal.set(true)
+      clearCommandQueue()
+      return
     }
 
     // Fallback: nothing to cancel or pop (shouldn't reach here if isActive is correct)

@@ -30,6 +30,7 @@ import {
   resetDirector,
   getChangeSummary,
   sendDirectorNotification,
+  sendTurnStatus,
   getNotifyMedium,
   type NotifyMedium,
 } from '../../services/director/directorEngine.js'
@@ -41,6 +42,7 @@ import {
 } from '../../services/telegram/telegramBot.js'
 import { globalStopSignal } from '../../services/telegram/telegramSignals.js'
 import { getOriginalCwd } from '../../bootstrap/state.js'
+import { enqueue } from '../../utils/messageQueueManager.js'
 
 // ─── UI Components ───────────────────────────────────────────────────────────
 
@@ -186,15 +188,15 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
         maxRounds={DEFAULT_MAX_ROUNDS}
         task={task}
         telegram={isTelegramActive()}
-        onReady={() =>
+        onReady={() => {
+          // Queue continuation as hidden meta command — user won't see /director
+          enqueue({ value: '/director', mode: 'prompt', isMeta: true })
           onDone(undefined, {
             display: 'system',
             shouldQuery: true,
             metaMessages: [prompt],
-            nextInput: '/director',
-            submitNextInput: true,
           })
-        }
+        }}
       />
     )
   }
@@ -231,16 +233,9 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     return prev
   })
 
-  // Send round progress update via correct medium
+  // Send per-turn status report to the user (Telegram or desktop notification)
   if (lastText.trim()) {
-    const round = getDirectorRound()
-    const preview = lastText.slice(0, 1200)
-    const suffix = lastText.length > 1200 ? '\n...(truncated)' : ''
-    if (getNotifyMedium() === 'telegram' && isTelegramActive()) {
-      // Full round output to Telegram (user wants to see progress)
-      const { sendTelegramMessage } = await import('../../services/telegram/telegramBot.js')
-      void sendTelegramMessage(`Director round ${round}:\n${preview}${suffix}`)
-    }
+    void sendTurnStatus(lastText)
   }
 
   // Check for incoming Telegram message
@@ -280,15 +275,15 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
       maxRounds={DEFAULT_MAX_ROUNDS}
       task={currentTask}
       telegram={isTelegramActive()}
-      onReady={() =>
+      onReady={() => {
+        // Queue continuation as hidden meta command
+        enqueue({ value: '/director', mode: 'prompt', isMeta: true })
         onDone(undefined, {
           display: 'system',
           shouldQuery: true,
           metaMessages: [result.prompt!],
-          nextInput: '/director',
-          submitNextInput: true,
         })
-      }
+      }}
     />
   )
 }

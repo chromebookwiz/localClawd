@@ -28,6 +28,7 @@ import {
   sendTelegramMessage,
 } from '../../services/telegram/telegramBot.js'
 import { globalStopSignal } from '../../services/telegram/telegramSignals.js'
+import { enqueue } from '../../utils/messageQueueManager.js'
 
 // ─── Module-level loop state ─────────────────────────────────────────────────
 
@@ -345,12 +346,13 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const metaMessages = [prompt]
 
   const handleReady = () => {
+    // Queue the next keepgoing invocation as a hidden meta command —
+    // the user won't see "/keepgoing" appear in their input.
+    enqueue({ value: nextCmd, mode: 'prompt', isMeta: true })
     onDone(undefined, {
       display: 'system',
       shouldQuery: true,
       metaMessages,
-      nextInput: nextCmd,
-      submitNextInput: true,
     })
   }
 

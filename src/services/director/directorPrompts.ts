@@ -69,7 +69,7 @@ export function buildDirectorReviewPrompt(
     : `Round ${round} (unlimited)`
 
   const telegramSection = telegramMsg
-    ? `\n━━━ MESSAGE FROM USER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${telegramMsg}\n━━━ (respond to this, then continue) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+    ? `\n━━━ MESSAGE FROM USER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${telegramMsg}\n━━━ Respond to this message, then continue your work. ━━━━━━━━━━━━━━\n`
     : ''
 
   return `\
@@ -78,10 +78,13 @@ export function buildDirectorReviewPrompt(
 The director reviewed your last response:
 ${reviewNotes}
 ${telegramSection}
-Continue working. Do not re-explain previous work.
-Pick up exactly where you left off and proceed with the next action.
-
-When ALL work is done, emit: TASK COMPLETE: <summary>`
+━━━ INSTRUCTIONS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Continue working — do not re-explain what was already done
+2. Use the Agent tool to spawn subagents for independent parallel work
+3. Run builds/tests after significant changes to verify correctness
+4. Assess whether the task is complete:
+   - If YES → emit: TASK COMPLETE: <summary of all work done>
+   - If NO  → proceed with the next action immediately`
 }
 
 /**
