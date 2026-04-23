@@ -78,7 +78,7 @@ export function getDefaultLocalLLMConfig(
 export function getLocalLLMProviderLabel(provider: LocalLLMProvider): string {
   switch (provider) {
     case 'vllm':
-      return 'vLLM'
+      return 'Local endpoint'
     case 'ollama':
       return 'Ollama'
     case 'openai':

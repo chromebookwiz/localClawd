@@ -1,9 +1,4 @@
 const MODEL_SCAN_TIMEOUT_MS = 5000
-const NETWORK_PROBE_TIMEOUT_MS = 600
-const NETWORK_CONCURRENCY = 30
-
-// Common vLLM / OpenAI-compat ports
-const VLLM_PORTS = [8000, 8080, 4000, 5000, 1234, 3000, 7860, 8888]
 
 async function fetchWithTimeout(
   url: string,
@@ -131,67 +126,15 @@ export type NetworkScanProgress = {
   found: number
 }
 
-async function probeVllmEndpoint(
-  url: string,
-  parentSignal: AbortSignal,
-): Promise<string[] | null> {
-  if (parentSignal.aborted) return null
-  try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), NETWORK_PROBE_TIMEOUT_MS)
-    // If parent aborts, abort this probe immediately
-    const onParentAbort = () => controller.abort()
-    parentSignal.addEventListener('abort', onParentAbort, { once: true })
-    let res: Response
-    try {
-      res = await fetch(`${url}/models`, { signal: controller.signal })
-    } finally {
-      clearTimeout(timer)
-      parentSignal.removeEventListener('abort', onParentAbort)
-    }
-    if (!res.ok) return null
-    const json = await res.json() as { data?: Array<{ id: string }> }
-    const models = (json.data ?? []).map((m) => m.id).filter(Boolean)
-    return models.length > 0 ? models : null
-  } catch {
-    return null
-  }
-}
-
+/**
+ * Deprecated: the old /24 port scanner was both slow and incomplete. Setup
+ * now uses explicit URL entry + preset/history picker (see LocalBackendSetup).
+ * This stub is kept so nothing that still imports it crashes at build time.
+ */
 export async function scanLocalNetworkForVllm(
-  subnet: string = '192.168.1',
-  abortSignal: AbortSignal,
-  onProgress?: (progress: NetworkScanProgress) => void,
+  _subnet: string = '',
+  _abortSignal?: AbortSignal,
+  _onProgress?: (progress: NetworkScanProgress) => void,
 ): Promise<DiscoveredEndpoint[]> {
-  const found: DiscoveredEndpoint[] = []
-  const tasks: Array<{ host: number; port: number }> = []
-
-  for (let host = 1; host <= 254; host++) {
-    for (const port of VLLM_PORTS) {
-      tasks.push({ host, port })
-    }
-  }
-
-  const total = tasks.length
-  let scanned = 0
-  let taskIdx = 0
-
-  async function worker(): Promise<void> {
-    while (taskIdx < tasks.length) {
-      if (abortSignal.aborted) return
-      const task = tasks[taskIdx++]
-      const url = `http://${subnet}.${task.host}:${task.port}/v1`
-      const models = await probeVllmEndpoint(url, abortSignal)
-      if (abortSignal.aborted) return
-      scanned++
-      if (models) {
-        found.push({ url, models })
-      }
-      onProgress?.({ scanned, total, found: found.length })
-    }
-  }
-
-  const workers = Array.from({ length: NETWORK_CONCURRENCY }, () => worker())
-  await Promise.all(workers)
-  return found
+  return []
 }
