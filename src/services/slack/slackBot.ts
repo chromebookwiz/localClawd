@@ -20,12 +20,21 @@ import { killAllIncludingSelf } from '../telegram/telegramKill.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface SlackFile {
+  id: string
+  name?: string
+  mimetype?: string
+  url_private?: string
+  url_private_download?: string
+}
+
 interface SlackMessage {
   ts: string
   user?: string
   bot_id?: string
   text?: string
   subtype?: string
+  files?: SlackFile[]
 }
 
 interface SlackResponse {
@@ -361,8 +370,7 @@ async function pollLoop(): Promise<void> {
 async function handleMessage(m: SlackMessage): Promise<void> {
   // Skip bot messages (including our own)
   if (m.bot_id) return
-  if (m.subtype && m.subtype !== 'thread_broadcast') return
-  if (!m.text) return
+  if (m.subtype && m.subtype !== 'thread_broadcast' && m.subtype !== 'file_share') return
   if (_botUserId && m.user === _botUserId) return
 
   // User filter
@@ -370,6 +378,24 @@ async function handleMessage(m: SlackMessage): Promise<void> {
     logForDebugging(`[slack] Ignored message from unauthorized user ${m.user}`)
     return
   }
+
+  // Voice / audio attachment — transcribe and treat as text
+  const audioFile = m.files?.find(f => f.mimetype?.startsWith('audio/'))
+  if (!m.text && audioFile?.url_private_download) {
+    const transcribed = await transcribeSlackAudio(audioFile)
+    if (transcribed) {
+      m = { ...m, text: m.text ? `${m.text}\n${transcribed}` : transcribed }
+      void sendSlackMessage(`🎙 _transcribed:_ ${transcribed.slice(0, 200)}${transcribed.length > 200 ? '…' : ''}`)
+    } else {
+      void sendSlackMessage(
+        '🎙 Voice received, but transcription is not configured.\n' +
+        'Set one of: `STT_BASE_URL`+`STT_API_KEY`, `GROQ_API_KEY`, or `OPENAI_API_KEY`.',
+      )
+      return
+    }
+  }
+
+  if (!m.text) return
 
   // Strip <@BOTID> prefix if user @-mentioned us
   let text = m.text.trim()
@@ -442,6 +468,19 @@ async function handleMessage(m: SlackMessage): Promise<void> {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+async function transcribeSlackAudio(file: SlackFile): Promise<string | null> {
+  const url = file.url_private_download ?? file.url_private
+  if (!url) return null
+  try {
+    const { transcribeFromUrl } = await import('../voice/transcribeAudio.js')
+    const filename = file.name ?? 'voice.m4a'
+    return await transcribeFromUrl(url, filename, `Bearer ${_token}`)
+  } catch (e) {
+    logForDebugging(`[slack] voice transcription failed: ${e}`)
+    return null
+  }
+}
 
 function chunkText(text: string, maxLen: number): string[] {
   if (text.length <= maxLen) return [text]

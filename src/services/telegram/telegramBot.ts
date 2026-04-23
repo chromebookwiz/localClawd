@@ -18,6 +18,14 @@ import { killAllIncludingSelf } from './telegramKill.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface TelegramFile {
+  file_id: string
+  file_unique_id: string
+  duration?: number
+  mime_type?: string
+  file_size?: number
+}
+
 interface TelegramUpdate {
   update_id: number
   message?: {
@@ -25,6 +33,10 @@ interface TelegramUpdate {
     from?: { id: number; username?: string; first_name?: string }
     chat: { id: number }
     text?: string
+    caption?: string
+    voice?: TelegramFile
+    audio?: TelegramFile
+    video_note?: TelegramFile
     date: number
   }
 }
@@ -279,7 +291,7 @@ async function pollLoop(): Promise<void> {
 
 async function handleUpdate(update: TelegramUpdate): Promise<void> {
   const msg = update.message
-  if (!msg?.text) return
+  if (!msg) return
 
   // Security: only accept messages from the configured chat
   if (msg.chat.id !== _chatId) {
@@ -288,7 +300,25 @@ async function handleUpdate(update: TelegramUpdate): Promise<void> {
   }
 
   const sender = msg.from?.username ?? msg.from?.first_name ?? 'user'
-  const text = msg.text.trim()
+  let text = msg.text?.trim() ?? ''
+
+  // Voice / audio / video_note — transcribe and treat as text
+  const audioFile = msg.voice ?? msg.audio ?? msg.video_note
+  if (!text && audioFile) {
+    const transcribed = await transcribeTelegramAudio(audioFile)
+    if (transcribed) {
+      text = transcribed
+      if (msg.caption) text = `${msg.caption}\n${text}`
+      void sendTelegramMessage(`🎙 _transcribed:_ ${text.slice(0, 200)}${text.length > 200 ? '…' : ''}`)
+    } else {
+      void sendTelegramMessage(
+        '🎙 Voice received, but transcription is not configured.\n' +
+        'Set one of: `STT_BASE_URL` + `STT_API_KEY`, `GROQ_API_KEY`, or `OPENAI_API_KEY`.',
+      )
+      return
+    }
+  }
+
   if (!text) return
 
   logForDebugging(`[telegram] Message from ${sender}: ${text.slice(0, 80)}`)
@@ -356,6 +386,20 @@ async function handleUpdate(update: TelegramUpdate): Promise<void> {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+async function transcribeTelegramAudio(file: TelegramFile): Promise<string | null> {
+  try {
+    const info = await api<{ file_path?: string }>('getFile', { file_id: file.file_id })
+    if (!info.ok || !info.result.file_path) return null
+    const url = `https://api.telegram.org/file/bot${_token}/${info.result.file_path}`
+    const { transcribeFromUrl } = await import('../voice/transcribeAudio.js')
+    const filename = info.result.file_path.split('/').pop() ?? 'voice.ogg'
+    return await transcribeFromUrl(url, filename)
+  } catch (e) {
+    logForDebugging(`[telegram] voice transcription failed: ${e}`)
+    return null
+  }
+}
 
 function chunkText(text: string, maxLen: number): string[] {
   if (text.length <= maxLen) return [text]

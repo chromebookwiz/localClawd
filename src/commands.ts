@@ -24,7 +24,8 @@ import slack from './commands/slack/index.js'
 import discord from './commands/discord/index.js'
 import schedule from './commands/schedule/index.js'
 import sessionsearch from './commands/sessionsearch/index.js'
-import hermes from './commands/hermes/index.js'
+import summarizeSessions from './commands/summarize-sessions/index.js'
+import ssh from './commands/ssh/index.js'
 import heartbeat from './commands/heartbeat/index.js'
 import sysprompt from './commands/sysprompt/index.js'
 import ctx from './commands/ctx/index.js'
@@ -314,7 +315,8 @@ const COMMANDS = memoize((): Command[] => [
   discord,
   schedule,
   sessionsearch,
-  hermes,
+  summarizeSessions,
+  ssh,
   heartbeat,
   sysprompt,
   ctx,

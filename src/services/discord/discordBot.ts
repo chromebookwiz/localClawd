@@ -16,6 +16,15 @@ import { logForDebugging } from '../../utils/debug.js'
 import { globalStopSignal } from '../telegram/telegramSignals.js'
 import { killAllIncludingSelf } from '../telegram/telegramKill.js'
 
+interface DiscordAttachment {
+  id: string
+  filename: string
+  content_type?: string
+  url: string
+  proxy_url?: string
+  size?: number
+}
+
 interface DiscordMessage {
   id: string
   channel_id: string
@@ -23,6 +32,7 @@ interface DiscordMessage {
   content: string
   timestamp: string
   type: number
+  attachments?: DiscordAttachment[]
 }
 
 const DISCORD_API = 'https://discord.com/api/v10'
@@ -276,6 +286,24 @@ async function handleMessage(m: DiscordMessage): Promise<void> {
     const mentionRe = new RegExp(`^<@!?${_botUserId}>\\s*`)
     text = text.replace(mentionRe, '').trim()
   }
+
+  // Voice / audio attachment — transcribe and treat as text
+  const audioAttachment = m.attachments?.find(
+    a => a.content_type?.startsWith('audio/') || /\.(ogg|m4a|mp3|wav|webm|opus)$/i.test(a.filename),
+  )
+  if (!text && audioAttachment) {
+    const transcribed = await transcribeDiscordAudio(audioAttachment)
+    if (transcribed) {
+      text = transcribed
+      void sendDiscordMessage(`🎙 _transcribed:_ ${transcribed.slice(0, 200)}${transcribed.length > 200 ? '…' : ''}`)
+    } else {
+      void sendDiscordMessage(
+        '🎙 Voice received, but transcription is not configured.\n' +
+        'Set one of: `STT_BASE_URL`+`STT_API_KEY`, `GROQ_API_KEY`, or `OPENAI_API_KEY`.',
+      )
+      return
+    }
+  }
   if (!text) return
 
   _reactionTargetId = m.id
@@ -331,6 +359,16 @@ async function handleMessage(m: DiscordMessage): Promise<void> {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+async function transcribeDiscordAudio(att: DiscordAttachment): Promise<string | null> {
+  try {
+    const { transcribeFromUrl } = await import('../voice/transcribeAudio.js')
+    return await transcribeFromUrl(att.url, att.filename)
+  } catch (e) {
+    logForDebugging(`[discord] voice transcription failed: ${e}`)
+    return null
+  }
+}
 
 function chunkText(text: string, maxLen: number): string[] {
   if (text.length <= maxLen) return [text]

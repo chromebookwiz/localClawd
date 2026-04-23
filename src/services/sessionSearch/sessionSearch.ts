@@ -12,6 +12,7 @@
 import { readdir, readFile, stat } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
+import { loadAllSummaries } from './sessionSummarize.js'
 
 export interface SessionMatch {
   sessionId: string
@@ -21,6 +22,8 @@ export interface SessionMatch {
   messageCount: number
   snippet: string
   preview: string
+  summary?: string
+  tags?: string[]
 }
 
 const PROJECTS_DIR = join(homedir(), '.claude', 'projects')
@@ -152,22 +155,56 @@ export async function searchSessions(
   const terms = tokenize(query)
   if (terms.length === 0) return []
 
-  const files = await listSessionFiles()
   const now = Date.now()
-  const results: SessionMatch[] = []
+  const matchMap = new Map<string, SessionMatch>()
 
+  // Pass 1: summaries (fast; only read small JSON files)
+  const summaries = await loadAllSummaries()
+  for (const s of summaries) {
+    const hay = (s.summary + ' ' + s.tags.join(' ') + ' ' + s.firstUserMessage).toLowerCase()
+    let score = 0
+    for (const term of terms) {
+      let idx = 0
+      while ((idx = hay.indexOf(term, idx)) !== -1) { score++; idx += term.length }
+      // Tag match — strong signal
+      if (s.tags.includes(term)) score += 5
+    }
+    if (score === 0) continue
+
+    const daysOld = Math.max(0, (now - s.lastModified) / (1000 * 60 * 60 * 24))
+    const recencyBoost = 1 / (1 + Math.log(1 + daysOld))
+    // Summary-match boost — these are curated
+    const finalScore = score * 2.0 * (0.7 + 0.3 * recencyBoost)
+
+    matchMap.set(s.sessionId, {
+      sessionId: s.sessionId,
+      projectSlug: s.projectSlug,
+      score: finalScore,
+      lastModified: s.lastModified,
+      messageCount: s.messageCount,
+      snippet: s.summary,
+      preview: s.firstUserMessage,
+      summary: s.summary,
+      tags: s.tags,
+    })
+  }
+
+  // Pass 2: raw session files (slower; do this only for sessions not in matchMap
+  // or to refine scores)
+  const files = await listSessionFiles()
   for (const f of files) {
+    const sessionId = f.path.split(/[\\/]/).pop()!.replace(/\.jsonl$/, '')
+    // Skip if we already have a strong match from summary and this file isn't newer
+    if (matchMap.has(sessionId)) continue
+
     const r = await scoreSession(terms, f.path)
     if (r.score === 0) continue
 
-    // Recency boost: log-scale days since last modified
     const daysOld = Math.max(0, (now - f.mtime) / (1000 * 60 * 60 * 24))
     const recencyBoost = 1 / (1 + Math.log(1 + daysOld))
     const finalScore = r.score * (0.7 + 0.3 * recencyBoost)
 
-    const sessionId = f.path.split(/[\\/]/).pop()!.replace(/\.jsonl$/, '')
-
-    results.push({
+    matchMap.set(sessionId, {
       sessionId,
       projectSlug: f.slug,
       score: finalScore,
@@ -178,6 +215,7 @@ export async function searchSessions(
     })
   }
 
+  const results = Array.from(matchMap.values())
   results.sort((a, b) => b.score - a.score)
   return results.slice(0, limit)
 }
