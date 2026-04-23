@@ -50,6 +50,7 @@ import { profileCheckpoint } from './utils/startupProfiler.js'
 import { initTelegram } from './services/telegram/telegramBot.js'
 import { initSlack } from './services/slack/slackBot.js'
 import { initDiscord } from './services/discord/discordBot.js'
+import { initSignal } from './services/signal/signalBot.js'
 import { startScheduler } from './services/schedule/scheduler.js'
 import { initProjectMemory } from './services/project/projectMemory.js'
 import { initSecretStore } from './services/secrets/secretStore.js'
@@ -316,6 +317,7 @@ export async function setup(
     void initTelegram() // Start Telegram bridge if TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID set
     void initSlack()    // Start Slack bridge if SLACK_BOT_TOKEN + SLACK_CHANNEL_ID set
     void initDiscord()  // Start Discord bridge if DISCORD_BOT_TOKEN + DISCORD_CHANNEL_ID set
+    void initSignal()   // Start Signal bridge if SIGNAL_NUMBER + SIGNAL_RECIPIENT set (needs signal-cli)
     startScheduler()    // Cron-like scheduler for /schedule entries
     // Register current project in memory so every session has persistent context
     try {

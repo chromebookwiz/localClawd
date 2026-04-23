@@ -37,6 +37,11 @@ import {
   isDiscordActive,
   sendDiscordMessage,
 } from '../../services/discord/discordBot.js'
+import {
+  getPendingSignalMessage,
+  isSignalActive,
+  sendSignalMessage,
+} from '../../services/signal/signalBot.js'
 import { globalStopSignal } from '../../services/telegram/telegramSignals.js'
 import { enqueue } from '../../utils/messageQueueManager.js'
 
@@ -302,6 +307,7 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     if (isTelegramActive()) void sendTelegramMessage(header)
     if (isSlackActive()) void sendSlackMessage(header)
     if (isDiscordActive()) void sendDiscordMessage(header)
+    if (isSignalActive()) void sendSignalMessage(header)
   }
 
   // Check global stop signal (from Telegram/Slack /stop)
@@ -317,6 +323,7 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     if (isTelegramActive()) void sendTelegramMessage(stopMsg)
     if (isSlackActive()) void sendSlackMessage(stopMsg)
     if (isDiscordActive()) void sendDiscordMessage(stopMsg)
+    if (isSignalActive()) void sendSignalMessage(stopMsg)
     return (
       <KeepGoingDone
         round={finalRound}
@@ -336,6 +343,7 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     if (isTelegramActive()) void sendTelegramMessage(pauseMsg)
     if (isSlackActive()) void sendSlackMessage(pauseMsg)
     if (isDiscordActive()) void sendDiscordMessage(pauseMsg)
+    if (isSignalActive()) void sendSignalMessage(pauseMsg)
     return (
       <KeepGoingCapReached
         round={finalRound}
@@ -350,7 +358,8 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const externalMsg =
     getPendingTelegramMessage() ??
     getPendingSlackMessage() ??
-    getPendingDiscordMessage()
+    getPendingDiscordMessage() ??
+    getPendingSignalMessage()
 
   // ── Build prompt + re-queue ───────────────────────────────────────────────
   const prompt = buildContinuationPrompt(round, maxRounds, focus, externalMsg)

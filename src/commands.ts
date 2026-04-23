@@ -22,9 +22,12 @@ import keepgoing from './commands/keepgoing/index.js'
 import telegram from './commands/telegram/index.js'
 import slack from './commands/slack/index.js'
 import discord from './commands/discord/index.js'
+import signalCmd from './commands/signal/index.js'
 import schedule from './commands/schedule/index.js'
 import sessionsearch from './commands/sessionsearch/index.js'
 import summarizeSessions from './commands/summarize-sessions/index.js'
+import compressSessions from './commands/compress-sessions/index.js'
+import distillSkill from './commands/distill-skill/index.js'
 import ssh from './commands/ssh/index.js'
 import heartbeat from './commands/heartbeat/index.js'
 import sysprompt from './commands/sysprompt/index.js'
@@ -313,9 +316,12 @@ const COMMANDS = memoize((): Command[] => [
   telegram,
   slack,
   discord,
+  signalCmd,
   schedule,
   sessionsearch,
   summarizeSessions,
+  compressSessions,
+  distillSkill,
   ssh,
   heartbeat,
   sysprompt,

@@ -14,7 +14,10 @@ What localclawd has today, and what it doesn't — yet.
 | Telegram bridge                    | polling, interactive setup, voice-memo transcription                   |
 | Slack bridge                       | polling, interactive setup, voice-memo transcription                   |
 | Discord bridge                     | REST polling, interactive setup, voice-memo transcription              |
+| Signal bridge                      | via `signal-cli`, shared `/stop /kill /status /schedules`              |
 | Voice-memo transcription           | Whisper-compatible endpoint (OpenAI / Groq / any OSS variant)          |
+| Trajectory compression             | `/compress-sessions` — condensed JSON for training data export         |
+| Skill distillation                 | `/distill-skill` — proposes a reusable skill from the recent session   |
 | Scheduled automations              | `/schedule` with cron, `@daily`, `every Nm`, delivered to any bridge   |
 | Session search                     | `/sessionsearch` — term-scored recall across all past conversations    |
 | LLM session summarization          | `/summarize-sessions` — condense old sessions into a searchable index  |
@@ -36,7 +39,6 @@ These are genuinely multi-turn work, external-service dependent, or both:
 | Feature                            | Why it's not done yet                                                  |
 |------------------------------------|------------------------------------------------------------------------|
 | WhatsApp bridge                    | Requires Twilio (paid) or WhatsApp Web scraping (fragile, TOS risk)    |
-| Signal bridge                      | Requires `signal-cli` daemon installed on the host                     |
 | Docker backend                     | Container image + lifecycle glue; substantial work                     |
 | Daytona backend                    | Needs a Daytona account; serverless-persistent envs                    |
 | Modal backend                      | Needs a Modal account; wake-on-demand GPU sandboxes                    |
@@ -45,8 +47,8 @@ These are genuinely multi-turn work, external-service dependent, or both:
 | Honcho dialectic user modeling     | External service; data residency decisions pending                     |
 | agentskills.io open-standard compat | Spec still evolving; local skills format is the source of truth today |
 | Atropos RL environments            | Research-grade; batch trajectory generation pipeline                   |
-| Trajectory compression             | Pending Atropos                                                        |
 | Python RPC tool bridge             | Local socket server for out-of-band tool calls                         |
+| Skill self-improvement loop        | Skills that observe + edit themselves during use (distillation exists) |
 
 ---
 

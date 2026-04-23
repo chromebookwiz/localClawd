@@ -22,7 +22,7 @@ export interface ScheduleEntry {
   enabled: boolean
   lastRun: number       // epoch ms (0 = never)
   nextRun: number       // epoch ms
-  deliverTo: 'cli' | 'telegram' | 'slack' | 'discord' | 'auto'
+  deliverTo: 'cli' | 'telegram' | 'slack' | 'discord' | 'signal' | 'auto'
 }
 
 interface ScheduleFile {
@@ -263,6 +263,12 @@ async function fireSchedule(s: ScheduleEntry): Promise<void> {
       const { isDiscordActive, sendDiscordMessage } = await import('../discord/discordBot.js')
       if (isDiscordActive()) {
         void sendDiscordMessage(`⏰ **Scheduled: ${s.name}**\n${s.prompt.slice(0, 200)}`)
+      }
+    }
+    if (s.deliverTo === 'signal' || s.deliverTo === 'auto') {
+      const { isSignalActive, sendSignalMessage } = await import('../signal/signalBot.js')
+      if (isSignalActive()) {
+        void sendSignalMessage(`Scheduled: ${s.name}\n${s.prompt.slice(0, 200)}`)
       }
     }
   } catch { /* bridge modules optional */ }
