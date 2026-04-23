@@ -35,10 +35,14 @@ import {
   isTelegramActive,
   sendTelegramMessage,
 } from '../telegram/telegramBot.js'
+import {
+  isSlackActive,
+  sendSlackMessage,
+} from '../slack/slackBot.js'
 
 // ─── Notification medium ────────────────────────────────────────────────────
 
-export type NotifyMedium = 'telegram' | 'desktop'
+export type NotifyMedium = 'telegram' | 'slack' | 'desktop'
 
 // ─── Module-level state ──────────────────────────────────────────────────────
 
@@ -119,7 +123,11 @@ export async function startDirectorTask(
   _projectId = project.id
   _maxRounds = maxRounds ?? 20
   _projectPath = projectPath
-  _notifyMedium = medium ?? (isTelegramActive() ? 'telegram' : 'desktop')
+  _notifyMedium = medium ?? (
+    isTelegramActive() ? 'telegram'
+    : isSlackActive() ? 'slack'
+    : 'desktop'
+  )
 
   // Capture git ref for change summary at completion
   _startGitRef = await captureGitRef(projectPath)
@@ -242,6 +250,8 @@ function stopHeartbeat(): void {
 export async function sendDirectorNotification(title: string, message: string): Promise<void> {
   if (_notifyMedium === 'telegram' && isTelegramActive()) {
     void sendTelegramMessage(`*${title}*\n${message}`)
+  } else if (_notifyMedium === 'slack' && isSlackActive()) {
+    void sendSlackMessage(`*${title}*\n${message}`)
   } else {
     void sendDesktopNotification(title, message)
   }

@@ -18,9 +18,13 @@ import diff from './commands/diff/index.js'
 import ctx_viz from './commands/ctx_viz/index.js'
 import doctor from './commands/doctor/index.js'
 import buddy from './commands/buddy/index.js'
-import director from './commands/director/index.js'
 import keepgoing from './commands/keepgoing/index.js'
 import telegram from './commands/telegram/index.js'
+import slack from './commands/slack/index.js'
+import discord from './commands/discord/index.js'
+import schedule from './commands/schedule/index.js'
+import sessionsearch from './commands/sessionsearch/index.js'
+import hermes from './commands/hermes/index.js'
 import heartbeat from './commands/heartbeat/index.js'
 import sysprompt from './commands/sysprompt/index.js'
 import ctx from './commands/ctx/index.js'
@@ -263,7 +267,6 @@ const COMMANDS = memoize((): Command[] => [
   contextsize,
   cost,
   diff,
-  director,
   doctor,
   effort,
   exit,
@@ -307,6 +310,11 @@ const COMMANDS = memoize((): Command[] => [
   vim,
   buddy,
   telegram,
+  slack,
+  discord,
+  schedule,
+  sessionsearch,
+  hermes,
   heartbeat,
   sysprompt,
   ctx,

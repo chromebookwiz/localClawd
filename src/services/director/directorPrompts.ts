@@ -10,7 +10,7 @@ export function buildDirectorTaskPrompt(
   projectContext: string,
   round: number,
   maxRounds: number,
-  medium?: 'telegram' | 'desktop',
+  medium?: 'telegram' | 'slack' | 'desktop',
 ): string {
   const roundInfo = isFinite(maxRounds)
     ? `Round ${round} of ${maxRounds}`
@@ -18,6 +18,8 @@ export function buildDirectorTaskPrompt(
 
   const mediumNote = medium === 'telegram'
     ? '\n- The user is connected via Telegram — progress updates and the final report are sent there automatically'
+    : medium === 'slack'
+    ? '\n- The user is connected via Slack — progress updates and the final report are posted to the Slack channel automatically'
     : '\n- The user is connected via CLI — progress updates are sent as desktop notifications'
 
   return `\

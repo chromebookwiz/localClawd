@@ -48,6 +48,10 @@ import { getPlanSlug } from './utils/plans.js'
 import { saveWorktreeState } from './utils/sessionStorage.js'
 import { profileCheckpoint } from './utils/startupProfiler.js'
 import { initTelegram } from './services/telegram/telegramBot.js'
+import { initSlack } from './services/slack/slackBot.js'
+import { initDiscord } from './services/discord/discordBot.js'
+import { startScheduler } from './services/schedule/scheduler.js'
+import { initProjectMemory } from './services/project/projectMemory.js'
 import { initSecretStore } from './services/secrets/secretStore.js'
 import { queryLocalProviderContextLength } from './services/api/localBackend.js'
 import { setLocalProviderContextWindow } from './utils/context.js'
@@ -310,6 +314,14 @@ export async function setup(
   // raced ahead and memoized an empty bundledSkills list.
   if (!isBareMode()) {
     void initTelegram() // Start Telegram bridge if TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID set
+    void initSlack()    // Start Slack bridge if SLACK_BOT_TOKEN + SLACK_CHANNEL_ID set
+    void initDiscord()  // Start Discord bridge if DISCORD_BOT_TOKEN + DISCORD_CHANNEL_ID set
+    startScheduler()    // Cron-like scheduler for /schedule entries
+    // Register current project in memory so every session has persistent context
+    try {
+      const { getOriginalCwd } = await import('./bootstrap/state.js')
+      void initProjectMemory(getOriginalCwd())
+    } catch { /* non-critical */ }
     initSecretStore() // Initialize encrypted secret store
     // Query local provider for actual context window size (fire-and-forget)
     void (async () => {

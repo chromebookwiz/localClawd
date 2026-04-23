@@ -15,7 +15,6 @@
 import { logForDebugging } from '../../utils/debug.js'
 import { globalStopSignal } from './telegramSignals.js'
 import { killAllIncludingSelf } from './telegramKill.js'
-import { isDirectorActive } from '../director/directorEngine.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -313,30 +312,42 @@ async function handleUpdate(update: TelegramUpdate): Promise<void> {
       return
     }
     if (text === '/status') {
-      const { getDirectorStatus } = await import('../director/directorEngine.js')
-      const status = await getDirectorStatus()
+      const { getProjectStatus } = await import('../project/projectMemory.js')
+      const status = await getProjectStatus()
       void sendTelegramMessage(`*Status*\n${status}`)
       return
     }
-    // Other / commands from Telegram — ignore unknown bot commands
-    void sendTelegramMessage(`Unknown command: ${text}\n\nAvailable: /stop /kill /status`)
+    if (text === '/schedule' || text === '/schedules') {
+      const { listSchedules } = await import('../schedule/scheduler.js')
+      const text2 = await listSchedules()
+      void sendTelegramMessage(`*Schedules*\n${text2}`)
+      return
+    }
+    if (text === '/help') {
+      void sendTelegramMessage(
+        '*localclawd commands*\n' +
+        '/stop — stop current task\n' +
+        '/kill — kill all instances\n' +
+        '/status — project status\n' +
+        '/schedules — list scheduled jobs\n' +
+        '/help — this message\n\n' +
+        'Any other message is forwarded to the agent.',
+      )
+      return
+    }
+    // Unknown bot command
+    void sendTelegramMessage(`Unknown command: ${text}\n\nAvailable: /stop /kill /status /schedules /help`)
     return
   }
 
-  // If director is active, queue for the director to consume
-  // If director is NOT active, auto-start director mode via command queue
-  if (isDirectorActive()) {
+  // Plain message — queue it as a prompt. The agent on the CLI side picks it up.
+  void sendTypingIndicator()
+  try {
+    const { enqueue } = await import('../../utils/messageQueueManager.js')
+    enqueue({ value: text, mode: 'prompt', priority: 'now' })
+  } catch (e) {
     _queue.push(text)
-  } else {
-    void sendTelegramMessage(`Starting director mode...`)
-    void sendTypingIndicator()
-    try {
-      const { enqueue } = await import('../../utils/messageQueueManager.js')
-      enqueue({ value: `/director ${text}`, mode: 'prompt', priority: 'now' })
-    } catch (e) {
-      _queue.push(text)
-      logForDebugging(`[telegram] Failed to auto-start director: ${e}`)
-    }
+    logForDebugging(`[telegram] Failed to enqueue message: ${e}`)
   }
 
   for (const cb of _listeners) {

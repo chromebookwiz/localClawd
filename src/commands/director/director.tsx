@@ -40,6 +40,12 @@ import {
   startTypingIndicator,
   stopTypingIndicator,
 } from '../../services/telegram/telegramBot.js'
+import {
+  getPendingSlackMessage,
+  isSlackActive,
+  startSlackWorkingIndicator,
+  stopSlackWorkingIndicator,
+} from '../../services/slack/slackBot.js'
 import { globalStopSignal } from '../../services/telegram/telegramSignals.js'
 import { getOriginalCwd } from '../../bootstrap/state.js'
 import { enqueue } from '../../utils/messageQueueManager.js'
@@ -173,14 +179,19 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   // ── Starting a new task ───────────────────────────────────────────────
   if (task && !isDirectorActive()) {
     const cwd = getOriginalCwd()
-    // Determine notification medium: Telegram if active, else desktop
-    const medium: NotifyMedium = isTelegramActive() ? 'telegram' : 'desktop'
+    // Determine notification medium: Telegram > Slack > desktop
+    const medium: NotifyMedium = isTelegramActive()
+      ? 'telegram'
+      : isSlackActive()
+      ? 'slack'
+      : 'desktop'
     const { prompt } = await startDirectorTask(task, cwd, DEFAULT_MAX_ROUNDS, medium)
 
     void sendDirectorNotification('Director', `Starting task:\n${task.slice(0, 200)}`)
 
-    // Start typing indicator so Telegram shows "typing..." while model works
+    // Start working indicator for the active medium
     if (isTelegramActive()) startTypingIndicator()
+    if (isSlackActive()) void startSlackWorkingIndicator()
 
     return (
       <DirectorBanner
@@ -203,8 +214,9 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
 
   // ── Continuation round (director is active) ───────────────────────────
 
-  // Model just finished generating — stop typing indicator
+  // Model just finished generating — stop typing/working indicators
   if (isTelegramActive()) stopTypingIndicator()
+  if (isSlackActive()) void stopSlackWorkingIndicator()
 
   // Check global stop signal
   if (globalStopSignal.get()) {
@@ -238,14 +250,15 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     void sendTurnStatus(lastText)
   }
 
-  // Check for incoming Telegram message
-  const telegramMsg = getPendingTelegramMessage()
+  // Check for incoming message from any external channel
+  const externalMsg = getPendingTelegramMessage() ?? getPendingSlackMessage()
 
   // Review and decide — director re-prompts every turn until task is done
-  const result = await reviewAndContinue(lastText, telegramMsg)
+  const result = await reviewAndContinue(lastText, externalMsg)
 
   if (result.done) {
     if (isTelegramActive()) stopTypingIndicator()
+    if (isSlackActive()) void stopSlackWorkingIndicator()
     const round = getDirectorRound()
     const reason = result.reason ?? 'completed'
     const changeSummary = await getChangeSummary()
@@ -266,8 +279,9 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const round = getDirectorRound()
   const currentTask = getDirectorTask()
 
-  // Resume typing indicator for next model turn
+  // Resume working indicator for next model turn
   if (isTelegramActive()) startTypingIndicator()
+  if (isSlackActive()) void startSlackWorkingIndicator()
 
   return (
     <DirectorBanner
