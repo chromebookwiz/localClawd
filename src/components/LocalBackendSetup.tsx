@@ -16,6 +16,12 @@ import {
   recordEndpointUse,
   type EndpointHistoryEntry,
 } from '../utils/model/endpointHistory.js'
+import {
+  detectTailscalePeers,
+  defaultPortForProvider,
+  urlsForPeer,
+  type TailscalePeer,
+} from '../utils/model/tailscaleDetect.js'
 import { TriangleSpinner } from './Spinner/TriangleSpinner.js'
 import TextInput from './TextInput.js'
 
@@ -162,8 +168,13 @@ export function LocalBackendSetup({
   // Endpoint history + presets
   const [history, setHistory] = useState<EndpointHistoryEntry[]>([])
 
+  // Tailscale peers (lazy-loaded on provider selection)
+  const [tailscalePeers, setTailscalePeers] = useState<TailscalePeer[]>([])
+  const [tailscaleLoaded, setTailscaleLoaded] = useState(false)
+
   const modelScanAbortRef = useRef<AbortController | null>(null)
   const scanStepDoneRef = useRef(false)
+  const prevStepRef = useRef<SetupStep>(step)
 
   useEffect(() => {
     void loadEndpointHistory().then(setHistory)
@@ -173,7 +184,12 @@ export function LocalBackendSetup({
 
   useEffect(() => { scanStepDoneRef.current = false }, [step])
 
+  // Only reset cursor when the step actually changes — not on every keystroke.
+  // Without this guard, backspacing in the URL field snaps the cursor to the
+  // end of the line on every character delete.
   useEffect(() => {
+    if (prevStepRef.current === step) return
+    prevStepRef.current = step
     const nextValue = step === 'baseUrl' ? baseUrl : step === 'model' ? model : apiKey
     setCursorOffset(nextValue.length)
   }, [step, baseUrl, model, apiKey])
@@ -222,6 +238,11 @@ export function LocalBackendSetup({
     setAvailableModels([])
     // Go straight to the preset/history picker — no network scan
     setStep('pickUrl')
+    // Kick off Tailscale detection in the background (only once per mount)
+    if (!tailscaleLoaded) {
+      setTailscaleLoaded(true)
+      void detectTailscalePeers().then(setTailscalePeers)
+    }
   }
 
   function pickUrl(url: string): void {
@@ -294,9 +315,28 @@ export function LocalBackendSetup({
 
   const modelMenuItems: MenuItem<string>[] = availableModels.map(m => ({ label: m, value: m }))
 
-  // Build the URL-picker menu: recent history (matching provider) first, then presets.
+  // Build the URL-picker menu:
+  //   1. Recent history (matching provider)
+  //   2. Tailscale peers (if tailscale is installed + some peers are online)
+  //   3. Common presets
+  //   4. "Enter URL manually"
   const matchingHistory = history.filter(h => h.provider === provider).slice(0, 5)
   const presets = commonPresetsForProvider(provider)
+  const tailscalePort = defaultPortForProvider(provider)
+  const tailscaleItems: MenuItem<string>[] = []
+  for (const peer of tailscalePeers) {
+    // Only surface the short hostname URL in the picker — keeps the list
+    // compact. DNSName and IP are still reachable if the user types them.
+    const urls = urlsForPeer(peer, tailscalePort)
+    const primary = urls[0]
+    if (primary) {
+      tailscaleItems.push({
+        label: `🔗 ${primary.label}  →  ${primary.url}`,
+        value: primary.url,
+      })
+    }
+  }
+
   const seen = new Set<string>()
   const urlPickerItems: MenuItem<string>[] = []
   for (const h of matchingHistory) {
@@ -304,6 +344,11 @@ export function LocalBackendSetup({
     seen.add(h.url)
     const when = timeAgo(h.lastUsed)
     urlPickerItems.push({ label: `${h.url}   (used ${when})`, value: h.url })
+  }
+  for (const t of tailscaleItems) {
+    if (seen.has(t.value)) continue
+    seen.add(t.value)
+    urlPickerItems.push(t)
   }
   for (const p of presets) {
     if (seen.has(p)) continue
@@ -339,8 +384,8 @@ export function LocalBackendSetup({
         <>
           <Text>Pick an endpoint URL, or enter one manually:</Text>
           <Text dimColor wrap="wrap">
-            Tip: for a machine on your LAN, use its mDNS name (e.g. http://my-box.local:8000/v1)
-            or its IP (e.g. http://192.168.1.42:8000/v1). No network scanning — just pick or paste.
+            Tip: for a LAN machine use its mDNS name (http://my-box.local:8000/v1)
+            or IP. Tailscale peers show up automatically (🔗) if tailscale is installed.
           </Text>
           <SimpleMenu
             items={urlPickerItems}

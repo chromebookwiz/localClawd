@@ -29,6 +29,8 @@ import summarizeSessions from './commands/summarize-sessions/index.js'
 import compressSessions from './commands/compress-sessions/index.js'
 import distillSkill from './commands/distill-skill/index.js'
 import ssh from './commands/ssh/index.js'
+import dockerRun from './commands/docker-run/index.js'
+import rpc from './commands/rpc/index.js'
 import heartbeat from './commands/heartbeat/index.js'
 import sysprompt from './commands/sysprompt/index.js'
 import ctx from './commands/ctx/index.js'
@@ -323,6 +325,8 @@ const COMMANDS = memoize((): Command[] => [
   compressSessions,
   distillSkill,
   ssh,
+  dockerRun,
+  rpc,
   heartbeat,
   sysprompt,
   ctx,
