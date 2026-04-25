@@ -16,6 +16,7 @@ import { Box, Text } from '../../ink.js'
 import type { LocalJSXCommandCall } from '../../types/command.js'
 import { dockerRun, isDockerAvailable } from '../../services/backend/dockerBackend.js'
 import { getOriginalCwd } from '../../bootstrap/state.js'
+import { AutoDone } from '../../components/AutoDone.js'
 
 function Result({
   image,
@@ -71,20 +72,24 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
   const input = (args ?? '').trim()
   if (!input) {
     return (
-      <Box marginTop={1}>
-        <Text color="yellow" wrap="wrap">
-          {'Usage: /docker-run <image> -- <command>\n' +
-            'Example: /docker-run python:3.12 -- python -c "print(\'hi\')"'}
-        </Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="yellow" wrap="wrap">
+            {'Usage: /docker-run <image> -- <command>\n' +
+              'Example: /docker-run python:3.12 -- python -c "print(\'hi\')"'}
+          </Text>
+        </Box>
+      </AutoDone>
     )
   }
 
   if (!isDockerAvailable()) {
     return (
-      <Box marginTop={1}>
-        <Text color="red">{'✗ docker CLI not found on PATH. Install Docker Desktop or the docker package.'}</Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="red">{'✗ docker CLI not found on PATH. Install Docker Desktop or the docker package.'}</Text>
+        </Box>
+      </AutoDone>
     )
   }
 
@@ -92,26 +97,37 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
   const sepIdx = input.indexOf(' -- ')
   if (sepIdx < 0) {
     return (
-      <Box marginTop={1}>
-        <Text color="red">{'/docker-run requires " -- " between the image and the command.'}</Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="red">{'/docker-run requires " -- " between the image and the command.'}</Text>
+        </Box>
+      </AutoDone>
     )
   }
   const image = input.slice(0, sepIdx).trim()
   const command = input.slice(sepIdx + 4).trim()
   if (!image || !command) {
     return (
-      <Box marginTop={1}>
-        <Text color="red">{'Both an image and a command are required.'}</Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="red">{'Both an image and a command are required.'}</Text>
+        </Box>
+      </AutoDone>
     )
   }
 
-  const result = await dockerRun({
-    image,
-    command,
-    workdir: getOriginalCwd(),
-  })
+  let result: Awaited<ReturnType<typeof dockerRun>>
+  try {
+    result = await dockerRun({ image, command, workdir: getOriginalCwd() })
+  } catch (e) {
+    return (
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="red">{`✗ docker-run failed: ${e instanceof Error ? e.message : String(e)}`}</Text>
+        </Box>
+      </AutoDone>
+    )
+  }
 
   return (
     <Result

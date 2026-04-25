@@ -18,6 +18,7 @@ import {
   isModalAuthed,
 } from '../../services/backend/modalBackend.js'
 import { getOriginalCwd } from '../../bootstrap/state.js'
+import { AutoDone } from '../../components/AutoDone.js'
 
 function Result({
   entrypoint, exitCode, stdout, stderr, onReady,
@@ -62,32 +63,38 @@ export const call: LocalJSXCommandCall = async (onDone, _ctx, args) => {
   const input = (args ?? '').trim()
   if (!input) {
     return (
-      <Box marginTop={1}>
-        <Text color="yellow" wrap="wrap">
-          {'Usage: /modal-run <module.py>[::function] [-- args...]\n' +
-            'Example: /modal-run train.py::main -- --epochs 5'}
-        </Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="yellow" wrap="wrap">
+            {'Usage: /modal-run <module.py>[::function] [-- args...]\n' +
+              'Example: /modal-run train.py::main -- --epochs 5'}
+          </Text>
+        </Box>
+      </AutoDone>
     )
   }
 
   if (!isModalAvailable()) {
     return (
-      <Box marginTop={1}>
-        <Text color="red" wrap="wrap">
-          {'✗ modal CLI not found. Install with `pip install modal`, then `modal token set`.'}
-        </Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="red" wrap="wrap">
+            {'✗ modal CLI not found. Install with `pip install modal`, then `modal token set`.'}
+          </Text>
+        </Box>
+      </AutoDone>
     )
   }
 
   if (!isModalAuthed()) {
     return (
-      <Box marginTop={1}>
-        <Text color="yellow" wrap="wrap">
-          {'⚠ modal is not authenticated. Run `modal token set` outside of localclawd first.'}
-        </Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="yellow" wrap="wrap">
+            {'⚠ modal is not authenticated. Run `modal token set` outside of localclawd first.'}
+          </Text>
+        </Box>
+      </AutoDone>
     )
   }
 
@@ -103,11 +110,16 @@ export const call: LocalJSXCommandCall = async (onDone, _ctx, args) => {
     extraArgs = []
   }
 
-  const result = await modalRun({
-    entrypoint,
-    args: extraArgs,
-    cwd: getOriginalCwd(),
-  })
+  let result: Awaited<ReturnType<typeof modalRun>>
+  try {
+    result = await modalRun({ entrypoint, args: extraArgs, cwd: getOriginalCwd() })
+  } catch (e) {
+    return (
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}><Text color="red">{`✗ modal-run failed: ${e instanceof Error ? e.message : String(e)}`}</Text></Box>
+      </AutoDone>
+    )
+  }
 
   return (
     <Result

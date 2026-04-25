@@ -19,6 +19,7 @@ import { Dialog } from '../../components/design-system/Dialog.js'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
+import { AutoDone } from '../../components/AutoDone.js'
 
 type SetupStep =
   | 'instructions'
@@ -329,17 +330,29 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
 
   if (!isDiscordActive()) {
     return (
-      <Box marginTop={1}>
-        <Text color="red">{'✗ Discord: Bot is not active. Run /discord to set it up.'}</Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="red">{'✗ Discord: Bot is not active. Run /discord to set it up.'}</Text>
+        </Box>
+      </AutoDone>
     )
   }
 
-  await sendDiscordMessage(text)
+  try {
+    await sendDiscordMessage(text)
+  } catch (e) {
+    return (
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}><Text color="red">{`✗ Discord send failed: ${e instanceof Error ? e.message : String(e)}`}</Text></Box>
+      </AutoDone>
+    )
+  }
   return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text bold color="#6366f1">{'◆ Discord — Sent'}</Text>
-      <Text dimColor>{`  "${text.slice(0, 80)}${text.length > 80 ? '…' : ''}"`}</Text>
-    </Box>
+    <AutoDone onDone={onDone}>
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold color="#6366f1">{'◆ Discord — Sent'}</Text>
+        <Text dimColor>{`  "${text.slice(0, 80)}${text.length > 80 ? '…' : ''}"`}</Text>
+      </Box>
+    </AutoDone>
   )
 }

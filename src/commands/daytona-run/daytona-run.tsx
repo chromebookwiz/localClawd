@@ -10,6 +10,7 @@ import * as React from 'react'
 import { Box, Text } from '../../ink.js'
 import type { LocalJSXCommandCall } from '../../types/command.js'
 import { daytonaRun, isDaytonaAvailable } from '../../services/backend/daytonaBackend.js'
+import { AutoDone } from '../../components/AutoDone.js'
 
 function Result({
   workspace, command, exitCode, stdout, stderr, onReady,
@@ -56,34 +57,55 @@ export const call: LocalJSXCommandCall = async (onDone, _ctx, args) => {
   const input = (args ?? '').trim()
   if (!input) {
     return (
-      <Box marginTop={1}>
-        <Text color="yellow" wrap="wrap">
-          {'Usage: /daytona-run <workspace> -- <command>\n' +
-            'Example: /daytona-run my-workspace -- npm test'}
-        </Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="yellow" wrap="wrap">
+            {'Usage: /daytona-run <workspace> -- <command>\n' +
+              'Example: /daytona-run my-workspace -- npm test'}
+          </Text>
+        </Box>
+      </AutoDone>
     )
   }
 
   if (!isDaytonaAvailable()) {
     return (
-      <Box marginTop={1}>
-        <Text color="red">{'✗ daytona CLI not found on PATH.'}</Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="red">{'✗ daytona CLI not found on PATH.'}</Text>
+        </Box>
+      </AutoDone>
     )
   }
 
   const sepIdx = input.indexOf(' -- ')
   if (sepIdx < 0) {
-    return <Box marginTop={1}><Text color="red">{'/daytona-run requires " -- " between workspace and command.'}</Text></Box>
+    return (
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}><Text color="red">{'/daytona-run requires " -- " between workspace and command.'}</Text></Box>
+      </AutoDone>
+    )
   }
   const workspace = input.slice(0, sepIdx).trim()
   const command = input.slice(sepIdx + 4).trim()
   if (!workspace || !command) {
-    return <Box marginTop={1}><Text color="red">{'Both a workspace name and a command are required.'}</Text></Box>
+    return (
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}><Text color="red">{'Both a workspace name and a command are required.'}</Text></Box>
+      </AutoDone>
+    )
   }
 
-  const result = await daytonaRun({ workspace, command })
+  let result: Awaited<ReturnType<typeof daytonaRun>>
+  try {
+    result = await daytonaRun({ workspace, command })
+  } catch (e) {
+    return (
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}><Text color="red">{`✗ daytona-run failed: ${e instanceof Error ? e.message : String(e)}`}</Text></Box>
+      </AutoDone>
+    )
+  }
   return (
     <Result
       workspace={workspace}

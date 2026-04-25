@@ -9,6 +9,7 @@ import * as React from 'react'
 import { Box, Text } from '../../ink.js'
 import type { LocalJSXCommandCall } from '../../types/command.js'
 import { runSsh } from '../../services/backend/sshBackend.js'
+import { AutoDone } from '../../components/AutoDone.js'
 
 function SshResult({
   target,
@@ -64,9 +65,11 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
   const input = (args ?? '').trim()
   if (!input) {
     return (
-      <Box marginTop={1}>
-        <Text color="yellow">{'Usage: /ssh <user@host> <command>'}</Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="yellow">{'Usage: /ssh <user@host> <command>'}</Text>
+        </Box>
+      </AutoDone>
     )
   }
 
@@ -74,15 +77,26 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
   const match = input.match(/^(\S+)\s+([\s\S]+)$/)
   if (!match) {
     return (
-      <Box marginTop={1}>
-        <Text color="red">{'/ssh requires both a target and a command.'}</Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="red">{'/ssh requires both a target and a command.'}</Text>
+        </Box>
+      </AutoDone>
     )
   }
   const target = match[1]!
   const command = match[2]!
 
-  const result = await runSsh({ target, command })
+  let result: Awaited<ReturnType<typeof runSsh>>
+  try {
+    result = await runSsh({ target, command })
+  } catch (e) {
+    return (
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}><Text color="red">{`✗ ssh failed: ${e instanceof Error ? e.message : String(e)}`}</Text></Box>
+      </AutoDone>
+    )
+  }
 
   return (
     <SshResult

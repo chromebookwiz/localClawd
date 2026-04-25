@@ -16,6 +16,7 @@ import {
   sendSignalMessage,
   getSignalRecipient,
 } from '../../services/signal/signalBot.js'
+import { AutoDone } from '../../components/AutoDone.js'
 
 function SignalStatus({ onReady }: { onReady: () => void }): React.ReactNode {
   const active = isSignalActive()
@@ -89,12 +90,22 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
 
   if (!isSignalActive()) {
     return (
-      <Box marginTop={1}>
-        <Text color="red">{'✗ Signal: bridge not active. Run /signal for setup instructions.'}</Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="red">{'✗ Signal: bridge not active. Run /signal for setup instructions.'}</Text>
+        </Box>
+      </AutoDone>
     )
   }
 
-  await sendSignalMessage(text)
+  try {
+    await sendSignalMessage(text)
+  } catch (e) {
+    return (
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}><Text color="red">{`✗ Signal send failed: ${e instanceof Error ? e.message : String(e)}`}</Text></Box>
+      </AutoDone>
+    )
+  }
   return <SignalSent text={text} onReady={() => onDone(undefined)} />
 }

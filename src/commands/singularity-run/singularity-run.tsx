@@ -10,6 +10,7 @@ import { Box, Text } from '../../ink.js'
 import type { LocalJSXCommandCall } from '../../types/command.js'
 import { singularityRun, isSingularityAvailable } from '../../services/backend/singularityBackend.js'
 import { getOriginalCwd } from '../../bootstrap/state.js'
+import { AutoDone } from '../../components/AutoDone.js'
 
 function Result({
   binary, image, command, exitCode, stdout, stderr, onReady,
@@ -57,34 +58,55 @@ export const call: LocalJSXCommandCall = async (onDone, _ctx, args) => {
   const input = (args ?? '').trim()
   if (!input) {
     return (
-      <Box marginTop={1}>
-        <Text color="yellow" wrap="wrap">
-          {'Usage: /singularity-run <image> -- <command>\n' +
-            'Example: /singularity-run docker://python:3.12 -- python -c "print(\'hi\')"'}
-        </Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="yellow" wrap="wrap">
+            {'Usage: /singularity-run <image> -- <command>\n' +
+              'Example: /singularity-run docker://python:3.12 -- python -c "print(\'hi\')"'}
+          </Text>
+        </Box>
+      </AutoDone>
     )
   }
 
   if (!isSingularityAvailable()) {
     return (
-      <Box marginTop={1}>
-        <Text color="red">{'✗ apptainer / singularity not found on PATH.'}</Text>
-      </Box>
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}>
+          <Text color="red">{'✗ apptainer / singularity not found on PATH.'}</Text>
+        </Box>
+      </AutoDone>
     )
   }
 
   const sepIdx = input.indexOf(' -- ')
   if (sepIdx < 0) {
-    return <Box marginTop={1}><Text color="red">{'/singularity-run requires " -- " between image and command.'}</Text></Box>
+    return (
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}><Text color="red">{'/singularity-run requires " -- " between image and command.'}</Text></Box>
+      </AutoDone>
+    )
   }
   const image = input.slice(0, sepIdx).trim()
   const command = input.slice(sepIdx + 4).trim()
   if (!image || !command) {
-    return <Box marginTop={1}><Text color="red">{'Both an image and a command are required.'}</Text></Box>
+    return (
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}><Text color="red">{'Both an image and a command are required.'}</Text></Box>
+      </AutoDone>
+    )
   }
 
-  const result = await singularityRun({ image, command, workdir: getOriginalCwd() })
+  let result: Awaited<ReturnType<typeof singularityRun>>
+  try {
+    result = await singularityRun({ image, command, workdir: getOriginalCwd() })
+  } catch (e) {
+    return (
+      <AutoDone onDone={onDone}>
+        <Box marginTop={1}><Text color="red">{`✗ singularity-run failed: ${e instanceof Error ? e.message : String(e)}`}</Text></Box>
+      </AutoDone>
+    )
+  }
   return (
     <Result
       binary={result.binary}

@@ -37,6 +37,9 @@ import skillsExport from './commands/skills-export/index.js'
 import skillsImport from './commands/skills-import/index.js'
 import skillStats from './commands/skill-stats/index.js'
 import skillNote from './commands/skill-note/index.js'
+import chaos from './commands/chaos/index.js'
+import kawaii from './commands/kawaii/index.js'
+import caveman from './commands/caveman/index.js'
 import reindexSessions from './commands/reindex-sessions/index.js'
 import windowsSetup from './commands/windows-setup/index.js'
 import rpc from './commands/rpc/index.js'
@@ -57,7 +60,6 @@ import logout from './commands/logout/index.js'
 import breakCache from './commands/break-cache/index.js'
 import mcp from './commands/mcp/index.js'
 import pr_comments from './commands/pr_comments/index.js'
-import releaseNotes from './commands/release-notes/index.js'
 import rename from './commands/rename/index.js'
 import resume from './commands/resume/index.js'
 import review, { ultrareview } from './commands/review.js'
@@ -303,7 +305,6 @@ const COMMANDS = memoize((): Command[] => [
   remoteEnv,
   plugin,
   pr_comments,
-  releaseNotes,
   reloadPlugins,
   rename,
   resume,
@@ -344,6 +345,9 @@ const COMMANDS = memoize((): Command[] => [
   skillNote,
   reindexSessions,
   windowsSetup,
+  chaos,
+  kawaii,
+  caveman,
   rpc,
   heartbeat,
   sysprompt,
@@ -746,7 +750,6 @@ export const BRIDGE_SAFE_COMMANDS: Set<Command> = new Set(
     clear, // Wipe transcript
     cost, // Show session cost
     summary, // Summarize conversation
-    releaseNotes, // Show changelog
     files, // List tracked files
   ].filter((c): c is Command => c !== null),
 )
