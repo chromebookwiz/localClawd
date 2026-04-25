@@ -25,6 +25,9 @@ What localclawd has today, and what it doesn't — yet.
 | Daytona backend                    | `/daytona-run <workspace> -- <cmd>` — wake-on-demand cloud workspaces  |
 | Portable skills export/import      | `/skills-export` + `/skills-import` — markdown+frontmatter format      |
 | Skill usage tracking               | `/skill-stats` — invocation counts + nudge to /distill-skill          |
+| Skill notes (self-improvement v1)  | `/skill-note <skill> <lesson>` — appends to a per-skill notes file    |
+| FTS5 session search                | Auto-uses BM25 when Node's `node:sqlite` is available (graceful fallback) |
+| Reindex command                    | `/reindex-sessions` — refreshes the FTS5 index from summaries          |
 | Windows host diagnostic            | `/windows-setup` — checks deps + persistent env-var hint               |
 | Python RPC bridge                  | `/rpc` — local 127.0.0.1 HTTP server exposing read/write/edit/bash/grep |
 | Scheduled automations              | `/schedule` with cron, `@daily`, `every Nm`, delivered to any bridge   |
@@ -48,10 +51,9 @@ These are genuinely multi-turn work, external-service dependent, or both:
 | Feature                            | Why it's not done yet                                                  |
 |------------------------------------|------------------------------------------------------------------------|
 | WhatsApp bridge                    | Requires Twilio (paid) or WhatsApp Web scraping (fragile, TOS risk)    |
-| FTS5 session search upgrade        | Depends on stable `node:sqlite`; current term-scored search works      |
 | Honcho dialectic user modeling     | External service; data residency decisions pending                     |
+| Deeper skill self-improvement loop | Notes exist; full self-rewrite needs invocation hooks not yet exposed  |
 | Atropos RL environments            | Research-grade; batch trajectory generation pipeline                   |
-| Skill self-improvement loop        | Skills that observe + edit themselves during use (distillation exists) |
 
 ---
 

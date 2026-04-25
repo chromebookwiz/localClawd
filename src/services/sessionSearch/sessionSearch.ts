@@ -13,6 +13,7 @@ import { readdir, readFile, stat } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
 import { loadAllSummaries } from './sessionSummarize.js'
+import { searchFts5 } from './fts5Index.js'
 
 export interface SessionMatch {
   sessionId: string
@@ -157,6 +158,30 @@ export async function searchSessions(
 
   const now = Date.now()
   const matchMap = new Map<string, SessionMatch>()
+
+  // Pass 0: try FTS5 (fastest, BM25-ranked). When available it's the
+  // primary signal; we still run the legacy passes to catch sessions
+  // that haven't been summarized yet.
+  const fts = await searchFts5(query, limit * 2)
+  if (fts && fts.length > 0) {
+    for (const hit of fts) {
+      const daysOld = Math.max(0, (now - hit.lastModified) / (1000 * 60 * 60 * 24))
+      const recencyBoost = 1 / (1 + Math.log(1 + daysOld))
+      // Multiply BM25 score by 3 so FTS5 hits dominate when present
+      const finalScore = hit.score * 3 * (0.7 + 0.3 * recencyBoost)
+      matchMap.set(hit.sessionId, {
+        sessionId: hit.sessionId,
+        projectSlug: hit.projectSlug,
+        score: finalScore,
+        lastModified: hit.lastModified,
+        messageCount: 0,
+        snippet: hit.summary,
+        preview: hit.firstUser,
+        summary: hit.summary,
+        tags: hit.tags,
+      })
+    }
+  }
 
   // Pass 1: summaries (fast; only read small JSON files)
   const summaries = await loadAllSummaries()

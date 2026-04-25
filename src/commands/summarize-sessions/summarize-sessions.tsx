@@ -11,6 +11,7 @@ import * as React from 'react'
 import { Box, Text } from '../../ink.js'
 import type { LocalJSXCommandCall } from '../../types/command.js'
 import { summarizeAllPending } from '../../services/sessionSearch/sessionSummarize.js'
+import { rebuildIndex } from '../../services/sessionSearch/fts5Index.js'
 
 function Result({
   lines,
@@ -42,6 +43,11 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
   const limit = parseInt((args ?? '').trim(), 10) || 20
 
   const result = await summarizeAllPending(limit)
+  // Best-effort: roll new summaries into the FTS5 index. If FTS5 isn't
+  // available this is a no-op.
+  if (result.summarized > 0) {
+    void rebuildIndex().catch(() => {})
+  }
   const lines: string[] = []
   lines.push(`Summarized: ${result.summarized}`)
   lines.push(`Skipped:    ${result.skipped}`)
