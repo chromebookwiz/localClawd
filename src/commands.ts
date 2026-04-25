@@ -35,6 +35,8 @@ import modalRun from './commands/modal-run/index.js'
 import daytonaRun from './commands/daytona-run/index.js'
 import skillsExport from './commands/skills-export/index.js'
 import skillsImport from './commands/skills-import/index.js'
+import skillStats from './commands/skill-stats/index.js'
+import windowsSetup from './commands/windows-setup/index.js'
 import rpc from './commands/rpc/index.js'
 import heartbeat from './commands/heartbeat/index.js'
 import sysprompt from './commands/sysprompt/index.js'
@@ -336,6 +338,8 @@ const COMMANDS = memoize((): Command[] => [
   daytonaRun,
   skillsExport,
   skillsImport,
+  skillStats,
+  windowsSetup,
   rpc,
   heartbeat,
   sysprompt,

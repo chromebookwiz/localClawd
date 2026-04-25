@@ -24,6 +24,8 @@ What localclawd has today, and what it doesn't — yet.
 | Modal backend                      | `/modal-run <module>::<func>` — serverless via the modal CLI           |
 | Daytona backend                    | `/daytona-run <workspace> -- <cmd>` — wake-on-demand cloud workspaces  |
 | Portable skills export/import      | `/skills-export` + `/skills-import` — markdown+frontmatter format      |
+| Skill usage tracking               | `/skill-stats` — invocation counts + nudge to /distill-skill          |
+| Windows host diagnostic            | `/windows-setup` — checks deps + persistent env-var hint               |
 | Python RPC bridge                  | `/rpc` — local 127.0.0.1 HTTP server exposing read/write/edit/bash/grep |
 | Scheduled automations              | `/schedule` with cron, `@daily`, `every Nm`, delivered to any bridge   |
 | Session search                     | `/sessionsearch` — term-scored recall across all past conversations    |

@@ -24,20 +24,14 @@ const ROWS: readonly string[] = [
   '  ▐▌  ▐▌  ',
 ]
 
-// Indigo palette matching the app accent color (#6366f1)
-const ROW_COLORS: readonly string[] = [
-  '#6366f1',   // main indigo — cap
-  '#6366f1',   // solid head
-  '#6366f1',   // eye row (background shows through the ▛▜ cutout gaps)
-  '#6366f1',   // solid chin
-  '#818cf8',   // lighter — stub feet
-]
+// Single accent color across the whole logo.
+const LOGO_COLOR = '#6366f1'
 
 export function Clawd({ pose: _pose = 'default' }: Props) {
   return (
     <Box flexDirection="column">
       {ROWS.map((row, index) => (
-        <Text key={index} color={ROW_COLORS[index]}>
+        <Text key={index} color={LOGO_COLOR}>
           {row}
         </Text>
       ))}
