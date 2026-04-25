@@ -20,6 +20,10 @@ What localclawd has today, and what it doesn't — yet.
 | Skill distillation                 | `/distill-skill` — proposes a reusable skill from the recent session   |
 | Tailscale peers in setup           | `tailscale status` peers auto-listed in the endpoint picker            |
 | Docker backend                     | `/docker-run <image> -- <cmd>` — ephemeral container, cwd bind-mounted |
+| Singularity / Apptainer backend    | `/singularity-run <image> -- <cmd>` — HPC-friendly container runtime   |
+| Modal backend                      | `/modal-run <module>::<func>` — serverless via the modal CLI           |
+| Daytona backend                    | `/daytona-run <workspace> -- <cmd>` — wake-on-demand cloud workspaces  |
+| Portable skills export/import      | `/skills-export` + `/skills-import` — markdown+frontmatter format      |
 | Python RPC bridge                  | `/rpc` — local 127.0.0.1 HTTP server exposing read/write/edit/bash/grep |
 | Scheduled automations              | `/schedule` with cron, `@daily`, `every Nm`, delivered to any bridge   |
 | Session search                     | `/sessionsearch` — term-scored recall across all past conversations    |
@@ -42,12 +46,8 @@ These are genuinely multi-turn work, external-service dependent, or both:
 | Feature                            | Why it's not done yet                                                  |
 |------------------------------------|------------------------------------------------------------------------|
 | WhatsApp bridge                    | Requires Twilio (paid) or WhatsApp Web scraping (fragile, TOS risk)    |
-| Daytona backend                    | Needs a Daytona account; serverless-persistent envs                    |
-| Modal backend                      | Needs a Modal account; wake-on-demand GPU sandboxes                    |
-| Singularity backend                | HPC-focused container runtime; low demand                              |
 | FTS5 session search upgrade        | Depends on stable `node:sqlite`; current term-scored search works      |
 | Honcho dialectic user modeling     | External service; data residency decisions pending                     |
-| agentskills.io open-standard compat | Spec still evolving; local skills format is the source of truth today |
 | Atropos RL environments            | Research-grade; batch trajectory generation pipeline                   |
 | Skill self-improvement loop        | Skills that observe + edit themselves during use (distillation exists) |
 
