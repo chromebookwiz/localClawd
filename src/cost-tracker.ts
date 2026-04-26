@@ -212,6 +212,17 @@ function formatModelUsage(): string {
 
   let result = 'Usage by model:'
   for (const [shortName, usage] of Object.entries(usageByShortName)) {
+    // Don't list a model whose totals are all zero — happens when an
+    // Anthropic-named small/fast slot was registered but never actually
+    // hit (e.g. local-provider runs that bypass haiku for title gen).
+    const hasAnyUse =
+      usage.inputTokens > 0 ||
+      usage.outputTokens > 0 ||
+      usage.cacheReadInputTokens > 0 ||
+      usage.cacheCreationInputTokens > 0 ||
+      usage.webSearchRequests > 0
+    if (!hasAnyUse) continue
+
     const usageString =
       `  ${formatNumber(usage.inputTokens)} input, ` +
       `${formatNumber(usage.outputTokens)} output, ` +

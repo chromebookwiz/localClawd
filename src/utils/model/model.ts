@@ -34,6 +34,14 @@ export type ModelName = string
 export type ModelSetting = ModelName | ModelAlias | null
 
 export function getSmallFastModel(): ModelName {
+  // localclawd: when running on a local provider, the small/fast slot
+  // (used for things like session-title generation) must point at the
+  // user's actual backend. Otherwise we leak a Claude model name into
+  // the cost summary even though no Anthropic call was ever made.
+  if (getAPIProvider() === 'local') {
+    const localModel = getLocalLLMModel()
+    if (localModel) return localModel
+  }
   return process.env.ANTHROPIC_SMALL_FAST_MODEL || getDefaultHaikuModel()
 }
 

@@ -161,7 +161,12 @@ function* yieldMissingToolResultBlocks(
  * the rules of thinking are the rules of the universe. If ye does not heed these
  * rules, ye will be punished with an entire day of debugging and hair pulling.
  */
-const MAX_OUTPUT_TOKENS_RECOVERY_LIMIT = 3
+// Bumped from 3 to 8 — for long autonomous tasks (especially on local
+// backends where max_output_tokens hits faster) we'd rather keep
+// recovering than truncate the work. Each recovery is one extra round
+// trip; 8 is enough to cover most "I'm halfway through this refactor"
+// situations without becoming an infinite loop pathology.
+const MAX_OUTPUT_TOKENS_RECOVERY_LIMIT = 8
 
 /**
  * Is this a max_output_tokens error message? If so, the streaming loop should
