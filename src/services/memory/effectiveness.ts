@@ -125,6 +125,14 @@ export async function markTaskOutcome(
   } catch (e) {
     logForDebugging(`[effectiveness] save failed: ${e}`)
   }
+
+  // Each commit counts as one "memory added" for the pruner's
+  // debounced auto-trigger. Cheap because the pruner only acts when
+  // both addition-count AND capacity thresholds are crossed.
+  try {
+    const { notifyMemoryAdded } = await import('./memoryPruner.js')
+    void notifyMemoryAdded()
+  } catch { /* optional */ }
 }
 
 /**

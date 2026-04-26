@@ -38,6 +38,7 @@ import skillsImport from './commands/skills-import/index.js'
 import skillStats from './commands/skill-stats/index.js'
 import skillNote from './commands/skill-note/index.js'
 import memoryStats from './commands/memory-stats/index.js'
+import memoryPrune from './commands/memory-prune/index.js'
 import chaos from './commands/chaos/index.js'
 import kawaii from './commands/kawaii/index.js'
 import caveman from './commands/caveman/index.js'
@@ -347,6 +348,7 @@ const COMMANDS = memoize((): Command[] => [
   skillStats,
   skillNote,
   memoryStats,
+  memoryPrune,
   reindexSessions,
   windowsSetup,
   chaos,

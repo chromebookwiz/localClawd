@@ -208,19 +208,34 @@ export async function initTelegram(): Promise<void> {
   let token = process.env.TELEGRAM_BOT_TOKEN
   let chatIdStr = process.env.TELEGRAM_CHAT_ID
 
-  // Fallback: load from ~/.claude/telegram.json if env vars are not set
+  // Resolution order: each project gets its own bot, so the per-project
+  // config wins when present. Falls back to env vars, then to user-level
+  // config, then to legacy ~/.claude/telegram.json.
   if (!token || !chatIdStr) {
     try {
-      const { readFile } = await import('fs/promises')
+      const { readFile, stat } = await import('fs/promises')
       const { join } = await import('path')
       const { homedir } = await import('os')
       const { getClaudeConfigHomeDir } = await import('../../utils/envUtils.js')
-      const newPath = join(getClaudeConfigHomeDir(), 'telegram.json')
-      const legacyPath = join(homedir(), '.claude', 'telegram.json')
-      let configPath = newPath
-      try { await (await import('fs/promises')).stat(newPath) } catch { configPath = legacyPath }
+      const { getOriginalCwd } = await import('../../bootstrap/state.js')
+
+      const candidates: string[] = []
+      try {
+        const cwd = getOriginalCwd()
+        if (cwd) candidates.push(join(cwd, '.localclawd', 'telegram.json'))
+      } catch { /* fine */ }
+      candidates.push(join(getClaudeConfigHomeDir(), 'telegram.json'))
+      candidates.push(join(homedir(), '.claude', 'telegram.json'))
+
+      let configPath: string | null = null
+      for (const p of candidates) {
+        try { await stat(p); configPath = p; break } catch { /* try next */ }
+      }
+      if (!configPath) throw new Error('no telegram config found')
+
       const raw = await readFile(configPath, 'utf-8')
       const config = JSON.parse(raw) as { token?: string; chatId?: number }
+      logForDebugging(`[telegram] using config from ${configPath}`)
       if (config.token && config.chatId) {
         token = config.token
         chatIdStr = String(config.chatId)

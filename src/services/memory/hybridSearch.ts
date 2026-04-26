@@ -26,6 +26,7 @@
 import { searchFts5, type Fts5SearchHit } from '../sessionSearch/fts5Index.js'
 import { embedSimilarity, isEmbeddingAvailable } from './embedding.js'
 import { getEffectivenessMap, recordRetrieval } from './effectiveness.js'
+import { findCandidates as findE8Candidates } from './e8RegionIndex.js'
 
 const RRF_K = 60
 
@@ -44,6 +45,7 @@ export interface HybridHit<T extends HybridDoc = HybridDoc> {
     bm25Rank?: number
     embedRank?: number
     latticeRank?: number
+    e8Rank?: number
   }
 }
 
@@ -69,6 +71,7 @@ export async function hybridRank<T extends HybridDoc>(
   const bm25Rank = new Map<string, number>()
   const embedRank = new Map<string, number>()
   const latticeRank = new Map<string, number>()
+  const e8Rank = new Map<string, number>()
 
   // Signal 1: BM25 from FTS5
   const fts = options.fts5Hits ?? (await searchFts5(query, 50)) ?? []
@@ -93,6 +96,16 @@ export async function hybridRank<T extends HybridDoc>(
     options.latticeOrder.forEach((doc, i) => latticeRank.set(doc.id, i + 1))
   }
 
+  // Signal 4: E8 concept-region match. Items in the same E8 cell as
+  // the query are conceptually adjacent; this is independent of cosine
+  // (which acts on the full embedding) — it captures coarse cluster
+  // membership and gives a useful tiebreaker when several candidates
+  // have similar BM25 / cosine scores.
+  try {
+    const e8Hits = await findE8Candidates(query, 1, 50)
+    e8Hits.forEach((hit, i) => e8Rank.set(hit.id, i + 1))
+  } catch { /* index optional */ }
+
   // Fuse with RRF, then weight by effectiveness
   const ids = candidates.map(c => c.id)
   const effMap = await getEffectivenessMap(ids)
@@ -115,6 +128,11 @@ export async function hybridRank<T extends HybridDoc>(
     if (lRank !== undefined) {
       rrf += 1 / (RRF_K + lRank)
       signals.latticeRank = lRank
+    }
+    const e8R = e8Rank.get(doc.id)
+    if (e8R !== undefined) {
+      rrf += 1 / (RRF_K + e8R)
+      signals.e8Rank = e8R
     }
 
     const eff = effMap[doc.id] ?? 0.5

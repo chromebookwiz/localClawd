@@ -201,26 +201,46 @@ function TelegramSetupDone({
         <Text>{`  Bot: @${botUsername}`}</Text>
         <Text>{`  Chat ID: ${chatId}`}</Text>
         <Text>{''}</Text>
-        <Text>{'  Credentials saved to ~/.claude/telegram.json'}</Text>
-        <Text>{'  They will be loaded automatically on next startup.'}</Text>
+        <Text>{'  Credentials saved to ./.localclawd/telegram.json (per-project).'}</Text>
+        <Text dimColor>{'  Each project directory uses its own bot — different convos stay isolated.'}</Text>
+        <Text dimColor>{'  Use a different bot for a different repo: cd there and run /telegram setup.'}</Text>
         <Text>{''}</Text>
-        <Text dimColor>{'  To persist across shell restarts, also add to your profile:'}</Text>
+        <Text dimColor>{'  Or set globally via env to share one bot across all projects:'}</Text>
         <Text color="cyan">{`  export TELEGRAM_BOT_TOKEN=<token>`}</Text>
         <Text color="cyan">{`  export TELEGRAM_CHAT_ID=${chatId}`}</Text>
         <Text>{''}</Text>
         <Text bold>{'  Commands from Telegram:'}</Text>
         <Text dimColor>{'    /stop  — stop current task'}</Text>
         <Text dimColor>{'    /kill  — stop ALL localclawd instances'}</Text>
-        <Text dimColor>{'    Any other message — inject into /keepgoing or /director'}</Text>
+        <Text dimColor>{'    Any other message — forwarded to the agent'}</Text>
       </Box>
     </Box>
   )
 }
 
 async function saveTelegramConfig(token: string, chatId: number): Promise<void> {
-  const configDir = getClaudeConfigHomeDir()
-  await mkdir(configDir, { recursive: true })
-  const configPath = join(configDir, 'telegram.json')
+  // Each agent lives in the directory it was launched from, so the
+  // per-project bot config goes inside .localclawd/ — different
+  // directories get distinct bots and conversations. Falls back to
+  // user-level config only if we can't determine a project root.
+  let configPath: string
+  try {
+    const { getOriginalCwd } = await import('../../bootstrap/state.js')
+    const cwd = getOriginalCwd()
+    if (cwd) {
+      const projDir = join(cwd, '.localclawd')
+      await mkdir(projDir, { recursive: true })
+      configPath = join(projDir, 'telegram.json')
+    } else {
+      const dir = getClaudeConfigHomeDir()
+      await mkdir(dir, { recursive: true })
+      configPath = join(dir, 'telegram.json')
+    }
+  } catch {
+    const dir = getClaudeConfigHomeDir()
+    await mkdir(dir, { recursive: true })
+    configPath = join(dir, 'telegram.json')
+  }
   await writeFile(configPath, JSON.stringify({ token, chatId }, null, 2), 'utf-8')
 }
 
