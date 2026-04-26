@@ -17,14 +17,20 @@ import { readdir, readFile, writeFile, mkdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
 import { logForDebugging } from '../../utils/debug.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import {
   getLocalLLMBaseUrl,
   getLocalLLMModel,
   getLocalLLMApiKey,
 } from '../../utils/model/providers.js'
 
-const PROJECTS_DIR = join(homedir(), '.claude', 'projects')
-const SUMMARIES_DIR = join(homedir(), '.claude', 'session-summaries')
+// Read sessions from both legacy (.claude/) and current (.localclawd/) paths
+// so existing histories don't lose recall after the rename.
+const PROJECTS_DIRS = [
+  join(getClaudeConfigHomeDir(), 'projects'),
+  join(homedir(), '.claude', 'projects'),
+]
+const SUMMARIES_DIR = join(getClaudeConfigHomeDir(), 'session-summaries')
 const MAX_TRANSCRIPT_CHARS = 12_000
 
 export interface SessionSummary {
@@ -54,8 +60,6 @@ function extractText(obj: unknown): string {
 
 async function listUnsummarized(): Promise<Array<{ slug: string; sessionId: string; path: string; mtime: number }>> {
   const result: Array<{ slug: string; sessionId: string; path: string; mtime: number }> = []
-  let slugs: string[]
-  try { slugs = await readdir(PROJECTS_DIR) } catch { return result }
 
   // Existing summaries by id (mtime is used to detect stale summaries)
   const existing = new Map<string, number>()
@@ -68,21 +72,28 @@ async function listUnsummarized(): Promise<Array<{ slug: string; sessionId: stri
     }
   } catch { /* dir doesn't exist yet */ }
 
-  for (const slug of slugs) {
-    const slugDir = join(PROJECTS_DIR, slug)
-    try {
-      const entries = await readdir(slugDir)
-      for (const entry of entries) {
-        if (!entry.endsWith('.jsonl')) continue
-        const sessionId = entry.replace(/\.jsonl$/, '')
-        const full = join(slugDir, entry)
-        const s = await stat(full).catch(() => null)
-        if (!s) continue
-        const existingMtime = existing.get(sessionId)
-        if (existingMtime && existingMtime >= s.mtimeMs) continue  // up-to-date
-        result.push({ slug, sessionId, path: full, mtime: s.mtimeMs })
-      }
-    } catch { /* skip */ }
+  const seen = new Set<string>()
+  for (const projectsDir of PROJECTS_DIRS) {
+    let slugs: string[]
+    try { slugs = await readdir(projectsDir) } catch { continue }
+    for (const slug of slugs) {
+      const slugDir = join(projectsDir, slug)
+      try {
+        const entries = await readdir(slugDir)
+        for (const entry of entries) {
+          if (!entry.endsWith('.jsonl')) continue
+          const sessionId = entry.replace(/\.jsonl$/, '')
+          if (seen.has(sessionId)) continue
+          seen.add(sessionId)
+          const full = join(slugDir, entry)
+          const s = await stat(full).catch(() => null)
+          if (!s) continue
+          const existingMtime = existing.get(sessionId)
+          if (existingMtime && existingMtime >= s.mtimeMs) continue
+          result.push({ slug, sessionId, path: full, mtime: s.mtimeMs })
+        }
+      } catch { /* skip */ }
+    }
   }
 
   return result

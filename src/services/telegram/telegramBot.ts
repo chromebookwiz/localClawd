@@ -214,7 +214,11 @@ export async function initTelegram(): Promise<void> {
       const { readFile } = await import('fs/promises')
       const { join } = await import('path')
       const { homedir } = await import('os')
-      const configPath = join(homedir(), '.claude', 'telegram.json')
+      const { getClaudeConfigHomeDir } = await import('../../utils/envUtils.js')
+      const newPath = join(getClaudeConfigHomeDir(), 'telegram.json')
+      const legacyPath = join(homedir(), '.claude', 'telegram.json')
+      let configPath = newPath
+      try { await (await import('fs/promises')).stat(newPath) } catch { configPath = legacyPath }
       const raw = await readFile(configPath, 'utf-8')
       const config = JSON.parse(raw) as { token?: string; chatId?: number }
       if (config.token && config.chatId) {

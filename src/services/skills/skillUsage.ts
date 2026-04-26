@@ -9,9 +9,9 @@
 
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
-import { homedir } from 'os'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
-const USAGE_PATH = join(homedir(), '.claude', 'skill-usage.json')
+const USAGE_PATH = join(getClaudeConfigHomeDir(), 'skill-usage.json')
 const MAX_ENTRIES = 500
 
 export interface SkillUseRecord {
@@ -39,7 +39,7 @@ async function loadFile(): Promise<UsageFile> {
 }
 
 async function saveFile(file: UsageFile): Promise<void> {
-  await mkdir(join(homedir(), '.claude'), { recursive: true })
+  await mkdir(getClaudeConfigHomeDir(), { recursive: true })
   // Cap by recency, drop oldest first
   if (file.records.length > MAX_ENTRIES) {
     file.records.sort((a, b) => b.lastUsed - a.lastUsed)

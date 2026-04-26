@@ -469,7 +469,10 @@ export function generateCommandSuggestions(
       return scoreDiff
     }
     // For similar Fuse scores, prefer more frequently used skills
-    return b.usage - a.usage
+    if (a.usage !== b.usage) return b.usage - a.usage
+    // Final tiebreak: alphabetical so the order is deterministic and
+    // not jittery between sessions.
+    return aName.localeCompare(bName)
   })
 
   // Map search results to suggestion items

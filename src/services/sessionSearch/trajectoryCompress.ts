@@ -17,9 +17,15 @@ import { readFile, writeFile, readdir, mkdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
 import { logForDebugging } from '../../utils/debug.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
-const PROJECTS_DIR = join(homedir(), '.claude', 'projects')
-const TRAJECTORIES_DIR = join(homedir(), '.claude', 'trajectories')
+// Read sessions from both legacy + current paths so old histories still
+// compress. Writes go to the canonical localclawd path only.
+const PROJECTS_DIRS = [
+  join(getClaudeConfigHomeDir(), 'projects'),
+  join(homedir(), '.claude', 'projects'),
+]
+const TRAJECTORIES_DIR = join(getClaudeConfigHomeDir(), 'trajectories')
 const MAX_TOOL_RESULT_CHARS = 4000
 
 type CompactContent =
@@ -125,16 +131,23 @@ export async function compressSession(
   sessionId: string,
   projectSlug: string,
 ): Promise<TrajectoryFile | null> {
-  const sourcePath = join(PROJECTS_DIR, projectSlug, `${sessionId}.jsonl`)
-  let source: string
-  let sourceStat: { mtimeMs: number; size: number }
-  try {
-    source = await readFile(sourcePath, 'utf-8')
-    const s = await stat(sourcePath)
-    sourceStat = { mtimeMs: s.mtimeMs, size: s.size }
-  } catch {
-    return null
+  // Try each projects dir until one resolves
+  let sourcePath = ''
+  let source: string | null = null
+  let sourceStat: { mtimeMs: number; size: number } | null = null
+  for (const projectsDir of PROJECTS_DIRS) {
+    const candidate = join(projectsDir, projectSlug, `${sessionId}.jsonl`)
+    try {
+      const text = await readFile(candidate, 'utf-8')
+      const s = await stat(candidate)
+      sourcePath = candidate
+      source = text
+      sourceStat = { mtimeMs: s.mtimeMs, size: s.size }
+      break
+    } catch { /* try next */ }
   }
+  if (!source || !sourceStat) return null
+  void sourcePath  // referenced for future error logging
 
   const lines = source.split('\n').filter(Boolean)
   const messages: CompactMessage[] = []
@@ -172,9 +185,6 @@ export async function compressSession(
 export async function compressAllPending(
   limit: number = 20,
 ): Promise<{ compressed: number; skipped: number; totalRatio: number }> {
-  let slugs: string[]
-  try { slugs = await readdir(PROJECTS_DIR) } catch { return { compressed: 0, skipped: 0, totalRatio: 1 } }
-
   // Existing trajectories (mtime gate)
   const existing = new Map<string, number>()
   try {
@@ -187,19 +197,26 @@ export async function compressAllPending(
   } catch { /* fine */ }
 
   const pending: Array<{ slug: string; sessionId: string; mtime: number }> = []
-  for (const slug of slugs) {
-    try {
-      const entries = await readdir(join(PROJECTS_DIR, slug))
-      for (const entry of entries) {
-        if (!entry.endsWith('.jsonl')) continue
-        const sessionId = entry.replace(/\.jsonl$/, '')
-        const s = await stat(join(PROJECTS_DIR, slug, entry)).catch(() => null)
-        if (!s) continue
-        const have = existing.get(sessionId)
-        if (have && have >= s.mtimeMs) continue
-        pending.push({ slug, sessionId, mtime: s.mtimeMs })
-      }
-    } catch { /* skip */ }
+  const seen = new Set<string>()
+  for (const projectsDir of PROJECTS_DIRS) {
+    let slugs: string[]
+    try { slugs = await readdir(projectsDir) } catch { continue }
+    for (const slug of slugs) {
+      try {
+        const entries = await readdir(join(projectsDir, slug))
+        for (const entry of entries) {
+          if (!entry.endsWith('.jsonl')) continue
+          const sessionId = entry.replace(/\.jsonl$/, '')
+          if (seen.has(sessionId)) continue
+          seen.add(sessionId)
+          const s = await stat(join(projectsDir, slug, entry)).catch(() => null)
+          if (!s) continue
+          const have = existing.get(sessionId)
+          if (have && have >= s.mtimeMs) continue
+          pending.push({ slug, sessionId, mtime: s.mtimeMs })
+        }
+      } catch { /* skip */ }
+    }
   }
 
   pending.sort((a, b) => b.mtime - a.mtime)

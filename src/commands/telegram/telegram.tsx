@@ -24,6 +24,7 @@ import { Dialog } from '../../components/design-system/Dialog.js'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 // ─── Setup steps ─────────────────────────────────────────────────────────────
 
@@ -217,7 +218,7 @@ function TelegramSetupDone({
 }
 
 async function saveTelegramConfig(token: string, chatId: number): Promise<void> {
-  const configDir = join(homedir(), '.claude')
+  const configDir = getClaudeConfigHomeDir()
   await mkdir(configDir, { recursive: true })
   const configPath = join(configDir, 'telegram.json')
   await writeFile(configPath, JSON.stringify({ token, chatId }, null, 2), 'utf-8')

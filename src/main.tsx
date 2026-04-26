@@ -3946,6 +3946,23 @@ async function run(): Promise<CommanderCommand> {
     await mcpResetChoicesHandler();
   });
 
+  // localclawd webui
+  program.command('webui').description('Start the localclawd browser dashboard and open a URL.').option('-p, --port <port>', 'HTTP port (default 7150)', '0').action(async (opts: { port: string }) => {
+    const { startWebuiServer } = await import('./services/webui/webuiServer.js');
+    const port = parseInt(opts.port, 10) || undefined;
+    const result = await startWebuiServer(port);
+    if (result.ok) {
+      console.log(`localclawd webui running at http://127.0.0.1:${result.port}/`);
+      console.log('  Drag panes by their header. Resize from the bottom-right corner.');
+      console.log('  Press Ctrl+C to stop.');
+      // Keep the process alive
+      await new Promise(() => {});
+    } else {
+      console.error(`webui failed to start: ${result.error}`);
+      process.exit(1);
+    }
+  });
+
   // claude server
   if (feature('DIRECT_CONNECT')) {
     program.command('server').description('Start a localclawd session server').option('--port <number>', 'HTTP port', '0').option('--host <string>', 'Bind address', '0.0.0.0').option('--auth-token <token>', 'Bearer token for auth').option('--unix <path>', 'Listen on a unix domain socket').option('--workspace <dir>', 'Default working directory for sessions that do not specify cwd').option('--idle-timeout <ms>', 'Idle timeout for detached sessions in ms (0 = never expire)', '600000').option('--max-sessions <n>', 'Maximum concurrent sessions (0 = unlimited)', '32').action(async (opts: {

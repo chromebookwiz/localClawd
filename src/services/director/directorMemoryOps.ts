@@ -5,8 +5,8 @@
 
 import { mkdir, readdir, readFile, stat, writeFile } from 'fs/promises'
 import { basename, join, relative, resolve } from 'path'
-import { homedir } from 'os'
 import { logForDebugging } from '../../utils/debug.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import type {
   DirectorMemoryState,
   DirectorProject,
@@ -18,16 +18,18 @@ import { createEmptyState } from './directorMemory.js'
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
 
-// Per-project state: stored inside the project's .claude/ directory.
-// Falls back to ~/.claude/director/ for the global registry.
-const GLOBAL_DIRECTOR_DIR = join(homedir(), '.claude', 'director')
+// Per-project state: stored inside the project's .localclawd/ directory.
+// The global registry only exists as a fallback for sessions that didn't
+// register a project root yet; per the user's preference, real memory
+// lives per-environment.
+const GLOBAL_DIRECTOR_DIR = join(getClaudeConfigHomeDir(), 'director')
 export const DIRECTOR_MEMORY_DIR = join(GLOBAL_DIRECTOR_DIR, 'memory')
 
 let _projectStateDir = ''
 
 /** Set the project root so state is stored per-project. */
 export function setDirectorProjectRoot(projectPath: string): void {
-  _projectStateDir = join(projectPath, '.claude')
+  _projectStateDir = join(projectPath, '.localclawd')
 }
 
 function getStatePath(): string {

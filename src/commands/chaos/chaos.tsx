@@ -51,8 +51,14 @@ export const call: LocalJSXCommandCall = async (onDone) => {
   setSessionSyspromptOverride(CHAOS_PROMPT)
   return (
     <AutoDone onDone={onDone}>
-      <Box marginTop={1}>
+      <Box flexDirection="column" marginTop={1}>
         <Text color="#f43f5e">{'◆ chaos mode engaged. ugh.'}</Text>
+        <Text dimColor>{'  System prompt now in effect (use /sysprompt default to revert):'}</Text>
+        <Box flexDirection="column" marginLeft={2} marginTop={1}>
+          {CHAOS_PROMPT.split('\n').map((line, i) => (
+            <Text key={i} dimColor>{line}</Text>
+          ))}
+        </Box>
       </Box>
     </AutoDone>
   )

@@ -17,10 +17,10 @@
 
 import { mkdir, readFile, writeFile, appendFile, stat } from 'fs/promises'
 import { join } from 'path'
-import { homedir } from 'os'
 import { logForDebugging } from '../../utils/debug.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
-const USER_SKILLS_DIR = join(homedir(), '.claude', 'skills')
+const USER_SKILLS_DIR = join(getClaudeConfigHomeDir(), 'skills')
 const MAX_NOTES_BYTES = 32 * 1024
 const MAX_NOTE_LENGTH = 500
 

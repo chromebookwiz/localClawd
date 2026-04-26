@@ -24,6 +24,7 @@ import { Dialog } from '../../components/design-system/Dialog.js'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 // ─── Setup flow ──────────────────────────────────────────────────────────────
 
@@ -282,7 +283,7 @@ async function saveSlackConfig(
   channelId: string,
   userId?: string,
 ): Promise<void> {
-  const configDir = join(homedir(), '.claude')
+  const configDir = getClaudeConfigHomeDir()
   await mkdir(configDir, { recursive: true })
   const configPath = join(configDir, 'slack.json')
   await writeFile(

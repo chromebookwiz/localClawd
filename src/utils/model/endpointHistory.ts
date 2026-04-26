@@ -1,13 +1,13 @@
 /**
  * Endpoint history — remembers URLs the user has entered so they don't
- * have to retype them. Stored at ~/.claude/endpoints.json.
+ * have to retype them. Stored at ~/.localclawd/endpoints.json.
  */
 
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
-import { homedir } from 'os'
+import { getClaudeConfigHomeDir } from '../envUtils.js'
 
-const HISTORY_PATH = join(homedir(), '.claude', 'endpoints.json')
+const HISTORY_PATH = join(getClaudeConfigHomeDir(), 'endpoints.json')
 const MAX_ENTRIES = 10
 
 export interface EndpointHistoryEntry {
@@ -41,7 +41,7 @@ export async function recordEndpointUse(
     const filtered = existing.filter(e => e.url !== url)
     filtered.unshift({ url, provider, lastUsed: Date.now() })
     const capped = filtered.slice(0, MAX_ENTRIES)
-    await mkdir(join(homedir(), '.claude'), { recursive: true })
+    await mkdir(getClaudeConfigHomeDir(), { recursive: true })
     await writeFile(
       HISTORY_PATH,
       JSON.stringify({ version: 1, entries: capped }, null, 2),

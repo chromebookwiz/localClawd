@@ -21,11 +21,11 @@ import { createServer, type IncomingMessage, type ServerResponse, type Server } 
 import { readFile, writeFile, mkdir, readdir, stat } from 'fs/promises'
 import { spawn } from 'child_process'
 import { join, resolve as resolvePath, relative } from 'path'
-import { homedir } from 'os'
 import { logForDebugging } from '../../utils/debug.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 const DEFAULT_PORT = 7149
-const PORT_FILE = join(homedir(), '.claude', 'rpc-port')
+const PORT_FILE = join(getClaudeConfigHomeDir(), 'rpc-port')
 
 let _server: Server | null = null
 let _boundPort = 0
@@ -289,7 +289,7 @@ export async function startToolRpcServer(): Promise<void> {
         _server = server
         logForDebugging(`[rpc] listening on 127.0.0.1:${_boundPort}`)
         // Write the port file for clients to discover
-        void mkdir(join(homedir(), '.claude'), { recursive: true }).then(() =>
+        void mkdir(getClaudeConfigHomeDir(), { recursive: true }).then(() =>
           writeFile(PORT_FILE, String(_boundPort), 'utf-8').catch(() => {}),
         )
       }

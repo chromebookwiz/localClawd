@@ -19,11 +19,11 @@
 
 import { readdir, readFile, stat } from 'fs/promises'
 import { join } from 'path'
-import { homedir } from 'os'
 import { logForDebugging } from '../../utils/debug.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
-const DB_PATH = join(homedir(), '.claude', 'sessions.db')
-const SUMMARIES_DIR = join(homedir(), '.claude', 'session-summaries')
+const DB_PATH = join(getClaudeConfigHomeDir(), 'sessions.db')
+const SUMMARIES_DIR = join(getClaudeConfigHomeDir(), 'session-summaries')
 
 interface SqliteDatabase {
   exec(sql: string): void

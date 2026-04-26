@@ -12,6 +12,7 @@
 import { readdir, readFile, stat } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { loadAllSummaries } from './sessionSummarize.js'
 import { searchFts5 } from './fts5Index.js'
 
@@ -27,7 +28,12 @@ export interface SessionMatch {
   tags?: string[]
 }
 
-const PROJECTS_DIR = join(homedir(), '.claude', 'projects')
+// Search both the canonical localclawd path AND the legacy .claude path so
+// users with existing session histories don't lose recall when they upgrade.
+const PROJECTS_DIRS = [
+  join(getClaudeConfigHomeDir(), 'projects'),
+  join(homedir(), '.claude', 'projects'),
+]
 const MAX_FILE_BYTES = 5 * 1024 * 1024   // 5 MB — skip huge sessions
 const MAX_SESSIONS_TO_SCAN = 200
 const MAX_SNIPPET_LEN = 160
@@ -62,27 +68,33 @@ function extractText(obj: unknown): string {
 
 async function listSessionFiles(): Promise<Array<{ slug: string; path: string; mtime: number }>> {
   const result: Array<{ slug: string; path: string; mtime: number }> = []
-  let projects: string[]
-  try {
-    projects = await readdir(PROJECTS_DIR)
-  } catch {
-    return result
-  }
-
-  for (const slug of projects) {
-    const slugDir = join(PROJECTS_DIR, slug)
+  const seen = new Set<string>()
+  for (const projectsDir of PROJECTS_DIRS) {
+    let projects: string[]
     try {
-      const entries = await readdir(slugDir)
-      for (const entry of entries) {
-        if (!entry.endsWith('.jsonl')) continue
-        const full = join(slugDir, entry)
-        try {
-          const s = await stat(full)
-          if (s.size > MAX_FILE_BYTES) continue
-          result.push({ slug, path: full, mtime: s.mtimeMs })
-        } catch { /* skip */ }
-      }
-    } catch { /* skip */ }
+      projects = await readdir(projectsDir)
+    } catch {
+      continue
+    }
+    for (const slug of projects) {
+      const slugDir = join(projectsDir, slug)
+      try {
+        const entries = await readdir(slugDir)
+        for (const entry of entries) {
+          if (!entry.endsWith('.jsonl')) continue
+          const full = join(slugDir, entry)
+          // Dedupe across legacy + new paths if the same session id exists
+          // in both (we deliberately don't migrate, just read both).
+          if (seen.has(entry)) continue
+          seen.add(entry)
+          try {
+            const s = await stat(full)
+            if (s.size > MAX_FILE_BYTES) continue
+            result.push({ slug, path: full, mtime: s.mtimeMs })
+          } catch { /* skip */ }
+        }
+      } catch { /* skip */ }
+    }
   }
 
   // Newest first, cap total

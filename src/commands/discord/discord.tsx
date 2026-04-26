@@ -20,6 +20,7 @@ import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
 import { AutoDone } from '../../components/AutoDone.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 type SetupStep =
   | 'instructions'
@@ -246,7 +247,7 @@ function DiscordSetupDone({
 }
 
 async function saveConfig(token: string, channelId: string, userId?: string): Promise<void> {
-  const configDir = join(homedir(), '.claude')
+  const configDir = getClaudeConfigHomeDir()
   await mkdir(configDir, { recursive: true })
   await writeFile(
     join(configDir, 'discord.json'),

@@ -15,13 +15,17 @@ import { readFile, readdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
 import { logForDebugging } from '../../utils/debug.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import {
   getLocalLLMBaseUrl,
   getLocalLLMModel,
   getLocalLLMApiKey,
 } from '../../utils/model/providers.js'
 
-const PROJECTS_DIR = join(homedir(), '.claude', 'projects')
+const PROJECTS_DIRS = [
+  join(getClaudeConfigHomeDir(), 'projects'),
+  join(homedir(), '.claude', 'projects'),
+]
 const MAX_TRANSCRIPT_CHARS = 10_000
 
 export interface DistilledSkill {
@@ -45,11 +49,12 @@ function extractText(obj: unknown): string {
 }
 
 async function findMostRecentSession(): Promise<string | null> {
-  try {
-    const slugs = await readdir(PROJECTS_DIR)
-    let best: { path: string; mtime: number } | null = null
+  let best: { path: string; mtime: number } | null = null
+  for (const projectsDir of PROJECTS_DIRS) {
+    let slugs: string[]
+    try { slugs = await readdir(projectsDir) } catch { continue }
     for (const slug of slugs) {
-      const slugDir = join(PROJECTS_DIR, slug)
+      const slugDir = join(projectsDir, slug)
       try {
         const entries = await readdir(slugDir)
         for (const entry of entries) {
@@ -63,10 +68,8 @@ async function findMostRecentSession(): Promise<string | null> {
         }
       } catch { /* skip */ }
     }
-    return best?.path ?? null
-  } catch {
-    return null
   }
+  return best?.path ?? null
 }
 
 async function buildTranscript(sessionPath: string): Promise<string> {

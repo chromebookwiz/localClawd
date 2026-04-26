@@ -18,10 +18,10 @@
 
 import { readdir, readFile, writeFile, mkdir, stat } from 'fs/promises'
 import { join, basename, extname, resolve } from 'path'
-import { homedir } from 'os'
 import { logForDebugging } from '../../utils/debug.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
-const USER_SKILLS_DIR = join(homedir(), '.claude', 'skills')
+const USER_SKILLS_DIR = join(getClaudeConfigHomeDir(), 'skills')
 
 export interface PortableSkill {
   name: string

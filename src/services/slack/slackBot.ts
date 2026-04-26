@@ -283,7 +283,11 @@ export async function initSlack(): Promise<void> {
       const { readFile } = await import('fs/promises')
       const { join } = await import('path')
       const { homedir } = await import('os')
-      const configPath = join(homedir(), '.claude', 'slack.json')
+      const { getClaudeConfigHomeDir } = await import('../../utils/envUtils.js')
+      const newPath = join(getClaudeConfigHomeDir(), 'slack.json')
+      const legacyPath = join(homedir(), '.claude', 'slack.json')
+      let configPath = newPath
+      try { await (await import('fs/promises')).stat(newPath) } catch { configPath = legacyPath }
       const raw = await readFile(configPath, 'utf-8')
       const config = JSON.parse(raw) as {
         token?: string

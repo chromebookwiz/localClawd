@@ -49,8 +49,14 @@ export const call: LocalJSXCommandCall = async (onDone) => {
   setSessionSyspromptOverride(KAWAII_PROMPT)
   return (
     <AutoDone onDone={onDone}>
-      <Box marginTop={1}>
+      <Box flexDirection="column" marginTop={1}>
         <Text color="#ec4899">{'◆ kawaii mode on ✨ ◕‿◕ '}</Text>
+        <Text dimColor>{'  System prompt now in effect (use /sysprompt default to revert):'}</Text>
+        <Box flexDirection="column" marginLeft={2} marginTop={1}>
+          {KAWAII_PROMPT.split('\n').map((line, i) => (
+            <Text key={i} dimColor>{line}</Text>
+          ))}
+        </Box>
       </Box>
     </AutoDone>
   )

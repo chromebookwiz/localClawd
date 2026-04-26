@@ -11,8 +11,8 @@
 
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
-import { homedir } from 'os'
 import { logForDebugging } from '../../utils/debug.js'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 
 export interface ScheduleEntry {
   id: string
@@ -30,7 +30,7 @@ interface ScheduleFile {
   schedules: ScheduleEntry[]
 }
 
-const SCHEDULES_PATH = join(homedir(), '.claude', 'schedules.json')
+const SCHEDULES_PATH = join(getClaudeConfigHomeDir(), 'schedules.json')
 const TICK_INTERVAL_MS = 30_000
 
 let _tickTimer: ReturnType<typeof setInterval> | null = null
@@ -49,7 +49,7 @@ async function loadSchedules(): Promise<ScheduleFile> {
 }
 
 async function saveSchedules(file: ScheduleFile): Promise<void> {
-  await mkdir(join(homedir(), '.claude'), { recursive: true })
+  await mkdir(getClaudeConfigHomeDir(), { recursive: true })
   await writeFile(SCHEDULES_PATH, JSON.stringify(file, null, 2), 'utf-8')
 }
 
