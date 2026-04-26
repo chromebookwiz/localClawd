@@ -26,6 +26,7 @@ What localclawd has today, and what it doesn't — yet.
 | Portable skills export/import      | `/skills-export` + `/skills-import` — markdown+frontmatter format      |
 | Skill usage tracking               | `/skill-stats` — invocation counts + nudge to /distill-skill          |
 | Skill notes (self-improvement v1)  | `/skill-note <skill> <lesson>` — appends to a per-skill notes file    |
+| Research mode                      | `/research-mode` — persistent web-search-first posture with citations  |
 | FTS5 session search                | Auto-uses BM25 when Node's `node:sqlite` is available (graceful fallback) |
 | Reindex command                    | `/reindex-sessions` — refreshes the FTS5 index from summaries          |
 | Windows host diagnostic            | `/windows-setup` — checks deps + persistent env-var hint               |

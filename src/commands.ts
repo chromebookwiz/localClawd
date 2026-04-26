@@ -40,6 +40,7 @@ import skillNote from './commands/skill-note/index.js'
 import chaos from './commands/chaos/index.js'
 import kawaii from './commands/kawaii/index.js'
 import caveman from './commands/caveman/index.js'
+import researchMode from './commands/research-mode/index.js'
 import reindexSessions from './commands/reindex-sessions/index.js'
 import windowsSetup from './commands/windows-setup/index.js'
 import rpc from './commands/rpc/index.js'
@@ -348,6 +349,7 @@ const COMMANDS = memoize((): Command[] => [
   chaos,
   kawaii,
   caveman,
+  researchMode,
   rpc,
   heartbeat,
   sysprompt,
