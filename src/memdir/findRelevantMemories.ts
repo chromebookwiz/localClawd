@@ -154,9 +154,11 @@ async function selectRelevantMemories(
           `[memdir] thinkharder: lattice added ${merged.length - sonnetSelected.length} extra memories`,
         )
       }
+      void logRetrievals(merged)
       return merged
     }
 
+    void logRetrievals(sonnetSelected)
     return sonnetSelected
   } catch (e) {
     if (signal.aborted) {
@@ -179,6 +181,7 @@ async function selectRelevantMemories(
       logForDebugging(
         `[memdir] lattice fallback selected ${merged.length} memories`,
       )
+      void logRetrievals(merged)
       return merged
     }
     return []
@@ -225,4 +228,19 @@ function pickLayeredMemoryAdditions(
   }
 
   return additions
+}
+
+/**
+ * Log the memories chosen for this turn so the effectiveness loop can
+ * credit/discredit them when the task ends. Best-effort; failures are
+ * silent so memory recall never blocks on bookkeeping.
+ */
+async function logRetrievals(filenames: readonly string[]): Promise<void> {
+  if (filenames.length === 0) return
+  try {
+    const { recordRetrieval } = await import('../services/memory/effectiveness.js')
+    for (const f of filenames) recordRetrieval(f, 'memory')
+  } catch {
+    // effectiveness module isn't critical
+  }
 }

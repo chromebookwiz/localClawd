@@ -254,7 +254,67 @@ export async function searchSessions(
 
   const results = Array.from(matchMap.values())
   results.sort((a, b) => b.score - a.score)
-  return results.slice(0, limit)
+
+  // RRF rerank when embeddings are available — fuses keyword + summary
+  // scoring (already in `results`) with semantic vector cosine. Multiplies
+  // the fused rank by per-session effectiveness so successful past
+  // recalls drift to the top over time.
+  const reranked = await maybeRerankWithRRF(query, results)
+  const final = (reranked ?? results).slice(0, limit)
+
+  // Log retrievals for the effectiveness loop. Best-effort.
+  try {
+    const { recordRetrieval } = await import('../memory/effectiveness.js')
+    for (const m of final) recordRetrieval(m.sessionId, 'session')
+  } catch { /* non-critical */ }
+
+  return final
+}
+
+async function maybeRerankWithRRF(
+  query: string,
+  candidates: SessionMatch[],
+): Promise<SessionMatch[] | null> {
+  if (candidates.length === 0) return null
+  try {
+    const { isEmbeddingAvailable, embedSimilarity } = await import('../memory/embedding.js')
+    if (!(await isEmbeddingAvailable())) return null
+
+    // Original ranking (by current score) provides one signal
+    const origRank = new Map<string, number>()
+    candidates.forEach((c, i) => origRank.set(c.sessionId, i + 1))
+
+    // Embedding ranking provides the second
+    const slice = candidates.slice(0, 50)
+    const docTexts = slice.map(c =>
+      [c.summary, c.snippet, c.preview, c.tags?.join(' ')].filter(Boolean).join('\n'),
+    )
+    const sims = await embedSimilarity(query, docTexts)
+    if (!sims) return null
+    const embedRank = new Map<string, number>()
+    slice
+      .map((c, i) => ({ id: c.sessionId, sim: sims[i]! }))
+      .sort((a, b) => b.sim - a.sim)
+      .forEach((entry, i) => embedRank.set(entry.id, i + 1))
+
+    const { getEffectivenessMap } = await import('../memory/effectiveness.js')
+    const effMap = await getEffectivenessMap(candidates.map(c => c.sessionId))
+    const RRF_K = 60
+
+    const fused = candidates.map(c => {
+      const oRank = origRank.get(c.sessionId)
+      const eRank = embedRank.get(c.sessionId)
+      let rrf = 0
+      if (oRank !== undefined) rrf += 1 / (RRF_K + oRank)
+      if (eRank !== undefined) rrf += 1 / (RRF_K + eRank)
+      const eff = effMap[c.sessionId] ?? 0.5
+      return { ...c, score: rrf * eff }
+    })
+    fused.sort((a, b) => b.score - a.score)
+    return fused
+  } catch {
+    return null
+  }
 }
 
 export function formatMatches(matches: SessionMatch[]): string {

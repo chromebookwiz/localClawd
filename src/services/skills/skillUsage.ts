@@ -68,6 +68,13 @@ export async function recordSkillUse(
   record.lastUsed = Date.now()
   record.outcomes[outcome]++
   await saveFile(file)
+
+  // Bridge skills into the effectiveness loop so the same outcome
+  // signal (TASK COMPLETE / failure) updates skill ranking too.
+  try {
+    const { recordRetrieval } = await import('../memory/effectiveness.js')
+    recordRetrieval(skillName, 'skill')
+  } catch { /* non-critical */ }
 }
 
 export async function getSkillUsage(): Promise<SkillUseRecord[]> {

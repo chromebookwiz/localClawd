@@ -212,6 +212,20 @@ async function recordTaskOutcome(
   } catch (e) {
     logForDebugging(`[director] Failed to record task: ${e}`)
   }
+
+  // Effectiveness loop: credit (or discredit) every memory/skill that
+  // was retrieved during this task. Over time the lattice + RRF
+  // ranking drift toward what actually produces good outcomes.
+  try {
+    const { markTaskOutcome } = await import('../memory/effectiveness.js')
+    const mapped: 'success' | 'failure' | 'partial' =
+      outcome === 'success' ? 'success'
+      : outcome === 'partial' ? 'partial'
+      : 'failure'
+    await markTaskOutcome(mapped)
+  } catch (e) {
+    logForDebugging(`[director] effectiveness update failed: ${e}`)
+  }
 }
 
 // ─── Per-turn status report ─────────────────────────────────────────────────
