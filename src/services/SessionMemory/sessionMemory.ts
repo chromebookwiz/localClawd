@@ -32,6 +32,7 @@ import {
   createUserMessage,
   hasToolCallsInLastAssistantTurn,
 } from '../../utils/messages.js'
+import { isEnvTruthy } from '../../utils/envUtils.js'
 import {
   getSessionMemoryDir,
   getSessionMemoryPath,
@@ -78,6 +79,15 @@ import {
  * Uses cached gate value - returns immediately without blocking.
  */
 function isSessionMemoryGateEnabled(): boolean {
+  if (isEnvTruthy(process.env.ENABLE_CLAUDE_CODE_SESSION_MEMORY)) {
+    return true
+  }
+  if (isEnvTruthy(process.env.DISABLE_CLAUDE_CODE_SESSION_MEMORY)) {
+    return false
+  }
+  if (process.env.USER_TYPE !== 'ant') {
+    return true
+  }
   return getFeatureValue_CACHED_MAY_BE_STALE('tengu_session_memory', false)
 }
 

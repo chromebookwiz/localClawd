@@ -89,6 +89,15 @@ export function getMemoryBaseDir(): string {
   return getClaudeConfigHomeDir()
 }
 
+/**
+ * Returns the per-project persistent memory root.
+ * Local builds keep memory inside the working tree's .localclawd directory so
+ * each repo or directory gets isolated memory by default.
+ */
+export function getProjectMemoryBaseDir(): string {
+  return join(getAutoMemBase(), '.localclawd').normalize('NFC')
+}
+
 const AUTO_MEM_DIRNAME = 'memory'
 const AUTO_MEM_ENTRYPOINT_NAME = 'MEMORY.md'
 
@@ -210,8 +219,8 @@ function getAutoMemBase(): string {
  * Resolution order:
  *   1. CLAUDE_COWORK_MEMORY_PATH_OVERRIDE env var (full-path override, used by Cowork)
  *   2. autoMemoryDirectory in settings.json (trusted sources only: policy/local/user)
- *   3. <memoryBase>/projects/<sanitized-git-root>/memory/
- *      where memoryBase is resolved by getMemoryBaseDir()
+ *   3. <projectRoot>/.localclawd/memory/
+ *      where projectRoot is the canonical git root or stable project root
  *
  * Memoized: render-path callers (collapseReadSearchGroups → isAutoManagedMemoryFile)
  * fire per tool-use message per Messages re-render; each miss costs
@@ -226,10 +235,9 @@ export const getAutoMemPath = memoize(
     if (override) {
       return override
     }
-    const projectsDir = join(getMemoryBaseDir(), 'projects')
-    return (
-      join(projectsDir, sanitizePath(getAutoMemBase()), AUTO_MEM_DIRNAME) + sep
-    ).normalize('NFC')
+    return (join(getProjectMemoryBaseDir(), AUTO_MEM_DIRNAME) + sep).normalize(
+      'NFC',
+    )
   },
   () => getProjectRoot(),
 )

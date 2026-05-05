@@ -130,6 +130,9 @@ import {
   runPreToolUseHooks,
 } from './toolHooks.js'
 
+const TOOL_FAILURE_REFLECTION_HINT =
+  'The previous tool call failed. Reflect on the error, adjust your approach, and continue the task unless the user needs to make a decision.'
+
 /** Minimum total hook duration (ms) to show inline timing summary */
 export const HOOK_TIMING_DISPLAY_THRESHOLD_MS = 500
 /** Log a debug warning when hooks/permission-decision block for this long. Matches
@@ -1733,6 +1736,16 @@ async function checkPermissionsAndCallTool(
           sourceToolAssistantUUID: assistantMessage.uuid,
         }),
       },
+      ...(!isInterrupt
+        ? [
+            {
+              message: createUserMessage({
+                content: TOOL_FAILURE_REFLECTION_HINT,
+                isMeta: true,
+              }),
+            },
+          ]
+        : []),
       ...hookMessages,
     ]
   } finally {

@@ -405,8 +405,17 @@ export function shouldUseSessionMemoryCompaction(): boolean {
   if (isEnvTruthy(process.env.ENABLE_CLAUDE_CODE_SM_COMPACT)) {
     return true
   }
+  if (isEnvTruthy(process.env.ENABLE_CLAUDE_CODE_SESSION_MEMORY)) {
+    return true
+  }
   if (isEnvTruthy(process.env.DISABLE_CLAUDE_CODE_SM_COMPACT)) {
     return false
+  }
+  if (isEnvTruthy(process.env.DISABLE_CLAUDE_CODE_SESSION_MEMORY)) {
+    return false
+  }
+  if (process.env.USER_TYPE !== 'ant') {
+    return true
   }
 
   const sessionMemoryFlag = getFeatureValue_CACHED_MAY_BE_STALE(

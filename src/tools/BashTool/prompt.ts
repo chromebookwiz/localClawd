@@ -330,6 +330,7 @@ export function getSimplePrompt(): string {
 
   const instructionItems: Array<string | string[]> = [
     'If your command will create new directories or files, first use this tool to run `ls` to verify the parent directory exists and is the correct location.',
+    'On Windows, prefer the PowerShell tool for native Windows build commands (for example Visual Studio, MSBuild, Ninja, or plain CMake workflows). Keep using Bash only when the command explicitly targets MinGW/MSYS2/Git Bash semantics.',
     'Always quote file paths that contain spaces with double quotes in your command (e.g., cd "path with spaces/file.txt")',
     'Try to maintain your current working directory throughout the session by using absolute paths and avoiding usage of `cd`. You may use `cd` if the User explicitly requests it.',
     `You may specify an optional timeout in milliseconds (up to ${getMaxTimeoutMs()}ms / ${getMaxTimeoutMs() / 60000} minutes). By default, your command will timeout after ${getDefaultTimeoutMs()}ms (${getDefaultTimeoutMs() / 60000} minutes).`,

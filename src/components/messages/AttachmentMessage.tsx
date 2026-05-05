@@ -40,6 +40,25 @@ export function AttachmentMessage({
   isTranscriptMode
 }: Props): React.ReactNode {
   const bg = useSelectedMessageBg();
+  const getAttachmentDisplayPath = (): string => {
+    switch (attachment.type) {
+      case 'directory':
+        return getDisplayPath(attachment.path);
+      case 'file':
+      case 'already_read_file':
+      case 'compact_file_reference':
+      case 'pdf_reference':
+      case 'selected_lines_in_ide':
+        return getDisplayPath(attachment.filename);
+      case 'nested_memory':
+        return getDisplayPath(attachment.path);
+      case 'dynamic_skill':
+        return getDisplayPath(attachment.skillDir);
+      default:
+        return 'displayPath' in attachment ? attachment.displayPath : '';
+    }
+  };
+  const resolvedDisplayPath = getAttachmentDisplayPath();
   // Hoisted to mount-time — per-message component, re-renders on every scroll.
   const isDemoEnv = feature('EXPERIMENTAL_SKILL_SEARCH') ?
   // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
@@ -126,45 +145,45 @@ export function AttachmentMessage({
   switch (attachment.type) {
     case 'directory':
       return <Line>
-          Listed directory <Text bold>{attachment.displayPath + sep}</Text>
+          Listed directory <Text bold>{resolvedDisplayPath + sep}</Text>
         </Line>;
     case 'file':
     case 'already_read_file':
       if (attachment.content.type === 'notebook') {
         return <Line>
-            Read <Text bold>{attachment.displayPath}</Text> (
+            Read <Text bold>{resolvedDisplayPath}</Text> (
             {attachment.content.file.cells.length} cells)
           </Line>;
       }
       if (attachment.content.type === 'file_unchanged') {
         return <Line>
-            Read <Text bold>{attachment.displayPath}</Text> (unchanged)
+            Read <Text bold>{resolvedDisplayPath}</Text> (unchanged)
           </Line>;
       }
       return <Line>
-          Read <Text bold>{attachment.displayPath}</Text> (
+          Read <Text bold>{resolvedDisplayPath}</Text> (
           {attachment.content.type === 'text' ? `${attachment.content.file.numLines}${attachment.truncated ? '+' : ''} lines` : formatFileSize(attachment.content.file.originalSize)}
           )
         </Line>;
     case 'compact_file_reference':
       return <Line>
-          Referenced file <Text bold>{attachment.displayPath}</Text>
+          Referenced file <Text bold>{resolvedDisplayPath}</Text>
         </Line>;
     case 'pdf_reference':
       return <Line>
-          Referenced PDF <Text bold>{attachment.displayPath}</Text> (
+          Referenced PDF <Text bold>{resolvedDisplayPath}</Text> (
           {attachment.pageCount} pages)
         </Line>;
     case 'selected_lines_in_ide':
       return <Line>
           ⧉ Selected{' '}
           <Text bold>{attachment.lineEnd - attachment.lineStart + 1}</Text>{' '}
-          lines from <Text bold>{attachment.displayPath}</Text> in{' '}
+          lines from <Text bold>{resolvedDisplayPath}</Text> in{' '}
           {attachment.ideName}
         </Line>;
     case 'nested_memory':
       return <Line>
-          Loaded <Text bold>{attachment.displayPath}</Text>
+          Loaded <Text bold>{resolvedDisplayPath}</Text>
         </Line>;
     case 'relevant_memories':
       // Usually absorbed into a CollapsedReadSearchGroup (collapseReadSearch.ts)
@@ -206,7 +225,7 @@ export function AttachmentMessage({
           <Text bold>
             {skillCount} {plural(skillCount, 'skill')}
           </Text>{' '}
-          from <Text bold>{attachment.displayPath}</Text>
+          from <Text bold>{resolvedDisplayPath}</Text>
         </Line>;
       }
     case 'skill_listing':

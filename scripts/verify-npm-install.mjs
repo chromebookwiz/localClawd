@@ -137,6 +137,12 @@ function seedVerifierHomeConfig() {
   const seededConfig = {
     theme: 'dark',
     hasCompletedOnboarding: true,
+    projects: {
+      [workspaceRoot]: {
+        hasTrustDialogAccepted: true,
+        projectOnboardingSeenCount: 0,
+      },
+    },
     localBackendProvider: 'vllm',
     localBackendBaseUrl: 'http://127.0.0.1:8000/v1',
     localBackendModel: 'qwen2.5-coder-32b-instruct',

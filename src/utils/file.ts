@@ -16,7 +16,7 @@ import { logEvent } from 'src/services/analytics/index.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import { getCwd } from '../utils/cwd.js'
 import { logForDebugging } from './debug.js'
-import { isENOENT, isFsInaccessible } from './errors.js'
+import { getErrnoCode, isENOENT, isFsInaccessible } from './errors.js'
 import {
   detectEncodingForResolvedPath,
   detectLineEndingsForString,
@@ -434,7 +434,9 @@ export function writeFileSyncAndFlush_DEPRECATED(
     // Atomic rename (on POSIX systems, this is atomic)
     // On Windows, this will overwrite the destination if it exists
     logForDebugging(`Renaming ${tempPath} to ${targetPath}`)
-    fs.renameSync(tempPath, targetPath)
+    retrySyncOnWindowsWriteError(`rename ${tempPath} -> ${targetPath}`, () =>
+      fs.renameSync(tempPath, targetPath),
+    )
     logForDebugging(`File ${targetPath} written atomically`)
   } catch (atomicError) {
     logForDebugging(`Failed to write file atomically: ${atomicError}`, {
@@ -466,13 +468,55 @@ export function writeFileSyncAndFlush_DEPRECATED(
         fallbackOptions.mode = options.mode
       }
 
-      fsWriteFileSync(targetPath, content, fallbackOptions)
+      retrySyncOnWindowsWriteError(`write ${targetPath}`, () =>
+        fsWriteFileSync(targetPath, content, fallbackOptions),
+      )
       logForDebugging(
         `File ${targetPath} written successfully with non-atomic fallback`,
       )
     } catch (fallbackError) {
       logForDebugging(`Non-atomic write also failed: ${fallbackError}`)
       throw fallbackError
+    }
+  }
+}
+
+const WINDOWS_TRANSIENT_WRITE_ERROR_CODES = new Set(['EACCES', 'EBUSY', 'EPERM'])
+const WINDOWS_WRITE_RETRY_DELAYS_MS = [25, 75, 150]
+
+function isTransientWindowsWriteError(error: unknown): boolean {
+  return (
+    getPlatform() === 'windows' &&
+    WINDOWS_TRANSIENT_WRITE_ERROR_CODES.has(getErrnoCode(error) ?? '')
+  )
+}
+
+function sleepSync(ms: number): void {
+  const buffer = new SharedArrayBuffer(4)
+  const view = new Int32Array(buffer)
+  Atomics.wait(view, 0, 0, ms)
+}
+
+function retrySyncOnWindowsWriteError<T>(
+  operation: string,
+  fn: () => T,
+): T {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return fn()
+    } catch (error) {
+      if (
+        !isTransientWindowsWriteError(error) ||
+        attempt >= WINDOWS_WRITE_RETRY_DELAYS_MS.length
+      ) {
+        throw error
+      }
+
+      const code = getErrnoCode(error) ?? 'unknown'
+      logForDebugging(
+        `Retrying ${operation} after transient ${code} error on Windows (${attempt + 1}/${WINDOWS_WRITE_RETRY_DELAYS_MS.length + 1})`,
+      )
+      sleepSync(WINDOWS_WRITE_RETRY_DELAYS_MS[attempt])
     }
   }
 }

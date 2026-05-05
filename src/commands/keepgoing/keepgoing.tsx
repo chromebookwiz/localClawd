@@ -284,6 +284,14 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   // and warns if an incompatible command follows it
   const { maxRounds, focus } = parseMaxRounds(chainedArgs)
 
+  if (sessionRound === 0 && !focus) {
+    onDone('What should I keep going on?', {
+      display: 'system',
+      nextInput: '/keepgoing ',
+    })
+    return null
+  }
+
   if (sessionRound === 0 || (focus && focus !== sessionFocus)) {
     resetSession(focus)
   }

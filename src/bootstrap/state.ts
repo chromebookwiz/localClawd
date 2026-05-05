@@ -720,17 +720,26 @@ export function getTotalWebSearchRequests(): number {
   return sumBy(Object.values(STATE.modelUsage), 'webSearchRequests')
 }
 
-let outputTokensAtTurnStart = 0
+function getTotalTurnTokens(): number {
+  return (
+    getTotalInputTokens() +
+    getTotalOutputTokens() +
+    getTotalCacheReadInputTokens() +
+    getTotalCacheCreationInputTokens()
+  )
+}
+
+let turnTokensAtTurnStart = 0
 let currentTurnTokenBudget: number | null = null
 export function getTurnOutputTokens(): number {
-  return getTotalOutputTokens() - outputTokensAtTurnStart
+  return getTotalTurnTokens() - turnTokensAtTurnStart
 }
 export function getCurrentTurnTokenBudget(): number | null {
   return currentTurnTokenBudget
 }
 let budgetContinuationCount = 0
 export function snapshotOutputTokensForTurn(budget: number | null): void {
-  outputTokensAtTurnStart = getTotalOutputTokens()
+  turnTokensAtTurnStart = getTotalTurnTokens()
   currentTurnTokenBudget = budget
   budgetContinuationCount = 0
 }

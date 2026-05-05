@@ -10,7 +10,10 @@ import { logEvent } from '../../services/analytics/index.js';
 import { errorMessage, ShellError } from '../errors.js';
 import { createSyntheticUserCaveatMessage, createUserInterruptionMessage, createUserMessage, prepareUserContent } from '../messages.js';
 import { resolveDefaultShell } from '../shell/resolveDefaultShell.js';
-import { isPowerShellToolEnabled } from '../shell/shellToolUtils.js';
+import {
+  isPowerShellToolEnabled,
+  shouldPreferPowerShellForCommand,
+} from '../shell/shellToolUtils.js';
 import { processToolResultBlock } from '../toolResultStorage.js';
 import { escapeXml } from '../xml.js';
 import type { ProcessUserInputContext } from './processUserInput.js';
@@ -23,7 +26,9 @@ export async function processBashCommand(inputString: string, precedingInputBloc
   // same platform + env-var gate as tools.ts so input-box routing matches
   // tool-list visibility. Computed up front so telemetry records the
   // actual shell, not the raw setting.
-  const usePowerShell = isPowerShellToolEnabled() && resolveDefaultShell() === 'powershell';
+  const usePowerShell =
+    (isPowerShellToolEnabled() && resolveDefaultShell() === 'powershell') ||
+    shouldPreferPowerShellForCommand(inputString);
   logEvent('tengu_input_bash', {
     powershell: usePowerShell
   });

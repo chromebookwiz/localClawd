@@ -24,7 +24,10 @@ type PromptShellTool = Tool & {
   ): Promise<{ data: ShellOut }>
 }
 
-import { isPowerShellToolEnabled } from './shell/shellToolUtils.js'
+import {
+  isPowerShellToolEnabled,
+  shouldPreferPowerShellForCommand,
+} from './shell/shellToolUtils.js'
 
 // Lazy: this file is on the startup import chain (main → commands →
 // loadSkillsDir → here). A static import would load PowerShellTool.ts
@@ -74,13 +77,15 @@ export async function executeShellCommandsInPrompt(
 ): Promise<string> {
   let result = text
 
-  // Resolve the tool once. `shell === undefined` and `shell === 'bash'` both
-  // hit BashTool. PowerShell only when the runtime gate allows — a skill
-  // author's frontmatter choice doesn't override the user's opt-in/out.
-  const shellTool: PromptShellTool =
+  // Resolve the tool per extracted command. This keeps explicit frontmatter
+  // behavior intact while allowing built-in prompt commands to prefer
+  // PowerShell for native Windows build workflows.
+  const getShellTool = (command: string): PromptShellTool =>
     shell === 'powershell' && isPowerShellToolEnabled()
       ? getPowerShellTool()
-      : BashTool
+      : shell === undefined && shouldPreferPowerShellForCommand(command)
+        ? getPowerShellTool()
+        : BashTool
 
   // INLINE_PATTERN's lookbehind is ~100x slower than BLOCK_PATTERN on large
   // skill content (265µs vs 2µs @ 17KB). 93% of skills have no !` at all,
@@ -94,6 +99,7 @@ export async function executeShellCommandsInPrompt(
       const command = match[1]?.trim()
       if (command) {
         try {
+          const shellTool = getShellTool(command)
           // Check permissions before executing
           const permissionResult = await hasPermissionsToUseTool(
             shellTool,

@@ -25,6 +25,19 @@ function getTextContent(node: ReactNode): string {
   }
   return '';
 }
+
+function renderOptionLabel(
+  label: ReactNode,
+  color?: string,
+  dimColor?: boolean,
+): ReactNode {
+  if (typeof label === 'string' || typeof label === 'number') {
+    return <Text dimColor={dimColor} color={color}>{label}</Text>;
+  }
+
+  return <Box flexGrow={1}>{label}</Box>;
+}
+
 type BaseOption<T> = {
   description?: string;
   dimDescription?: boolean;
@@ -400,7 +413,7 @@ export function Select(t0) {
             }
             const isOptionDisabled = option_1.disabled === true;
             const optionColor = isOptionDisabled ? undefined : isSelected ? "success" : isFocused ? "suggestion" : undefined;
-            return <Box key={String(option_1.value)} flexDirection="column" flexShrink={0}><SelectOption isFocused={isFocused} isSelected={isSelected} shouldShowDownArrow={areMoreOptionsBelow && isLastVisibleOption} shouldShowUpArrow={areMoreOptionsAbove && isFirstVisibleOption}><Text dimColor={isOptionDisabled} color={optionColor}>{label}</Text></SelectOption>{option_1.description && <Box paddingLeft={2}><Text dimColor={isOptionDisabled || option_1.dimDescription !== false} color={optionColor}><Ansi>{option_1.description}</Ansi></Text></Box>}<Text> </Text></Box>;
+            return <Box key={String(option_1.value)} flexDirection="column" flexShrink={0}><SelectOption isFocused={isFocused} isSelected={isSelected} shouldShowDownArrow={areMoreOptionsBelow && isLastVisibleOption} shouldShowUpArrow={areMoreOptionsAbove && isFirstVisibleOption}>{renderOptionLabel(label, optionColor, isOptionDisabled)}</SelectOption>{option_1.description && <Box paddingLeft={2}><Text dimColor={isOptionDisabled || option_1.dimDescription !== false} color={optionColor}><Ansi>{option_1.description}</Ansi></Text></Box>}<Text> </Text></Box>;
           })}</Box>;
         break bb0;
       }
@@ -447,7 +460,7 @@ export function Select(t0) {
               label_0 = <>{labelText_0.slice(0, index_2)}<Text {...styles.highlightedText()}>{highlightText}</Text>{labelText_0.slice(index_2 + highlightText.length)}</>;
             }
             const isOptionDisabled_0 = option_2.disabled === true;
-            return <Box key={String(option_2.value)} flexDirection="column" flexShrink={0}><SelectOption isFocused={isFocused_0} isSelected={isSelected_0} shouldShowDownArrow={areMoreOptionsBelow_0 && isLastVisibleOption_0} shouldShowUpArrow={areMoreOptionsAbove_0 && isFirstVisibleOption_0}><>{!hideIndexes && <Text dimColor={true}>{`${i_0}.`.padEnd(maxIndexWidth_0 + 1)}</Text>}<Text dimColor={isOptionDisabled_0} color={isOptionDisabled_0 ? undefined : isSelected_0 ? "success" : isFocused_0 ? "suggestion" : undefined}>{label_0}</Text></></SelectOption>{option_2.description && <Box paddingLeft={hideIndexes ? 4 : maxIndexWidth_0 + 4}><Text dimColor={isOptionDisabled_0 || option_2.dimDescription !== false} color={isOptionDisabled_0 ? undefined : isSelected_0 ? "success" : isFocused_0 ? "suggestion" : undefined}><Ansi>{option_2.description}</Ansi></Text></Box>}</Box>;
+            return <Box key={String(option_2.value)} flexDirection="column" flexShrink={0}><SelectOption isFocused={isFocused_0} isSelected={isSelected_0} shouldShowDownArrow={areMoreOptionsBelow_0 && isLastVisibleOption_0} shouldShowUpArrow={areMoreOptionsAbove_0 && isFirstVisibleOption_0}><>{!hideIndexes && <Text dimColor={true}>{`${i_0}.`.padEnd(maxIndexWidth_0 + 1)}</Text>}{renderOptionLabel(label_0, isOptionDisabled_0 ? undefined : isSelected_0 ? "success" : isFocused_0 ? "suggestion" : undefined, isOptionDisabled_0)}</></SelectOption>{option_2.description && <Box paddingLeft={hideIndexes ? 4 : maxIndexWidth_0 + 4}><Text dimColor={isOptionDisabled_0 || option_2.dimDescription !== false} color={isOptionDisabled_0 ? undefined : isSelected_0 ? "success" : isFocused_0 ? "suggestion" : undefined}><Ansi>{option_2.description}</Ansi></Text></Box>}</Box>;
           })}</Box>;
         break bb0;
       }
