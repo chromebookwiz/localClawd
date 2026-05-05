@@ -95,7 +95,7 @@ function convertStatusMessage(msg: SDKStatusMessage): SystemMessage | null {
     subtype: 'informational',
     content:
       msg.status === 'compacting'
-        ? 'Compacting conversation…'
+        ? 'Compressing context…'
         : `Status: ${msg.status}`,
     level: 'info',
     uuid: msg.uuid,

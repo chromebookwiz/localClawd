@@ -32,6 +32,7 @@ import type {
   AttachmentMessage,
   Message,
   RequestStartEvent,
+  SystemMessage,
   StreamEvent,
   ToolUseSummaryMessage,
   UserMessage,
@@ -105,11 +106,13 @@ import type { Terminal, Continue } from './query/transitions.js'
 import { feature } from 'bun:bundle'
 import {
   getCurrentTurnTokenBudget,
+  getSessionId,
   getTurnOutputTokens,
   incrementBudgetContinuationCount,
 } from './bootstrap/state.js'
 import { createBudgetTracker, checkTokenBudget } from './query/tokenBudget.js'
 import { count } from './utils/array.js'
+import { notifySessionMetadataChanged } from './utils/sessionState.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const snipModule = feature('HISTORY_SNIP')
@@ -219,6 +222,181 @@ type State = {
   // Why the previous iteration continued. Undefined on first iteration.
   // Lets tests assert recovery paths fired without inspecting message contents.
   transition: Continue | undefined
+}
+
+type TurnCompletionSignal = 'completed' | 'needs_input' | null
+
+function extractAssistantText(message: AssistantMessage | undefined): string {
+  if (!message) {
+    return ''
+  }
+
+  const { content } = message.message
+  if (typeof content === 'string') {
+    return content
+  }
+
+  return content
+    .filter(
+      block =>
+        block.type === 'text' &&
+        typeof block.text === 'string' &&
+        block.text.trim().length > 0,
+    )
+    .map(block => block.text)
+    .join('\n')
+}
+
+function toSingleLineSummary(text: string): string {
+  const cleaned = stripSignatureBlocks(text).replace(/\s+/g, ' ').trim()
+  if (!cleaned) {
+    return 'Completed another work step.'
+  }
+
+  const firstSentence = cleaned.split(/(?<=[.!?])\s+/)[0]?.trim() || cleaned
+  const normalized = firstSentence.replace(/^summary:\s*/i, '').trim()
+  if (normalized.length <= 220) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, 217).trimEnd()}...`
+}
+
+function detectTurnCompletionSignal(text: string): TurnCompletionSignal {
+  if (!text) {
+    return null
+  }
+
+  const normalized = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (
+    /\b(task complete|task completed|work complete|work completed|implementation complete|implementation completed|audit complete|audit completed)\b/.test(
+      normalized,
+    ) ||
+    /\b(all done|task is complete|work is complete)\b/.test(normalized)
+  ) {
+    return 'completed'
+  }
+
+  if (
+    /\b(needs? input|need your input|need user input|waiting on you|please confirm|please choose)\b/.test(
+      normalized,
+    )
+  ) {
+    return 'needs_input'
+  }
+
+  return null
+}
+
+function isKeepGoingTurn(messages: Message[]): boolean {
+  return messages.some(
+    message =>
+      message.type === 'user' &&
+      message.isMeta === true &&
+      typeof message.message.content === 'string' &&
+      message.message.content.includes('[KEEP GOING'),
+  )
+}
+
+function createPostTurnSummaryMessage(params: {
+  assistantMessage: AssistantMessage | undefined
+  summary: string
+  completionSignal: TurnCompletionSignal
+  autoContinuing: boolean
+}): {
+  message: SystemMessage
+  metadata: Record<string, unknown>
+} {
+  const { assistantMessage, summary, completionSignal, autoContinuing } = params
+  const baseMessage = createSystemMessage(
+    autoContinuing
+      ? `Summary: ${summary} Continuing automatically.`
+      : `Summary: ${summary}`,
+    'info',
+  )
+  const statusCategory =
+    completionSignal === 'completed'
+      ? 'completed'
+      : completionSignal === 'needs_input'
+        ? 'waiting'
+        : 'review_ready'
+  const statusDetail = autoContinuing
+    ? 'Turn ended without an explicit completion marker; continuing automatically.'
+    : completionSignal === 'needs_input'
+      ? 'Waiting for user input.'
+      : 'Turn completed.'
+  const needsAction =
+    completionSignal === 'needs_input'
+      ? 'Provide the requested input to continue.'
+      : autoContinuing
+        ? 'No action required; continuing automatically.'
+        : 'No immediate action required.'
+  const summarizesUuid = assistantMessage?.uuid ?? baseMessage.uuid ?? ''
+  const metadata = {
+    type: 'system',
+    subtype: 'post_turn_summary',
+    summarizes_uuid: summarizesUuid,
+    status_category: statusCategory,
+    status_detail: statusDetail,
+    is_noteworthy: autoContinuing || completionSignal === 'needs_input',
+    title: autoContinuing ? 'Continuing work' : 'Turn summary',
+    description: summary,
+    recent_action: summary,
+    needs_action: needsAction,
+    artifact_urls: [],
+    uuid: baseMessage.uuid,
+    session_id: getSessionId(),
+  }
+
+  return {
+    message: {
+      ...baseMessage,
+      ...metadata,
+    },
+    metadata,
+  }
+}
+
+function createAutoContinuationPrompt(summary: string): UserMessage {
+  return createUserMessage({
+    content:
+      `The previous turn ended before you explicitly marked the task complete. Continue directly from this summary without repeating prior work: ${summary}\n` +
+      `When the task is actually done, say TASK COMPLETE in your response. If you need the user to proceed, say NEEDS INPUT and state exactly what you need.`,
+    isMeta: true,
+  })
+}
+
+function shouldAutoContinueTurn(params: {
+  assistantMessage: AssistantMessage | undefined
+  completionSignal: TurnCompletionSignal
+  hasTurnHistory: boolean
+  keepGoingActive: boolean
+  preventContinuation: boolean
+  agentId: string | undefined
+}): boolean {
+  const {
+    assistantMessage,
+    completionSignal,
+    hasTurnHistory,
+    keepGoingActive,
+    preventContinuation,
+    agentId,
+  } = params
+
+  if (!assistantMessage || assistantMessage.isApiErrorMessage) {
+    return false
+  }
+
+  if (completionSignal || keepGoingActive || preventContinuation || agentId) {
+    return false
+  }
+
+  return hasTurnHistory
 }
 
 export async function* query(
@@ -1280,10 +1458,6 @@ async function* queryLoop(
         stopHookActive,
       )
 
-      if (stopHookResult.preventContinuation) {
-        return { reason: 'stop_hook_prevented' }
-      }
-
       if (stopHookResult.blockingErrors.length > 0) {
         const next: State = {
           messages: [
@@ -1310,6 +1484,31 @@ async function* queryLoop(
         continue
       }
 
+      const lastAssistantText = extractAssistantText(lastMessage)
+      const completionSignal = detectTurnCompletionSignal(lastAssistantText)
+      const autoContinueTurn = shouldAutoContinueTurn({
+        assistantMessage: lastMessage,
+        completionSignal,
+        hasTurnHistory: Boolean(pendingToolUseSummary) || turnCount > 1,
+        keepGoingActive: isKeepGoingTurn(messagesForQuery),
+        preventContinuation: stopHookResult.preventContinuation,
+        agentId: toolUseContext.agentId,
+      })
+      const postTurnSummary = createPostTurnSummaryMessage({
+        assistantMessage: lastMessage,
+        summary: toSingleLineSummary(lastAssistantText),
+        completionSignal,
+        autoContinuing: autoContinueTurn,
+      })
+      yield postTurnSummary.message
+      notifySessionMetadataChanged({
+        post_turn_summary: postTurnSummary.metadata,
+      })
+
+      if (stopHookResult.preventContinuation) {
+        return { reason: 'stop_hook_prevented' }
+      }
+
       if (feature('TOKEN_BUDGET')) {
         const decision = checkTokenBudget(
           budgetTracker!,
@@ -1327,6 +1526,7 @@ async function* queryLoop(
             messages: [
               ...messagesForQuery,
               ...assistantMessages,
+              postTurnSummary.message,
               createUserMessage({
                 content: decision.nudgeMessage,
                 isMeta: true,
@@ -1357,6 +1557,29 @@ async function* queryLoop(
             queryDepth: queryTracking.depth,
           })
         }
+      }
+
+      if (autoContinueTurn) {
+        state = {
+          messages: [
+            ...messagesForQuery,
+            ...assistantMessages,
+            postTurnSummary.message,
+            createAutoContinuationPrompt(
+              postTurnSummary.metadata.description as string,
+            ),
+          ],
+          toolUseContext,
+          autoCompactTracking: tracking,
+          maxOutputTokensRecoveryCount: 0,
+          hasAttemptedReactiveCompact: false,
+          maxOutputTokensOverride: undefined,
+          pendingToolUseSummary: undefined,
+          stopHookActive: undefined,
+          turnCount,
+          transition: { reason: 'next_turn' },
+        }
+        continue
       }
 
       return { reason: 'completed' }

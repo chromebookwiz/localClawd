@@ -1,7 +1,9 @@
 import { getGlobalConfig } from '../utils/config.js'
+import { saveGlobalConfig } from '../utils/config.js'
 import {
   type Companion,
   type CompanionBones,
+  type StoredCompanion,
   EYES,
   HATS,
   RARITIES,
@@ -83,6 +85,30 @@ function rollStats(
 
 const SALT = 'friend-2026-401'
 
+const COMPANION_NAMES = [
+  'Pip',
+  'Mochi',
+  'Tango',
+  'Pebble',
+  'Nori',
+  'Comet',
+  'Juniper',
+  'Nova',
+  'Fig',
+  'Rook',
+  'Miso',
+  'Sprout',
+] as const
+
+const COMPANION_PERSONALITIES = [
+  'curious and methodical',
+  'quietly confident',
+  'playful but observant',
+  'cheerfully relentless',
+  'calm under pressure',
+  'detail-obsessed in a useful way',
+] as const
+
 export type Roll = {
   bones: CompanionBones
   inspirationSeed: number
@@ -121,6 +147,17 @@ export function companionUserId(): string {
   return config.oauthAccount?.accountUuid ?? config.userID ?? 'anon'
 }
 
+function createStoredCompanion(userId: string): StoredCompanion {
+  const { inspirationSeed } = roll(userId)
+  const rng = mulberry32(hashString(`${userId}:${inspirationSeed}:soul`))
+
+  return {
+    name: pick(rng, COMPANION_NAMES),
+    personality: pick(rng, COMPANION_PERSONALITIES),
+    hatchedAt: Date.now(),
+  }
+}
+
 // Regenerate bones from userId, merge with stored soul. Bones never persist
 // so species renames and SPECIES-array edits can't break stored companions,
 // and editing config.companion can't fake a rarity.
@@ -129,5 +166,35 @@ export function getCompanion(): Companion | undefined {
   if (!stored) return undefined
   const { bones } = roll(companionUserId())
   // bones last so stale bones fields in old-format configs get overridden
+  return { ...stored, ...bones }
+}
+
+export function ensureCompanion(options?: { unmute?: boolean }): Companion {
+  const existing = getCompanion()
+  const shouldUnmute = options?.unmute === true
+  if (existing && (!shouldUnmute || getGlobalConfig().companionMuted !== true)) {
+    return existing
+  }
+
+  const userId = companionUserId()
+  const { bones } = roll(userId)
+  const stored = getGlobalConfig().companion ?? createStoredCompanion(userId)
+
+  saveGlobalConfig(current => {
+    const nextCompanion = current.companion ?? stored
+    const nextMuted = shouldUnmute ? false : current.companionMuted
+    if (
+      current.companion === nextCompanion &&
+      current.companionMuted === nextMuted
+    ) {
+      return current
+    }
+    return {
+      ...current,
+      companion: nextCompanion,
+      companionMuted: nextMuted,
+    }
+  })
+
   return { ...stored, ...bones }
 }
