@@ -1,21 +1,17 @@
 /**
- * /keepgoing — ultimate persistent autonomous mode.
+ * /keepgoing — persistent autonomous mode.
  *
- * Runs fully autonomously with all tool permissions bypassed.
- * A warning is shown on entry. Permissions are restored when the loop ends.
+ * Runs indefinitely with all tool permissions bypassed.
+ * Only the USER can stop it: Ctrl+C, or /stop via Telegram/Slack.
  *
- * Works standalone or combined with /thinkharder:
- *   /thinkharder → /keepgoing   Each round uses the full 5-phase verification pipeline.
+ * Self-directed prompts: after round 1 the model writes its own
+ * NEXT: <directive> at the end of each response. That directive
+ * becomes the sole prompt for the next round, keeping things fresh
+ * and contextually relevant rather than repeating boilerplate.
  *
- * Telegram bridge: if TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set, the
- * agent sends a status update after each round and any messages you send
- * from Telegram are injected as the next round's focus.
- *
- * Stop signals (any in the last assistant message ends the loop):
- *   TASK COMPLETE:   TASK_COMPLETE:   NEEDS INPUT:   NEEDS_INPUT:
- *   FINISHED         ALL DONE         WORK COMPLETE:
- *
- * Round cap: default 50. Override: /keepgoing 100  or  /keepgoing unlimited
+ * Context: auto-compact fires transparently when the window fills.
+ * If the model returns (no content) the loop detects it and sends
+ * a re-orient prompt so the model can continue from the summary.
  */
 
 import * as React from 'react'
@@ -52,11 +48,15 @@ import { enqueue } from '../../utils/messageQueueManager.js'
 let sessionRound = 0
 let sessionFocus = ''
 let sessionOriginalMode: PermissionMode = 'default'
+// The model writes NEXT: <text> at the end of each response.
+// That text becomes the directive for the following round.
+let sessionSelfDirective = ''
 
 function resetSession(focus: string, originalMode: PermissionMode): void {
   sessionRound = 0
   sessionFocus = focus
   sessionOriginalMode = originalMode
+  sessionSelfDirective = ''
 }
 
 function incrementRound(): number {
@@ -64,28 +64,22 @@ function incrementRound(): number {
   return sessionRound
 }
 
-// ─── Configuration ────────────────────────────────────────────────────────────
+// ─── Self-directive extraction ───────────────────────────────────────────────
 
-// keepgoing never stops due to a round count — only user stop signals, Ctrl+C,
-// or model-emitted TASK COMPLETE / NEEDS INPUT / FINISHED end the loop.
-function parseFocus(args: string): string {
-  return args.trim()
+// Pull the NEXT: paragraph the model writes at the end of each turn.
+// Accept NEXT: at the start of a line, possibly preceded by a separator.
+function extractSelfDirective(text: string): string {
+  // Match "NEXT:" (with optional markdown like "**NEXT:**") followed by content
+  const match = text.match(/\*{0,2}NEXT:\*{0,2}\s*(.+?)(?=\n\n|\n(?:[A-Z*─━]|\d+\.)|\s*$)/s)
+  if (!match) return ''
+  // Collapse whitespace and cap length — this is a planning note, not a novel
+  return match[1].replace(/\s+/g, ' ').trim().slice(0, 600)
 }
 
-// ─── Stop signal detection ────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const STOP_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
-  { pattern: /TASK[_ ]COMPLETE:/i,  label: 'task complete' },
-  { pattern: /NEEDS[_ ]INPUT:/i,    label: 'paused — needs input' },
-  { pattern: /\bFINISHED\b/i,       label: 'finished' },
-  { pattern: /ALL[_ ]DONE\b/i,      label: 'all done' },
-  { pattern: /WORK[_ ]COMPLETE:/i,  label: 'work complete' },
-]
-
-function detectStopSignal(text: string): string | null {
-  for (const { pattern, label } of STOP_PATTERNS)
-    if (pattern.test(text)) return label
-  return null
+function parseFocus(args: string): string {
+  return args.trim()
 }
 
 function extractLastAssistantText(
@@ -103,72 +97,76 @@ function extractLastAssistantText(
   return ''
 }
 
-// ─── Continuation prompt ──────────────────────────────────────────────────────
+// ─── Prompt builders ─────────────────────────────────────────────────────────
 
-function buildContinuationPrompt(
+// Sent on round 1 (or whenever we have no self-directive, e.g. after compact).
+// Explains the setup once and asks the model to start writing NEXT: directives.
+function buildOnboardingPrompt(
   round: number,
   focus: string,
-  telegramMsg: string | null,
+  externalMsg: string | null,
   contextCompacted: boolean,
 ): string {
-  const roundInfo = `Round ${round}`
-
-  const modeTag = isThinkHarderMode
-    ? ' · 🧠 THINK HARDER'
+  const modeTag = isThinkHarderMode ? ' · 🧠 THINK HARDER' : ''
+  const focusLine = focus ? `\nFocus: ${focus}\n` : ''
+  const compactNote = contextCompacted
+    ? `\n⚠ Context was compacted. Re-orient: read key files you were working on, then continue.\n`
     : ''
-
-  const focusLine = focus
-    ? `\nCurrent focus: ${focus}\n`
+  const telegramSection = externalMsg
+    ? `\n━━━ MESSAGE FROM USER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${externalMsg}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
     : ''
-
-  const telegramSection = telegramMsg
-    ? `\n━━━ 📱 TELEGRAM MESSAGE FROM USER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${telegramMsg}\n━━━ (respond to this, then continue autonomous work) ━━━━━━━━━━━━━━\n`
-    : ''
-
-  const thinkHarderSection = isThinkHarderMode
-    ? `\n${THINKHARDER_ROUND_PROMPT}\n`
-    : ''
-
-  const compactedSection = contextCompacted
-    ? `\n⚠ CONTEXT NOTE: The conversation was automatically compacted to free up context. Re-orient by reading key files, then continue the task.\n`
-    : ''
-
-  const continueInstruction = contextCompacted
-    ? `The conversation was compacted. Re-read any files you were working on and continue.`
-    : `Pick up exactly where you left off. Do not re-explain what was already done.\nProceed directly with the next action.`
+  const thinkHarder = isThinkHarderMode ? `\n${THINKHARDER_ROUND_PROMPT}\n` : ''
 
   return `\
-[KEEP GOING — AUTONOMOUS OPERATION — ${roundInfo}${modeTag}]
-${focusLine}${compactedSection}${telegramSection}${thinkHarderSection}
-You are in full autonomous mode with all permissions bypassed. Work continuously until all tasks are done.
+[KEEP GOING — Round ${round}${modeTag}]
+${focusLine}${compactNote}${telegramSection}${thinkHarder}
+You are in fully autonomous mode — all tool permissions bypassed.
+This loop runs indefinitely. Only the user can stop it (Ctrl+C or /stop).
+You are the only one deciding what to work on next.
 
-━━━ CAPABILITIES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-You have access to ALL tools:
-  • Read, Write, Edit, MultiEdit   — file operations
-  • Bash                           — run commands, builds, tests, git
-  • Glob, Grep                     — search codebase
-  • WebFetch, WebSearch            — internet access
-  • Agent                          — SPAWN SUBAGENTS for parallel/complex work
-  • TodoCreate, TodoUpdate         — task tracking
+━━━ TOOLS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Read, Write, Edit, MultiEdit · Bash · Glob, Grep · WebFetch, WebSearch
+Agent (spawn subagents for parallel or complex sub-tasks)
+TodoCreate, TodoUpdate
 
-SPAWN SUBAGENTS when:
-  → A sub-task is independent of current work (run in parallel)
-  → A task is complex enough to benefit from a fresh context
-  → You need specialized work done concurrently (e.g., research + implement)
+━━━ RULES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+· Proceed with every action without asking for permission
+· Commit after each logical unit of work
+· Run builds/tests after significant changes
+· If genuinely blocked: state the blocker clearly, spawn a subagent to research it, or try an alternative approach — do NOT stall
 
-━━━ AUTONOMOUS RULES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. ALL PERMISSIONS ARE BYPASSED — proceed with every tool use without asking
-2. After completing a major milestone, state: "Completed: <what was done>"
-3. After significant changes, run tests/builds to verify correctness
-4. Use git commits after each logical unit of work
-5. If you encounter a blocker you cannot resolve autonomously, emit:
-     NEEDS INPUT: <specific question>
-   Then stop and wait — do NOT guess or assume critical details
-6. When ALL work is truly complete, emit:
-     TASK COMPLETE: <one-sentence summary of everything accomplished>
+━━━ SELF-DIRECTIVE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+At the END of every response, write exactly this line:
 
-━━━ CONTINUE NOW ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${continueInstruction}`
+NEXT: <1–3 sentences describing your specific plan for the next round>
+
+This becomes your only prompt next round. Be precise about what to do,
+what files to touch, and what outcome to verify.`
+}
+
+// Sent on rounds 2+ when the model has written a NEXT: directive.
+// Lightweight — just shows the directive and asks the model to continue.
+function buildSelfDirectedPrompt(
+  round: number,
+  directive: string,
+  focus: string,
+  externalMsg: string | null,
+): string {
+  const modeTag = isThinkHarderMode ? ' · 🧠 THINK HARDER' : ''
+  const focusNote = focus ? `\nFocus: ${focus}` : ''
+  const telegramSection = externalMsg
+    ? `\n━━━ MESSAGE FROM USER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${externalMsg}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+    : ''
+  const thinkHarder = isThinkHarderMode ? `\n${THINKHARDER_ROUND_PROMPT}\n` : ''
+
+  return `\
+[KEEP GOING — Round ${round}${modeTag}]${focusNote}
+${telegramSection}${thinkHarder}
+DIRECTIVE:
+${directive}
+
+Proceed. End your response with:
+NEXT: <your plan for the following round>`
 }
 
 // ─── UI Components ────────────────────────────────────────────────────────────
@@ -204,17 +202,16 @@ function KeepGoingBanner({
         <Box flexDirection="column" marginBottom={1} borderStyle="round" borderColor="yellow" paddingX={1}>
           <Text bold color="yellow">{'⚠  Keep Going — Autonomous Mode'}</Text>
           <Text color="yellow">{'   All tool permissions are bypassed for this session.'}</Text>
-          <Text dimColor>{'   The agent will execute Bash, file writes, and all other tools'}</Text>
-          <Text dimColor>{'   without asking. Press Ctrl+C at any time to interrupt.'}</Text>
+          <Text dimColor>{'   The agent will run indefinitely. Ctrl+C or /stop to halt.'}</Text>
         </Box>
       )}
       <Text bold color="cyan">
         {`◆ Keep Going  [round ${round}]${badgeStr}`}
       </Text>
       {focus ? (
-        <Text dimColor color="cyan">{`  ↳ Focus: ${focus}`}</Text>
+        <Text dimColor color="cyan">{`  ↳ ${focus}`}</Text>
       ) : (
-        <Text dimColor>{'  ↳ All permissions bypassed · Ctrl+C to interrupt'}</Text>
+        <Text dimColor>{'  ↳ self-directed · Ctrl+C or /stop to halt'}</Text>
       )}
     </Box>
   )
@@ -268,7 +265,7 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     resetSession(focus, currentMode)
   }
 
-  // ── Activate bypass permissions mode for this session ───────────────────
+  // ── Activate bypass permissions ──────────────────────────────────────────
   context.setAppState(prev => ({
     ...prev,
     toolPermissionContext: {
@@ -277,25 +274,29 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     },
   }))
 
-  // ── Detect stop signal from the last model response ──────────────────────
-  let stopReason: string | null = null
+  // ── Extract last assistant response ──────────────────────────────────────
   let lastText = ''
   context.setMessages(prev => {
     lastText = extractLastAssistantText(
       prev as Array<{ role: string; content: unknown }>,
     )
-    // (no content) means the model had nothing to say (tool-call-only turn or
-    // context overflow). Never treat it as a stop signal — just continue.
-    if (lastText !== NO_CONTENT_MESSAGE && lastText.trim() !== '') {
-      stopReason = detectStopSignal(lastText)
-    }
     return prev
   })
-  // Detect whether this turn was context-compacted (empty/no-content response)
+
+  // Context compacted: model returned nothing (overflow or compaction event)
   const contextCompacted = lastText === NO_CONTENT_MESSAGE || lastText.trim() === ''
 
-  // ── Send last response to active chat bridge (fire-and-forget) ───────────
-  if (lastText.trim()) {
+  // Update self-directive from the model's last response
+  if (!contextCompacted) {
+    const newDirective = extractSelfDirective(lastText)
+    if (newDirective) sessionSelfDirective = newDirective
+  } else {
+    // After compaction the directive may be stale — clear it so we re-onboard
+    sessionSelfDirective = ''
+  }
+
+  // ── Forward to chat bridges ──────────────────────────────────────────────
+  if (lastText.trim() && lastText !== NO_CONTENT_MESSAGE) {
     const preview = lastText.slice(0, 1200)
     const suffix = lastText.length > 1200 ? '\n…(truncated)' : ''
     const header = `🤖 *Round ${sessionRound}*\n${preview}${suffix}`
@@ -305,22 +306,17 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     if (isSignalActive()) void sendSignalMessage(header)
   }
 
-  // Check global stop signal (from Telegram/Slack /stop)
+  // ── Only the user can stop the loop ──────────────────────────────────────
   if (globalStopSignal.get()) {
     globalStopSignal.reset()
-    stopReason = 'stopped via /stop'
-  }
-
-  if (stopReason !== null) {
     const finalRound = sessionRound
     const savedMode = sessionOriginalMode
     resetSession('', 'default')
-    // Restore original permission mode
     context.setAppState(prev => ({
       ...prev,
       toolPermissionContext: { ...prev.toolPermissionContext, mode: savedMode },
     }))
-    const stopMsg = `✅ *keepgoing stopped*\nRound ${finalRound} · ${stopReason}`
+    const stopMsg = `✅ *keepgoing stopped*\nRound ${finalRound} · stopped via /stop`
     if (isTelegramActive()) void sendTelegramMessage(stopMsg)
     if (isSlackActive()) void sendSlackMessage(stopMsg)
     if (isDiscordActive()) void sendDiscordMessage(stopMsg)
@@ -328,7 +324,7 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     return (
       <KeepGoingDone
         round={finalRound}
-        reason={stopReason}
+        reason="stopped via /stop"
         onReady={() => onDone(undefined)}
       />
     )
@@ -338,25 +334,29 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const round = incrementRound()
   const showBypassWarning = round === 1
 
-  // ── Check for incoming message from any chat bridge to inject ────────────
+  // ── Check for incoming chat bridge message ────────────────────────────────
   const externalMsg =
     getPendingTelegramMessage() ??
     getPendingSlackMessage() ??
     getPendingDiscordMessage() ??
     getPendingSignalMessage()
 
-  // ── Build prompt + re-queue ───────────────────────────────────────────────
-  const prompt = buildContinuationPrompt(round, focus, externalMsg, contextCompacted)
-  const nextCmd = focus ? `/keepgoing ${focus}` : '/keepgoing'
+  // ── Choose prompt ─────────────────────────────────────────────────────────
+  // Round 1 (or after compaction / missing directive) → full onboarding.
+  // Round 2+ with a model-written directive → lightweight self-directed prompt.
+  const useOnboarding = round === 1 || contextCompacted || !sessionSelfDirective
+  const prompt = useOnboarding
+    ? buildOnboardingPrompt(round, focus, externalMsg, contextCompacted)
+    : buildSelfDirectedPrompt(round, sessionSelfDirective, focus, externalMsg)
 
-  const metaMessages = [prompt]
+  const nextCmd = focus ? `/keepgoing ${focus}` : '/keepgoing'
 
   const handleReady = () => {
     enqueue({ value: nextCmd, mode: 'prompt', isMeta: true })
     onDone(undefined, {
       display: 'system',
       shouldQuery: true,
-      metaMessages,
+      metaMessages: [prompt],
     })
   }
 
