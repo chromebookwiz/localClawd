@@ -9,8 +9,9 @@ function getEnvAlias(localKey: string, legacyKey: string): string | undefined {
   return process.env[localKey] ?? process.env[legacyKey]
 }
 
-// Model context window size (200k tokens for all models right now)
-export const MODEL_CONTEXT_WINDOW_DEFAULT = 200_000
+// Default context window when no model capability or provider detection is available.
+// 262144 = 256k — a common real-world limit for local models (vLLM, Ollama).
+export const MODEL_CONTEXT_WINDOW_DEFAULT = 262_144
 export const COMPACT_CONTEXT_WINDOW_CHOICES = [
   32_000,
   64_000,
