@@ -284,12 +284,25 @@ async function main(): Promise<void> {
   profileCheckpoint('cli_after_main_complete');
 }
 
-// Catch any unhandled promise rejections (e.g. from fire-and-forget void calls)
-// and print them instead of crashing silently.
+// Log unhandled rejections but NEVER exit — these often come from fire-and-forget
+// void calls (Telegram, Slack, etc.) and must not crash a long-running session.
+// Crash reason is written to ~/.claude/crash.log for diagnosis.
 process.on('unhandledRejection', (reason: unknown) => {
   const msg = reason instanceof Error ? reason.stack ?? reason.message : String(reason);
-  process.stderr.write(`\nlocalclawd: unhandled error — ${msg}\n`);
-  process.exit(1);
+  process.stderr.write(`\nlocalclawd: unhandled error (continuing) — ${msg}\n`);
+  try {
+    const { appendFileSync, mkdirSync } = require('fs') as typeof import('fs');
+    const { homedir } = require('os') as typeof import('os');
+    const { join } = require('path') as typeof import('path');
+    const dir = join(homedir(), '.claude');
+    mkdirSync(dir, { recursive: true });
+    appendFileSync(
+      join(dir, 'crash.log'),
+      `[${new Date().toISOString()}] unhandledRejection: ${msg}\n`,
+    );
+  } catch {
+    // ignore write failure
+  }
 });
 
 // eslint-disable-next-line custom-rules/no-top-level-side-effects

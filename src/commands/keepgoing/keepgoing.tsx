@@ -247,7 +247,50 @@ function KeepGoingDone({
 
 // ─── Command entry point ──────────────────────────────────────────────────────
 
+// Write crash info to ~/.claude/crash.log for diagnosis
+function logKgCrash(error: unknown, context: string): void {
+  const msg = error instanceof Error ? (error.stack ?? error.message) : String(error)
+  try {
+    const { appendFileSync, mkdirSync } = require('fs') as typeof import('fs')
+    const { homedir } = require('os') as typeof import('os')
+    const { join } = require('path') as typeof import('path')
+    const dir = join(homedir(), '.claude')
+    mkdirSync(dir, { recursive: true })
+    appendFileSync(join(dir, 'crash.log'), `[${new Date().toISOString()}] keepgoing ${context}: ${msg}\n`)
+  } catch { /* ignore */ }
+}
+
+// Safely fire a void send — catches both sync throws and promise rejections
+function safeSend(fn: () => Promise<unknown>): void {
+  try {
+    fn().catch(e => logKgCrash(e, 'send'))
+  } catch (e) {
+    logKgCrash(e, 'send-sync')
+  }
+}
+
 export const call: LocalJSXCommandCall = async (onDone, context, args) => {
+  try {
+    return await callInner(onDone, context, args)
+  } catch (error) {
+    logKgCrash(error, 'call')
+    const msg = error instanceof Error ? error.message : String(error)
+    // Re-enqueue so the loop can restart after showing the error
+    try {
+      const rawArgs = args?.trim() ?? ''
+      const nextCmd = rawArgs ? `/keepgoing ${rawArgs}` : '/keepgoing'
+      enqueue({ value: nextCmd, mode: 'prompt', isMeta: true })
+    } catch { /* ignore */ }
+    onDone(`⚠ keepgoing error (restarting): ${msg}`, { display: 'system' })
+    return null
+  }
+}
+
+async function callInner(
+  onDone: Parameters<LocalJSXCommandCall>[0],
+  context: Parameters<LocalJSXCommandCall>[1],
+  args: Parameters<LocalJSXCommandCall>[2],
+): Promise<ReturnType<LocalJSXCommandCall>> {
   const rawArgs = args?.trim() ?? ''
   const { extractChain } =
     await import('../../utils/commandChaining.js')
@@ -279,12 +322,16 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
 
   // ── Extract last assistant response ──────────────────────────────────────
   let lastText = ''
-  context.setMessages(prev => {
-    lastText = extractLastAssistantText(
-      prev as Array<{ role: string; content: unknown }>,
-    )
-    return prev
-  })
+  try {
+    context.setMessages(prev => {
+      lastText = extractLastAssistantText(
+        prev as Array<{ role: string; content: unknown }>,
+      )
+      return prev
+    })
+  } catch (e) {
+    logKgCrash(e, 'extractLastAssistantText')
+  }
 
   // Context compacted: model returned nothing (overflow or compaction event)
   const contextCompacted = lastText === NO_CONTENT_MESSAGE || lastText.trim() === ''
@@ -303,10 +350,10 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     const preview = lastText.slice(0, 1200)
     const suffix = lastText.length > 1200 ? '\n…(truncated)' : ''
     const header = `🤖 *Round ${sessionRound}*\n${preview}${suffix}`
-    if (isTelegramActive()) void sendTelegramMessage(header)
-    if (isSlackActive()) void sendSlackMessage(header)
-    if (isDiscordActive()) void sendDiscordMessage(header)
-    if (isSignalActive()) void sendSignalMessage(header)
+    if (isTelegramActive()) safeSend(() => sendTelegramMessage(header))
+    if (isSlackActive()) safeSend(() => sendSlackMessage(header))
+    if (isDiscordActive()) safeSend(() => sendDiscordMessage(header))
+    if (isSignalActive()) safeSend(() => sendSignalMessage(header))
   }
 
   // ── Only the user can stop the loop ──────────────────────────────────────
@@ -320,10 +367,10 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
       toolPermissionContext: { ...prev.toolPermissionContext, mode: savedMode },
     }))
     const stopMsg = `✅ *keepgoing stopped*\nRound ${finalRound} · stopped via /stop`
-    if (isTelegramActive()) void sendTelegramMessage(stopMsg)
-    if (isSlackActive()) void sendSlackMessage(stopMsg)
-    if (isDiscordActive()) void sendDiscordMessage(stopMsg)
-    if (isSignalActive()) void sendSignalMessage(stopMsg)
+    if (isTelegramActive()) safeSend(() => sendTelegramMessage(stopMsg))
+    if (isSlackActive()) safeSend(() => sendSlackMessage(stopMsg))
+    if (isDiscordActive()) safeSend(() => sendDiscordMessage(stopMsg))
+    if (isSignalActive()) safeSend(() => sendSignalMessage(stopMsg))
     return (
       <KeepGoingDone
         round={finalRound}
@@ -355,12 +402,18 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const nextCmd = focus ? `/keepgoing ${focus}` : '/keepgoing'
 
   const handleReady = () => {
-    enqueue({ value: nextCmd, mode: 'prompt', isMeta: true })
-    onDone(undefined, {
-      display: 'system',
-      shouldQuery: true,
-      metaMessages: [prompt],
-    })
+    try {
+      enqueue({ value: nextCmd, mode: 'prompt', isMeta: true })
+      onDone(undefined, {
+        display: 'system',
+        shouldQuery: true,
+        metaMessages: [prompt],
+      })
+    } catch (e) {
+      logKgCrash(e, 'handleReady')
+      // Attempt recovery: call onDone without metaMessages so the loop isn't permanently stuck
+      try { onDone(`⚠ keepgoing recovered from internal error`, { display: 'system' }) } catch { /* ignore */ }
+    }
   }
 
   return (
