@@ -66,14 +66,24 @@ function incrementRound(): number {
 
 // ─── Self-directive extraction ───────────────────────────────────────────────
 
-// Pull the NEXT: paragraph the model writes at the end of each turn.
-// Accept NEXT: at the start of a line, possibly preceded by a separator.
+// Pull the NEXT: line the model writes at the end of each turn.
+// Searches bottom-up so the last NEXT: wins if the model writes multiple.
 function extractSelfDirective(text: string): string {
-  // Match "NEXT:" (with optional markdown like "**NEXT:**") followed by content
-  const match = text.match(/\*{0,2}NEXT:\*{0,2}\s*(.+?)(?=\n\n|\n(?:[A-Z*─━]|\d+\.)|\s*$)/s)
-  if (!match) return ''
-  // Collapse whitespace and cap length — this is a planning note, not a novel
-  return match[1].replace(/\s+/g, ' ').trim().slice(0, 600)
+  const lines = text.split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]!.trim()
+    const m = line.match(/^\*{0,2}NEXT:\*{0,2}\s*(.+)/i)
+    if (!m) continue
+    let directive = m[1]!.trim()
+    // Collect wrapped continuation lines (non-blank, not a new section header)
+    for (let j = i + 1; j < lines.length && j < i + 5; j++) {
+      const next = lines[j]!.trim()
+      if (!next || /^(SUMMARY:|NEXT:|\*{0,2}[A-Z]{2})/i.test(next)) break
+      directive += ' ' + next
+    }
+    return directive.replace(/\s+/g, ' ').trim().slice(0, 600)
+  }
+  return ''
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -403,15 +413,18 @@ async function callInner(
 
   const handleReady = () => {
     try {
-      enqueue({ value: nextCmd, mode: 'prompt', isMeta: true })
+      // nextInput + submitNextInput: true queues the next /keepgoing call AFTER
+      // the model responds (processed in handlePromptSubmit after onQuery returns).
+      // Direct enqueue() before onDone() races with the query and fires too early.
       onDone(undefined, {
         display: 'system',
         shouldQuery: true,
         metaMessages: [prompt],
+        nextInput: nextCmd,
+        submitNextInput: true,
       })
     } catch (e) {
       logKgCrash(e, 'handleReady')
-      // Attempt recovery: call onDone without metaMessages so the loop isn't permanently stuck
       try { onDone(`⚠ keepgoing recovered from internal error`, { display: 'system' }) } catch { /* ignore */ }
     }
   }

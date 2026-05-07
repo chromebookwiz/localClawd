@@ -32,11 +32,16 @@ REVIEW AND REPROMPT PROTOCOL:
 5. After final approval: move the image to the user's desired location if specified, then report the saved path.
 
 FIXING ARTIFACTS:
-- Corner / edge artifacts → cfg is too high for this model. Flow models (z_image_turbo, AuraFlow, Lumina2): cfg MUST be 1. Retry with cfg=1.
+- Corner / edge artifacts → cfg is wrong. Flow models (z_image_turbo, AuraFlow, Lumina2)
+  have cfg=1 built into the workflow — do NOT pass cfg when using these. If you did, retry
+  without cfg. For the built-in txt2img (SD 1.5) workflow, cfg=7 is correct.
 - Ring or halo artefacts  → steps too high. Try steps=4 for turbo workflows.
 - Blurry result           → steps too low or wrong sampler. Increase steps by +4.
 - Washed-out / grey       → VAE mismatch. Try a different workflow.
 - Size-related artefacts  → dimensions must be multiples of 64. Flow models need 1024×1024.
-Pass overrides via the tool parameters: steps, cfg, width, height, model.
+
+IMPORTANT: For named workflows (anything except the built-in fallback), cfg is NOT
+adjustable — the workflow controls it. Only pass width, height, steps, model overrides.
+Never pass cfg for z_image_turbo, AuraFlow, or Lumina2 workflows.
 
 Use this tool when the user asks you to generate, create, or render an image.`

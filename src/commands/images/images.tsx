@@ -52,6 +52,12 @@ function parseFlags(text: string): {
   extract('height', v => { result.height = parseInt(v, 10) || undefined })
   extract('seed', v => { result.seed = parseInt(v, 10) })
   extract('model', v => { result.model = v })
+  // --size 1024x1024 shorthand
+  s = s.replace(/--size\s+(\d+)[xX×](\d+)/i, (_, w, h) => {
+    result.width = parseInt(w, 10)
+    result.height = parseInt(h, 10)
+    return ''
+  })
   s = s.replace(/--negative\s+"([^"]+)"/i, (_, v) => { result.negative = v; return '' })
   s = s.replace(/--negative\s+'([^']+)'/i, (_, v) => { result.negative = v; return '' })
   result.cleaned = s.replace(/\s+/g, ' ').trim()
@@ -75,17 +81,19 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       '  Workflow: /image <name>: [flags] <prompt>',
       '',
       '  Flags (override per-request):',
-      '    --steps N    — sampling steps',
-      '    --cfg N      — guidance scale',
+      '    --size WxH   — width × height shorthand (e.g. --size 1024x1024)',
       '    --width N    — image width in pixels',
       '    --height N   — image height in pixels',
+      '    --steps N    — sampling steps',
+      '    --cfg N      — guidance scale (use 1 for flow models)',
       '    --seed N     — fixed seed for reproducibility',
       '    --model NAME — checkpoint filename',
       '',
       '  Examples:',
       '    /image a misty forest at dawn, cinematic lighting',
-      '    /image --width 1024 --height 1024 a detailed portrait',
-      '    /image txt2img: --steps 30 an elderly scholar by candlelight',
+      '    /image --size 1024x1024 a detailed portrait',
+      '    /image --size 512x768 --steps 30 an elderly scholar by candlelight',
+      '    /image txt2img: --width 768 --height 512 rolling hills at sunset',
       '',
       `  Default workflow: ${defaultWf}`,
     ]
@@ -186,11 +194,12 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       }
     : {
         seed,
+        // cfg is preserved from the workflow — flow models (z_image_turbo,
+        // AuraFlow, Lumina2) embed cfg=1 and overriding it causes artifacts.
         ...(flags.model ? { model: flags.model } : {}),
         ...(flags.width ? { width: flags.width } : {}),
         ...(flags.height ? { height: flags.height } : {}),
         ...(flags.steps ? { steps: flags.steps } : {}),
-        ...(flags.cfg ? { cfg: flags.cfg } : {}),
       }
 
   const finalWorkflow = injectPrompt(workflow, promptText, negative, injectParams)

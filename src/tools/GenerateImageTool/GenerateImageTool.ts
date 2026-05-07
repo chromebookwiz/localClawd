@@ -108,12 +108,14 @@ async function callInner(input: z.infer<ReturnType<typeof inputSchema>>, abortCo
       }
     : {
         seed,
-        // Still allow explicit overrides from the tool call even for named workflows
+        // Allow size/steps overrides from the tool call for named workflows.
+        // cfg is intentionally NOT overridable — named workflows (e.g. z_image_turbo,
+        // AuraFlow, Lumina2) embed the correct cfg (usually 1) and overriding it
+        // causes edge/ring artifacts. The model must not pass cfg for these workflows.
         ...(input.model && { model: input.model }),
         ...(input.width && { width: input.width }),
         ...(input.height && { height: input.height }),
         ...(input.steps && { steps: input.steps }),
-        ...(input.cfg && { cfg: input.cfg }),
       }
 
   const workflow = injectPrompt(
