@@ -180,11 +180,12 @@ export const GenerateImageTool = buildTool({
     const allImageMeta = Object.values(result.outputs).flatMap(o => o.images ?? [])
     const imgMeta = allImageMeta.find(img => img.filename === firstImage)
     const subfolder = imgMeta?.subfolder ?? ''
+    const imgType = imgMeta?.type ?? 'output'
 
     // Download from ComfyUI
     let rawBytes: Buffer | null = null
     try {
-      const params = new URLSearchParams({ filename: firstImage, subfolder, type: 'output' })
+      const params = new URLSearchParams({ filename: firstImage, subfolder, type: imgType })
       const res = await fetch(`${backendUrl}/view?${params}`)
       if (res.ok) {
         rawBytes = Buffer.from(await res.arrayBuffer())

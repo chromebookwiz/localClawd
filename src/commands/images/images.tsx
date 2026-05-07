@@ -172,11 +172,13 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
   const savedPaths: string[] = []
 
   for (const imgFilename of comfyImages) {
-    const subfolder = Object.values(result.outputs)
+    const imgMeta = Object.values(result.outputs)
       .flatMap(o => o.images ?? [])
-      .find(img => img.filename === imgFilename)?.subfolder ?? ''
+      .find(img => img.filename === imgFilename)
+    const subfolder = imgMeta?.subfolder ?? ''
+    const imgType = imgMeta?.type ?? 'output'
     try {
-      const params = new URLSearchParams({ filename: imgFilename, subfolder, type: 'output' })
+      const params = new URLSearchParams({ filename: imgFilename, subfolder, type: imgType })
       const res = await fetch(`${backendUrl}/view?${params}`)
       if (res.ok) {
         const outName = `${timestamp()}_${slugify(promptText)}.png`
