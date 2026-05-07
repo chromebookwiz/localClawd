@@ -19,7 +19,6 @@ import ctx_viz from './commands/ctx_viz/index.js'
 import doctor from './commands/doctor/index.js'
 import buddy from './commands/buddy/index.js'
 import image from './commands/images/index.js'
-import imagePipeline from './commands/image-pipeline/index.js'
 import keepgoing from './commands/keepgoing/index.js'
 import telegram from './commands/telegram/index.js'
 import slack from './commands/slack/index.js'
@@ -332,7 +331,6 @@ const COMMANDS = memoize((): Command[] => [
   vim,
   buddy,
   image,
-  imagePipeline,
   telegram,
   slack,
   discord,
