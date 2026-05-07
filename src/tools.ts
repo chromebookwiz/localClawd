@@ -79,6 +79,7 @@ import { ReadMcpResourceTool } from './tools/ReadMcpResourceTool/ReadMcpResource
 import { ToolSearchTool } from './tools/ToolSearchTool/ToolSearchTool.js'
 import { EnterPlanModeTool } from './tools/EnterPlanModeTool/EnterPlanModeTool.js'
 import { WebScreenshotTool } from './tools/WebScreenshotTool/WebScreenshotTool.js'
+import { GenerateImageTool } from './tools/GenerateImageTool/GenerateImageTool.js'
 import { EnterWorktreeTool } from './tools/EnterWorktreeTool/EnterWorktreeTool.js'
 import { ExitWorktreeTool } from './tools/ExitWorktreeTool/ExitWorktreeTool.js'
 import { ConfigTool } from './tools/ConfigTool/ConfigTool.js'
@@ -252,6 +253,8 @@ export function getAllBaseTools(): Tools {
     ...(isToolSearchEnabledOptimistic() ? [ToolSearchTool] : []),
     // localclawd: Web screenshot/vision tool for UI verification
     WebScreenshotTool,
+    // localclawd: ComfyUI image generation tool
+    GenerateImageTool,
   ]
 }
 

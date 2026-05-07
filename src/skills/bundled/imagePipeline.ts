@@ -417,10 +417,6 @@ Use this whenever the user asks to:
 `
 
 export function registerImagePipelineSkill(): void {
-  if (process.env.USER_TYPE !== 'ant') {
-    return
-  }
-
   registerBundledSkill({
     name: 'image-pipeline',
     description:
