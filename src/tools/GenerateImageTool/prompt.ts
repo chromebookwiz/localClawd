@@ -12,8 +12,12 @@ Workflow selection:
 - Workflows support {{positive_prompt}} / {{negative_prompt}} templates or raw ComfyUI API exports
 
 Output directory:
-- .localclawd/image-pipeline/generated/ when the pipeline is scaffolded (run /image-pipeline setup)
-- ~/generatedimages/ otherwise
+- All generated images are saved to: <project-root>/.localclawd/image-pipeline/generated/
+- The full absolute path is returned in the tool result (path field).
+- After inspecting the image, you can move it anywhere using Bash (mv) or PowerShell (Move-Item).
+  Example: move to project root → mv "<path>" "./my-image.png"
+  Example: move to desktop     → mv "<path>" "$HOME/Desktop/my-image.png"
+  If the user specifies a destination, move it there immediately after approving the result.
 
 If ComfyUI is not reachable, ask the user to run /image-pipeline config <url> with their ComfyUI address.
 To list available workflows, call /image-pipeline list.
@@ -21,18 +25,18 @@ To list available workflows, call /image-pipeline list.
 After generating, the image is returned visually in the tool result so you can review it.
 
 REVIEW AND REPROMPT PROTOCOL:
-1. After calling GenerateImage, examine the returned image carefully.
-2. If the image does not match the description, has quality issues (artifacts, wrong style, wrong subject, blurry), or clearly fails — call GenerateImage again.
-3. Refine: add missing details, fix style keywords, adjust composition language. Do not simply repeat the same prompt.
+1. After calling GenerateImage, examine the returned image carefully for quality AND artifacts.
+2. If the image has edge/corner artifacts, blurring, or wrong content — fix parameters and retry (do not keep a bad image).
+3. Refine: add missing details, fix style keywords, adjust composition. Do not repeat the same prompt.
 4. You may iterate up to 3 times total. Stop as soon as a result is satisfactory.
-5. Show the user the final saved path and a brief assessment of what changed.
+5. After final approval: move the image to the user's desired location if specified, then report the saved path.
 
-FIXING ARTIFACTS (see /image-tips for full guide):
-- Corner / edge artifacts → wrong cfg for model type. Flow models (z_image_turbo, AuraFlow, Lumina2): cfg MUST be 1.0. Retry with cfg=1.
+FIXING ARTIFACTS:
+- Corner / edge artifacts → cfg is too high for this model. Flow models (z_image_turbo, AuraFlow, Lumina2): cfg MUST be 1. Retry with cfg=1.
 - Ring or halo artefacts  → steps too high. Try steps=4 for turbo workflows.
-- Blurry result           → steps too low, or wrong sampler. Increase steps by +4.
+- Blurry result           → steps too low or wrong sampler. Increase steps by +4.
 - Washed-out / grey       → VAE mismatch. Try a different workflow.
-- Size-related artefacts  → use multiples of 64. Flow models need 1024×1024.
+- Size-related artefacts  → dimensions must be multiples of 64. Flow models need 1024×1024.
 Pass overrides via the tool parameters: steps, cfg, width, height, model.
 
 Use this tool when the user asks you to generate, create, or render an image.`

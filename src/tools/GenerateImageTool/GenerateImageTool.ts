@@ -262,12 +262,20 @@ export const GenerateImageTool = buildTool({
     }
 
     const imgData = imageDataCache.get(output)
+    const reviewNote = imgData
+      ? [
+          'Review the image above for artifacts before accepting:',
+          '  • Edge/corner artifacts → retry with cfg=1 (flow models require cfg=1)',
+          '  • Halo/ring artifacts   → retry with fewer steps (steps=4 for turbo)',
+          '  • Wrong content/style   → rephrase the prompt',
+          'If satisfied, move the file to the desired location using Bash mv or PowerShell Move-Item.',
+          `  mv "${output.path}" <destination>`,
+        ].join('\n')
+      : `Vision unavailable — inspect manually at: ${output.path}\nMove with: mv "${output.path}" <destination>`
     const textSummary = [
       `Image saved: ${output.path}`,
       `Seed: ${output.seed}  ·  Prompt ID: ${output.promptId}`,
-      imgData
-        ? 'Review the image above. If it does not match the description or has quality issues, call GenerateImage again with an improved prompt (up to 3 iterations total).'
-        : `Image saved to ${output.path} — vision not available for inline review.`,
+      reviewNote,
     ].join('\n')
 
     if (imgData) {

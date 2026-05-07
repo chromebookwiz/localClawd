@@ -22,11 +22,12 @@ export function renderToolUseErrorMessage(error: unknown): React.ReactNode {
 }
 
 export function renderToolResultMessage(output: Output): React.ReactNode {
+  if (output.error) return <Text color="red">{output.error}</Text>
   return (
     <Text dimColor>
-      {output.path
-        ? `Saved: ${output.path}`
-        : output.error ?? 'Generation failed'}
+      {`Saved: ${output.path}`}
+      {'\n'}
+      <Text color="yellow">{'Inspect above — move with: mv "' + output.path + '" <destination>'}</Text>
     </Text>
   )
 }
