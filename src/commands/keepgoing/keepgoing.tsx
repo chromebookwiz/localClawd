@@ -413,12 +413,12 @@ async function callInner(
 
   const handleReady = () => {
     try {
-      // Enqueue the next /keepgoing call BEFORE onDone so ESC (popAllEditable)
-      // can pull it out of the queue and cancel the loop. With isMeta: false
-      // (default), the queued command is editable — pressing ESC during the
-      // model response moves it to the input box where the user can clear it.
-      // The query guard prevents it from being processed until onQuery returns.
-      enqueue({ value: nextCmd, mode: 'prompt' })
+      // Enqueue BEFORE onDone so the command is in the queue while the model
+      // runs. isMeta: true hides it from the input preview (prevents the text
+      // from appearing as a "pasted prompt" in the UI). ESC still clears it
+      // because useCancelRequest calls clearCommandQueue() on abort, which
+      // removes all queued commands including isMeta ones.
+      enqueue({ value: nextCmd, mode: 'prompt', isMeta: true })
       onDone(undefined, {
         display: 'system',
         shouldQuery: true,
