@@ -25,7 +25,7 @@ import { isAgentSwarmsEnabled } from './utils/agentSwarmsEnabled.js'
 import { checkAndRestoreTerminalBackup } from './utils/appleTerminalBackup.js'
 import { prefetchApiKeyFromApiKeyHelperIfSafe } from './utils/auth.js'
 import { clearMemoryFileCaches } from './utils/instructionsmd.js'
-import { getCurrentProjectConfig, getGlobalConfig } from './utils/config.js'
+import { getCurrentProjectConfig, getGlobalConfig, saveGlobalConfig } from './utils/config.js'
 import { logForDebugging } from './utils/debug.js'
 import { logForDiagnosticsNoPII } from './utils/diagLogs.js'
 import { env } from './utils/env.js'
@@ -327,7 +327,15 @@ export async function setup(
       void initProjectMemory(getOriginalCwd())
     } catch { /* non-critical */ }
     initSecretStore() // Initialize encrypted secret store
-    // Query local provider for actual context window size (fire-and-forget)
+    // Restore persisted context window immediately (sync) so thresholds are
+    // correct from the very first turn — before async detection completes.
+    const persistedCtx = getGlobalConfig().compactContextWindowTokens
+    if (persistedCtx && persistedCtx > 0) {
+      setLocalProviderContextWindow(persistedCtx)
+      logForDebugging(`[context] Restored context window from config: ${persistedCtx} tokens`)
+    }
+    // Query local provider for actual context window size (fire-and-forget).
+    // Overwrites the persisted value if the provider reports something different.
     void (async () => {
       try {
         const provider = getLocalLLMProvider()
@@ -337,10 +345,12 @@ export async function setup(
         const contextLen = await queryLocalProviderContextLength(baseUrl, model, apiKey, provider)
         if (contextLen && contextLen > 0) {
           setLocalProviderContextWindow(contextLen)
+          // Persist so it survives restarts without requiring re-detection
+          saveGlobalConfig(c => ({ ...c, compactContextWindowTokens: contextLen }))
           logForDebugging(`[context] Local provider context window: ${contextLen} tokens`)
         }
       } catch {
-        // Non-fatal — fall back to configured default
+        // Non-fatal — persisted value already applied above
       }
     })()
     initSessionMemory() // Synchronous - registers hook, gate check happens lazily

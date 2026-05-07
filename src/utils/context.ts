@@ -132,6 +132,13 @@ export function getContextWindowForModel(
   if (_localProviderContextWindow && _localProviderContextWindow > 0) {
     return _localProviderContextWindow
   }
+  // Fall back to persisted config (set via /contextsize or auto-detected on
+  // a previous session). This ensures thresholds are correct even if the
+  // in-memory value hasn't been restored yet (e.g. very early in startup).
+  const persisted = getGlobalConfig().compactContextWindowTokens
+  if (persisted && persisted > 0) {
+    return persisted
+  }
   return MODEL_CONTEXT_WINDOW_DEFAULT
 }
 
