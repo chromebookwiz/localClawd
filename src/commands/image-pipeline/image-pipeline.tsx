@@ -108,9 +108,15 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     lines.push(`  Generated images will be saved to:`)
     lines.push(`    ${generatedDir}`)
     lines.push('')
+    lines.push('  To add custom workflows:')
+    lines.push(`    Export from ComfyUI → Save (API Format) → drop into:`)
+    lines.push(`      .localclawd/image-pipeline/workflows/`)
+    lines.push(`      .localclawd/image-pipeline/workflows/comfyui/  ← or any subfolder`)
+    lines.push('')
     lines.push('  Next steps:')
     lines.push('    /image-pipeline config http://127.0.0.1:8000  — confirm or change ComfyUI URL')
-    lines.push('    /image-pipeline workflow txt2img              — set default workflow')
+    lines.push('    /image-pipeline list                          — see all available workflows')
+    lines.push('    /image-pipeline workflow z_image_turbo        — set default workflow')
     lines.push('    /image a misty forest at dawn                 — generate an image')
 
     onDone(lines.join('\n'), { display: 'system' })
@@ -182,9 +188,13 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       defaultSampler: 'euler', defaultModel: '', outputDir: '.localclawd/image-pipeline/generated',
     }
 
-    // Verify the workflow file exists
+    // Verify the workflow file exists (search by exact path or basename)
     const workflows = await listWorkflows(projectRoot)
-    const match = workflows.find(w => w === name || w === `${name}.json`)
+    const baseName = name.replace(/\.json$/, '').split(/[\\/]/).pop() ?? name
+    const match = workflows.find(w => {
+      const wName = w.replace(/\.json$/, '')
+      return wName === name.replace(/\.json$/, '') || wName.split(/[\\/]/).pop() === baseName
+    })
     if (!match) {
       const lines = [
         `◆ Image Pipeline — Workflow not found: "${name}"`,
@@ -194,13 +204,17 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
         lines.push('  Available:')
         for (const w of workflows) lines.push(`    • ${w.replace(/\.json$/, '')}`)
       } else {
-        lines.push('  No workflows found — run /image-pipeline setup first.')
+        lines.push('  No local workflows found.')
+        lines.push('  Run /image-pipeline setup to add bundled templates.')
+        lines.push('  Or export a workflow from ComfyUI (API Format) and drop it into:')
+        lines.push(`    ${join(projectRoot, '.localclawd', 'image-pipeline', 'workflows')}`)
       }
       onDone(lines.join('\n'), { display: 'system' })
       return null
     }
 
-    config.defaultWorkflow = name.replace(/\.json$/, '')
+    // Store the relative path (without .json), e.g. "txt2img" or "comfyui/basicImage"
+    config.defaultWorkflow = match.replace(/\.json$/, '')
     await saveConfig(projectRoot, config)
 
     onDone(
@@ -294,24 +308,23 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
 
     const fetchResult = await fetchServerWorkflow(backendUrl, name)
     if ('error' in fetchResult) {
-      const wfDir = `${projectRoot}\\.localclawd\\image-pipeline\\workflows`
+      const wfDir = join(projectRoot, '.localclawd', 'image-pipeline', 'workflows', 'comfyui')
       onDone(
         [
           `◆ Image Pipeline — Fetch Failed: "${name}"`,
           '',
           `  ${fetchResult.error}`,
           '',
-          '  Your ComfyUI version may not support workflow download via API.',
-          '  Export the workflow manually:',
-          '',
+          '  Export the workflow manually from ComfyUI:',
           `  1. Open ComfyUI: ${backendUrl}`,
-          '  2. Load the workflow from the sidebar',
-          '  3. Settings → Enable Dev Mode (gear icon)',
-          '  4. Click Save (API Format) — saves a flat JSON file',
-          '  5. Copy that file here:',
-          `       ${wfDir}\\${name}.json`,
+          '  2. Load the workflow (sidebar or Menu → Open)',
+          '  3. Settings → Enable Dev Mode',
+          '  4. Save (API Format) — exports a flat JSON file',
+          '  5. Drop the JSON file into:',
+          `       ${wfDir}`,
           '',
-          '  Then use: /image ' + name + ': <your prompt>',
+          '  Then: /image-pipeline workflow ' + name,
+          '        /image ' + name + ': <your prompt>',
         ].join('\n'),
         { display: 'system' },
       )

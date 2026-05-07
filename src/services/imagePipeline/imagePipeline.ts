@@ -153,12 +153,28 @@ export async function loadWorkflow(
   projectRoot: string,
   name: string,
 ): Promise<Record<string, WorkflowNode> | null> {
+  const wfBase = join(projectRoot, '.localclawd', 'image-pipeline', 'workflows')
   const filename = name.endsWith('.json') ? name : `${name}.json`
+
+  // Try the name as a direct relative path first (e.g. "txt2img" or "comfyui/basicImage")
   try {
-    const data = await readFile(
-      join(projectRoot, '.localclawd', 'image-pipeline', 'workflows', filename),
-      'utf-8',
-    )
+    const data = await readFile(join(wfBase, filename), 'utf-8')
+    return JSON.parse(data) as Record<string, WorkflowNode>
+  } catch {
+    // fall through to basename search
+  }
+
+  // Search all workflows for a matching basename (e.g. "basicImage" matches "comfyui/basicImage.json")
+  const all = await listWorkflows(projectRoot)
+  const baseName = name.replace(/\.json$/, '').split(/[\\/]/).pop() ?? name
+  const match = all.find(w => {
+    const wBaseName = w.replace(/\.json$/, '').split(/[\\/]/).pop() ?? ''
+    return wBaseName === baseName
+  })
+  if (!match) return null
+
+  try {
+    const data = await readFile(join(wfBase, match), 'utf-8')
     return JSON.parse(data) as Record<string, WorkflowNode>
   } catch {
     return null
@@ -313,12 +329,6 @@ export async function scaffoldProject(projectRoot: string): Promise<{
     await writeFile(join(base, 'prompts', 'example.json'), JSON.stringify(EXAMPLE_PROMPT, null, 2), 'utf-8')
     created.push('.localclawd/image-pipeline/prompts/example.json')
 
-    await writeFile(join(base, 'workflows', 'txt2img.json'), JSON.stringify(DEFAULT_WORKFLOW, null, 2), 'utf-8')
-    created.push('.localclawd/image-pipeline/workflows/txt2img.json')
-
-    await writeFile(join(base, 'workflows', 'z_image_turbo.json'), JSON.stringify(Z_IMAGE_TURBO_WORKFLOW, null, 2), 'utf-8')
-    created.push('.localclawd/image-pipeline/workflows/z_image_turbo.json')
-
     await writeFile(join(base, 'scripts', 'generate.sh'), GENERATE_SH, 'utf-8')
     created.push('.localclawd/image-pipeline/scripts/generate.sh')
 
@@ -327,6 +337,20 @@ export async function scaffoldProject(projectRoot: string): Promise<{
 
     await writeFile(join(base, 'README.md'), README_CONTENT, 'utf-8')
     created.push('.localclawd/image-pipeline/README.md')
+  }
+
+  // Always ensure bundled workflow templates exist (idempotent, never overwrites user files)
+  for (const [wfName, wfContent] of [
+    ['txt2img.json', DEFAULT_WORKFLOW],
+    ['z_image_turbo.json', Z_IMAGE_TURBO_WORKFLOW],
+  ] as const) {
+    const wfPath = join(base, 'workflows', wfName)
+    try {
+      await access(wfPath)
+    } catch {
+      await writeFile(wfPath, JSON.stringify(wfContent, null, 2), 'utf-8')
+      created.push(`.localclawd/image-pipeline/workflows/${wfName}`)
+    }
   }
 
   return { configPath, created, alreadyExisted }
@@ -360,13 +384,28 @@ export async function listPrompts(projectRoot: string): Promise<string[]> {
   }
 }
 
+// Returns paths relative to the workflows/ directory, e.g. ["txt2img.json", "comfyui/basicImage.json"]
 export async function listWorkflows(projectRoot: string): Promise<string[]> {
-  try {
-    const { readdir } = await import('fs/promises')
-    const dir = join(projectRoot, '.localclawd', 'image-pipeline', 'workflows')
-    const files = await readdir(dir)
-    return files.filter(f => f.endsWith('.json'))
-  } catch {
-    return []
+  const base = join(projectRoot, '.localclawd', 'image-pipeline', 'workflows')
+  const results: string[] = []
+
+  async function scan(dir: string, rel: string): Promise<void> {
+    try {
+      const { readdir: rd } = await import('fs/promises')
+      const entries = await rd(dir, { withFileTypes: true })
+      for (const entry of entries) {
+        const entryRel = rel ? `${rel}/${entry.name}` : entry.name
+        if (entry.isDirectory()) {
+          await scan(join(dir, entry.name), entryRel)
+        } else if (entry.isFile() && entry.name.endsWith('.json')) {
+          results.push(entryRel)
+        }
+      }
+    } catch {
+      // dir doesn't exist
+    }
   }
+
+  await scan(base, '')
+  return results
 }
