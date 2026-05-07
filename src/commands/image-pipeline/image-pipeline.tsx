@@ -65,11 +65,12 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
 
     lines.push('')
     lines.push('  Commands:')
-    lines.push('    /image-pipeline setup             — create project dirs and workflow templates')
-    lines.push('    /image-pipeline config <url>      — set ComfyUI backend URL')
-    lines.push('    /image-pipeline workflow <name>   — set default workflow')
-    lines.push('    /image-pipeline list              — list local + server workflows')
-    lines.push('    /image-pipeline fetch <name>      — download workflow from ComfyUI server')
+    lines.push('    /image-pipeline setup                     — create project dirs and workflow templates')
+    lines.push('    /image-pipeline config <url>              — set ComfyUI backend URL')
+    lines.push('    /image-pipeline workflow <name>           — set default workflow')
+    lines.push('    /image-pipeline defaults [--steps N ...]  — show or set default parameters')
+    lines.push('    /image-pipeline list                      — list local + server workflows')
+    lines.push('    /image-pipeline fetch <name>              — download workflow from ComfyUI server')
     lines.push('')
     lines.push('  To generate images:')
     lines.push('    /image <prompt>                   — generate with default workflow')
@@ -353,17 +354,77 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     return null
   }
 
+  // ── defaults ──────────────────────────────────────────────────────────────
+  if (subcmd === 'defaults') {
+    await scaffoldProject(projectRoot)
+    const config = (await loadConfig(projectRoot)) ?? {
+      backendUrl: DEFAULT_COMFYUI_URL,
+      defaultWidth: 512, defaultHeight: 512, defaultSteps: 20, defaultCfg: 7,
+      defaultSampler: 'euler', defaultModel: '', outputDir: '.localclawd/image-pipeline/generated',
+    }
+
+    // No args — show current defaults
+    if (!restText) {
+      onDone(
+        [
+          '◆ Image Pipeline — Default Parameters',
+          '',
+          `  Steps:  ${config.defaultSteps ?? 20}`,
+          `  CFG:    ${config.defaultCfg ?? 7}`,
+          `  Width:  ${config.defaultWidth ?? 512}`,
+          `  Height: ${config.defaultHeight ?? 512}`,
+          `  Model:  ${config.defaultModel || '(unset — uses workflow default)'}`,
+          '',
+          '  Usage:  /image-pipeline defaults --steps 20 --cfg 7 --width 512 --height 512',
+          '  Reset:  /image-pipeline defaults --steps 20 --cfg 7 --width 512 --height 512 --model ""',
+        ].join('\n'),
+        { display: 'system' },
+      )
+      return null
+    }
+
+    // Parse --key value flags
+    let s = restText
+    const extract = (flag: string, fn: (v: string) => void) => {
+      s = s.replace(new RegExp(`--${flag}\\s+(\\S+)`, 'i'), (_, v) => { fn(v); return '' })
+    }
+    extract('steps', v => { const n = parseInt(v, 10); if (n > 0) config.defaultSteps = n })
+    extract('cfg', v => { const n = parseFloat(v); if (n > 0) config.defaultCfg = n })
+    extract('width', v => { const n = parseInt(v, 10); if (n >= 64) config.defaultWidth = n })
+    extract('height', v => { const n = parseInt(v, 10); if (n >= 64) config.defaultHeight = n })
+    extract('model', v => { config.defaultModel = v === '""' || v === "''" ? '' : v })
+
+    await saveConfig(projectRoot, config)
+    onDone(
+      [
+        '◆ Image Pipeline — Defaults Saved',
+        '',
+        `  Steps:  ${config.defaultSteps ?? 20}`,
+        `  CFG:    ${config.defaultCfg ?? 7}`,
+        `  Width:  ${config.defaultWidth ?? 512}`,
+        `  Height: ${config.defaultHeight ?? 512}`,
+        `  Model:  ${config.defaultModel || '(unset)'}`,
+        '',
+        '  These apply to /image <prompt> (built-in workflow) and per-request overrides.',
+        '  Named workflows use their own settings unless you pass --flags.',
+      ].join('\n'),
+      { display: 'system' },
+    )
+    return null
+  }
+
   // ── unknown subcommand ────────────────────────────────────────────────────
   onDone(
     [
       `◆ Image Pipeline — Unknown subcommand: "${subcmd}"`,
       '',
       '  Commands:',
-      '    /image-pipeline setup             — scaffold project',
-      '    /image-pipeline config <url>      — set ComfyUI backend URL',
-      '    /image-pipeline workflow <name>   — set default workflow',
-      '    /image-pipeline list              — list local + server workflows',
-      '    /image-pipeline fetch <name>      — download workflow from ComfyUI server',
+      '    /image-pipeline setup                       — scaffold project',
+      '    /image-pipeline config <url>                — set ComfyUI backend URL',
+      '    /image-pipeline workflow <name>             — set default workflow',
+      '    /image-pipeline defaults [--steps N ...]    — show or set default parameters',
+      '    /image-pipeline list                        — list local + server workflows',
+      '    /image-pipeline fetch <name>                — download workflow from ComfyUI server',
     ].join('\n'),
     { display: 'system' },
   )

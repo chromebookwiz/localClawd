@@ -160,9 +160,9 @@ export function isAutoCompactEnabled(): boolean {
   if (isEnvTruthy(process.env.DISABLE_AUTO_COMPACT)) {
     return false
   }
-  // Check if user has disabled auto-compact in their settings
-  const userConfig = getGlobalConfig()
-  return userConfig.autoCompactEnabled
+  // Always enabled — compact automatically whenever context fills, no user
+  // config needed. Set DISABLE_AUTO_COMPACT=1 to opt out.
+  return true
 }
 
 export async function shouldAutoCompact(

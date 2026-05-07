@@ -22,9 +22,17 @@ After generating, the image is returned visually in the tool result so you can r
 
 REVIEW AND REPROMPT PROTOCOL:
 1. After calling GenerateImage, examine the returned image carefully.
-2. If the image does not match the description, has quality issues (artifacts, wrong style, wrong subject, blurry), or clearly fails the user's intent — call GenerateImage again with an improved prompt.
+2. If the image does not match the description, has quality issues (artifacts, wrong style, wrong subject, blurry), or clearly fails — call GenerateImage again.
 3. Refine: add missing details, fix style keywords, adjust composition language. Do not simply repeat the same prompt.
 4. You may iterate up to 3 times total. Stop as soon as a result is satisfactory.
-5. Show the user the final saved path and a brief assessment of what changed between iterations.
+5. Show the user the final saved path and a brief assessment of what changed.
+
+FIXING ARTIFACTS (see /image-tips for full guide):
+- Corner / edge artifacts → wrong cfg for model type. Flow models (z_image_turbo, AuraFlow, Lumina2): cfg MUST be 1.0. Retry with cfg=1.
+- Ring or halo artefacts  → steps too high. Try steps=4 for turbo workflows.
+- Blurry result           → steps too low, or wrong sampler. Increase steps by +4.
+- Washed-out / grey       → VAE mismatch. Try a different workflow.
+- Size-related artefacts  → use multiples of 64. Flow models need 1024×1024.
+Pass overrides via the tool parameters: steps, cfg, width, height, model.
 
 Use this tool when the user asks you to generate, create, or render an image.`

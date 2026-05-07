@@ -22,6 +22,7 @@ import * as React from 'react'
 import { Box, Text } from '../../ink.js'
 import type { LocalJSXCommandCall } from '../../types/command.js'
 import type { PermissionMode } from '../../types/permissions.js'
+import { NO_CONTENT_MESSAGE } from '../../constants/messages.js'
 import { isThinkHarderMode, THINKHARDER_ROUND_PROMPT } from '../thinkharder/thinkharder.js'
 import {
   getPendingTelegramMessage,
@@ -65,24 +66,10 @@ function incrementRound(): number {
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
-const DEFAULT_MAX_ROUNDS = 50
-
-function parseMaxRounds(args: string): { maxRounds: number; focus: string } {
-  const parts = args.trim().split(/\s+/)
-  let maxRounds = DEFAULT_MAX_ROUNDS
-  const focusParts: string[] = []
-
-  for (const part of parts) {
-    if (part === 'unlimited' || part === '0') {
-      maxRounds = Infinity
-    } else if (/^\d+$/.test(part)) {
-      maxRounds = parseInt(part, 10)
-    } else if (part) {
-      focusParts.push(part)
-    }
-  }
-
-  return { maxRounds, focus: focusParts.join(' ') }
+// keepgoing never stops due to a round count — only user stop signals, Ctrl+C,
+// or model-emitted TASK COMPLETE / NEEDS INPUT / FINISHED end the loop.
+function parseFocus(args: string): string {
+  return args.trim()
 }
 
 // ─── Stop signal detection ────────────────────────────────────────────────────
@@ -120,13 +107,11 @@ function extractLastAssistantText(
 
 function buildContinuationPrompt(
   round: number,
-  maxRounds: number,
   focus: string,
   telegramMsg: string | null,
+  contextCompacted: boolean,
 ): string {
-  const roundInfo = isFinite(maxRounds)
-    ? `Round ${round} of ${maxRounds}`
-    : `Round ${round} (unlimited)`
+  const roundInfo = `Round ${round}`
 
   const modeTag = isThinkHarderMode
     ? ' · 🧠 THINK HARDER'
@@ -144,9 +129,17 @@ function buildContinuationPrompt(
     ? `\n${THINKHARDER_ROUND_PROMPT}\n`
     : ''
 
+  const compactedSection = contextCompacted
+    ? `\n⚠ CONTEXT NOTE: The conversation was automatically compacted to free up context. Re-orient by reading key files, then continue the task.\n`
+    : ''
+
+  const continueInstruction = contextCompacted
+    ? `The conversation was compacted. Re-read any files you were working on and continue.`
+    : `Pick up exactly where you left off. Do not re-explain what was already done.\nProceed directly with the next action.`
+
   return `\
 [KEEP GOING — AUTONOMOUS OPERATION — ${roundInfo}${modeTag}]
-${focusLine}${telegramSection}${thinkHarderSection}
+${focusLine}${compactedSection}${telegramSection}${thinkHarderSection}
 You are in full autonomous mode with all permissions bypassed. Work continuously until all tasks are done.
 
 ━━━ CAPABILITIES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -175,15 +168,13 @@ SPAWN SUBAGENTS when:
      TASK COMPLETE: <one-sentence summary of everything accomplished>
 
 ━━━ CONTINUE NOW ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Pick up exactly where you left off. Do not re-explain what was already done.
-Proceed directly with the next action.`
+${continueInstruction}`
 }
 
 // ─── UI Components ────────────────────────────────────────────────────────────
 
 function KeepGoingBanner({
   round,
-  maxRounds,
   focus,
   thinkHarder,
   telegram,
@@ -191,7 +182,6 @@ function KeepGoingBanner({
   onReady,
 }: {
   round: number
-  maxRounds: number
   focus: string
   thinkHarder: boolean
   telegram: boolean
@@ -202,10 +192,6 @@ function KeepGoingBanner({
     const id = setTimeout(onReady, 0)
     return () => clearTimeout(id)
   }, [onReady])
-
-  const roundDisplay = isFinite(maxRounds)
-    ? `${round}/${maxRounds}`
-    : `${round}/∞`
 
   const badges: string[] = []
   if (thinkHarder) badges.push('🧠 ThinkHarder')
@@ -223,7 +209,7 @@ function KeepGoingBanner({
         </Box>
       )}
       <Text bold color="cyan">
-        {`◆ Keep Going  [round ${roundDisplay}]${badgeStr}`}
+        {`◆ Keep Going  [round ${round}]${badgeStr}`}
       </Text>
       {focus ? (
         <Text dimColor color="cyan">{`  ↳ Focus: ${focus}`}</Text>
@@ -259,35 +245,6 @@ function KeepGoingDone({
   )
 }
 
-function KeepGoingCapReached({
-  round,
-  maxRounds,
-  focus,
-  onReady,
-}: {
-  round: number
-  maxRounds: number
-  focus: string
-  onReady: () => void
-}): React.ReactNode {
-  React.useEffect(() => {
-    const id = setTimeout(onReady, 0)
-    return () => clearTimeout(id)
-  }, [onReady])
-
-  const resumeCmd = focus ? `/keepgoing ${focus}` : '/keepgoing'
-
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text bold color="yellow">
-        {`◆ Keep Going — round cap reached (${round}/${maxRounds})`}
-      </Text>
-      <Text dimColor>{`  Type ${resumeCmd} to continue for another ${maxRounds} rounds.`}</Text>
-      <Text dimColor>{'  Permissions restored to previous mode.'}</Text>
-    </Box>
-  )
-}
-
 // ─── Command entry point ──────────────────────────────────────────────────────
 
 export const call: LocalJSXCommandCall = async (onDone, context, args) => {
@@ -295,7 +252,7 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const { extractChain } =
     await import('../../utils/commandChaining.js')
   const { ownArgs: chainedArgs } = extractChain(rawArgs)
-  const { maxRounds, focus } = parseMaxRounds(chainedArgs)
+  const focus = parseFocus(chainedArgs)
 
   if (sessionRound === 0 && !focus) {
     onDone('What should I keep going on?', {
@@ -327,9 +284,15 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     lastText = extractLastAssistantText(
       prev as Array<{ role: string; content: unknown }>,
     )
-    stopReason = detectStopSignal(lastText)
+    // (no content) means the model had nothing to say (tool-call-only turn or
+    // context overflow). Never treat it as a stop signal — just continue.
+    if (lastText !== NO_CONTENT_MESSAGE && lastText.trim() !== '') {
+      stopReason = detectStopSignal(lastText)
+    }
     return prev
   })
+  // Detect whether this turn was context-compacted (empty/no-content response)
+  const contextCompacted = lastText === NO_CONTENT_MESSAGE || lastText.trim() === ''
 
   // ── Send last response to active chat bridge (fire-and-forget) ───────────
   if (lastText.trim()) {
@@ -371,33 +334,9 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     )
   }
 
-  // ── Increment round and check cap ────────────────────────────────────────
+  // ── Increment round ───────────────────────────────────────────────────────
   const round = incrementRound()
   const showBypassWarning = round === 1
-
-  if (isFinite(maxRounds) && round > maxRounds) {
-    const finalRound = sessionRound
-    const savedMode = sessionOriginalMode
-    resetSession('', 'default')
-    // Restore original permission mode
-    context.setAppState(prev => ({
-      ...prev,
-      toolPermissionContext: { ...prev.toolPermissionContext, mode: savedMode },
-    }))
-    const pauseMsg = `⏸ *keepgoing paused*\nRound cap ${finalRound}/${maxRounds} reached.`
-    if (isTelegramActive()) void sendTelegramMessage(pauseMsg)
-    if (isSlackActive()) void sendSlackMessage(pauseMsg)
-    if (isDiscordActive()) void sendDiscordMessage(pauseMsg)
-    if (isSignalActive()) void sendSignalMessage(pauseMsg)
-    return (
-      <KeepGoingCapReached
-        round={finalRound}
-        maxRounds={maxRounds}
-        focus={focus}
-        onReady={() => onDone(undefined)}
-      />
-    )
-  }
 
   // ── Check for incoming message from any chat bridge to inject ────────────
   const externalMsg =
@@ -407,13 +346,8 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     getPendingSignalMessage()
 
   // ── Build prompt + re-queue ───────────────────────────────────────────────
-  const prompt = buildContinuationPrompt(round, maxRounds, focus, externalMsg)
-
-  const nextArgs: string[] = []
-  if (!isFinite(maxRounds)) nextArgs.push('unlimited')
-  else if (maxRounds !== DEFAULT_MAX_ROUNDS) nextArgs.push(String(maxRounds))
-  if (focus) nextArgs.push(focus)
-  const nextCmd = `/keepgoing${nextArgs.length ? ' ' + nextArgs.join(' ') : ''}`
+  const prompt = buildContinuationPrompt(round, focus, externalMsg, contextCompacted)
+  const nextCmd = focus ? `/keepgoing ${focus}` : '/keepgoing'
 
   const metaMessages = [prompt]
 
@@ -429,7 +363,6 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   return (
     <KeepGoingBanner
       round={round}
-      maxRounds={maxRounds}
       focus={focus}
       thinkHarder={isThinkHarderMode}
       telegram={isTelegramActive()}

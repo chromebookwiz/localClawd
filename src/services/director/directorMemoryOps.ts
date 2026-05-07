@@ -293,7 +293,7 @@ export function getProjectContext(
 
   const lines: string[] = []
   lines.push(`Project: ${project.description}`)
-  lines.push(`Path: ${project.path}`)
+  lines.push(`Path: ${project.path.replace(/\\/g, '/')}`)
   if (project.gitRemote) lines.push(`Remote: ${project.gitRemote}`)
   lines.push(`Access count: ${project.accessCount}`)
 
