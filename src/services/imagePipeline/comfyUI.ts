@@ -107,12 +107,12 @@ export async function fetchServerWorkflowList(url: string): Promise<string[] | n
 export async function fetchServerWorkflow(
   url: string,
   name: string,
-): Promise<{ data: unknown } | { error: string }> {
+): Promise<{ data: unknown } | { error: string; manualExport: true }> {
   const filename = name.endsWith('.json') ? name : `${name}.json`
-  // Try both path formats — ComfyUI version differences
   const candidates = [
     `${url}/userdata/workflows/${encodeURIComponent(filename)}`,
     `${url}/userdata/${encodeURIComponent(filename)}`,
+    `${url}/userdata?file=${encodeURIComponent(`workflows/${filename}`)}`,
   ]
   for (const candidate of candidates) {
     try {
@@ -120,16 +120,21 @@ export async function fetchServerWorkflow(
       if (res.ok) {
         try {
           const data = await res.json()
+          // Reject obvious error/HTML responses
+          if (data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 0) continue
           return { data }
         } catch {
-          return { error: `HTTP 200 but response is not JSON at ${candidate}` }
+          // Not JSON body — try next
         }
       }
     } catch {
-      // network error — try next
+      // Network error — try next
     }
   }
-  return { error: `Not found. Tried:\n  ${candidates.join('\n  ')}` }
+  return {
+    error: `ComfyUI did not return workflow content (tried ${candidates.length} URL patterns).`,
+    manualExport: true,
+  }
 }
 
 export function extractOutputImages(item: ComfyUIHistoryItem): string[] {

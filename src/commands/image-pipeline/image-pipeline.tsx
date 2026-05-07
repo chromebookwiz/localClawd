@@ -294,14 +294,24 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
 
     const fetchResult = await fetchServerWorkflow(backendUrl, name)
     if ('error' in fetchResult) {
+      const wfDir = `${projectRoot}\\.localclawd\\image-pipeline\\workflows`
       onDone(
         [
           `◆ Image Pipeline — Fetch Failed: "${name}"`,
           '',
           `  ${fetchResult.error}`,
           '',
-          '  Make sure ComfyUI is running and the workflow exists.',
-          '  Run /image-pipeline fetch (no args) to list available workflows.',
+          '  Your ComfyUI version may not support workflow download via API.',
+          '  Export the workflow manually:',
+          '',
+          `  1. Open ComfyUI: ${backendUrl}`,
+          '  2. Load the workflow from the sidebar',
+          '  3. Settings → Enable Dev Mode (gear icon)',
+          '  4. Click Save (API Format) — saves a flat JSON file',
+          '  5. Copy that file here:',
+          `       ${wfDir}\\${name}.json`,
+          '',
+          '  Then use: /image ' + name + ': <your prompt>',
         ].join('\n'),
         { display: 'system' },
       )
