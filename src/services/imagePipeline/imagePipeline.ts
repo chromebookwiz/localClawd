@@ -121,7 +121,7 @@ export function injectPrompt(
       if (params.steps !== undefined) node.inputs.steps = params.steps
       if (params.cfg !== undefined) node.inputs.cfg = params.cfg
     }
-    if (node.class_type === 'EmptyLatentImage') {
+    if (node.class_type === 'EmptyLatentImage' || node.class_type === 'EmptySD3LatentImage') {
       if (params.width !== undefined) node.inputs.width = params.width
       if (params.height !== undefined) node.inputs.height = params.height
     }
@@ -162,6 +162,38 @@ export async function loadWorkflow(
   } catch {
     return null
   }
+}
+
+// Z-Image-Turbo workflow (API format, derived from official Comfy-Org template).
+// Required models (download to ComfyUI/models/):
+//   diffusion_models/z_image_turbo_bf16.safetensors
+//   text_encoders/qwen_3_4b.safetensors
+//   vae/ae.safetensors
+export const Z_IMAGE_TURBO_WORKFLOW: Record<string, WorkflowNode> = {
+  '28': { class_type: 'UNETLoader', inputs: { unet_name: 'z_image_turbo_bf16.safetensors', weight_dtype: 'default' } },
+  '30': { class_type: 'CLIPLoader', inputs: { clip_name: 'qwen_3_4b.safetensors', type: 'lumina2' } },
+  '29': { class_type: 'VAELoader', inputs: { vae_name: 'ae.safetensors' } },
+  '27': { class_type: 'CLIPTextEncode', inputs: { clip: ['30', 0], text: '{{positive_prompt}}' } },
+  '33': { class_type: 'ConditioningZeroOut', inputs: { conditioning: ['27', 0] } },
+  '13': { class_type: 'EmptySD3LatentImage', inputs: { width: 1024, height: 1024, batch_size: 1 } },
+  '11': { class_type: 'ModelSamplingAuraFlow', inputs: { model: ['28', 0], shift: 3 } },
+  '3': {
+    class_type: 'KSampler',
+    inputs: {
+      model: ['11', 0],
+      positive: ['27', 0],
+      negative: ['33', 0],
+      latent_image: ['13', 0],
+      seed: 42,
+      steps: 8,
+      cfg: 1,
+      sampler_name: 'res_multistep',
+      scheduler: 'simple',
+      denoise: 1,
+    },
+  },
+  '8': { class_type: 'VAEDecode', inputs: { samples: ['3', 0], vae: ['29', 0] } },
+  '9': { class_type: 'SaveImage', inputs: { filename_prefix: 'z-image-turbo', images: ['8', 0] } },
 }
 
 const GENERATE_SH = `#!/usr/bin/env bash
@@ -282,6 +314,9 @@ export async function scaffoldProject(projectRoot: string): Promise<{
 
     await writeFile(join(base, 'workflows', 'txt2img.json'), JSON.stringify(DEFAULT_WORKFLOW, null, 2), 'utf-8')
     created.push('.localclawd/image-pipeline/workflows/txt2img.json')
+
+    await writeFile(join(base, 'workflows', 'z_image_turbo.json'), JSON.stringify(Z_IMAGE_TURBO_WORKFLOW, null, 2), 'utf-8')
+    created.push('.localclawd/image-pipeline/workflows/z_image_turbo.json')
 
     await writeFile(join(base, 'scripts', 'generate.sh'), GENERATE_SH, 'utf-8')
     created.push('.localclawd/image-pipeline/scripts/generate.sh')

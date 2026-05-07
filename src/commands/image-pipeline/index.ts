@@ -4,8 +4,8 @@ const imagePipeline: Command = {
   type: 'local-jsx',
   name: 'image-pipeline',
   aliases: ['comfyui', 'imgpipe'],
-  description: 'ComfyUI image generation pipeline — auto-detects local ComfyUI, scaffolds project templates, and submits generation jobs',
-  argumentHint: '[setup|generate|list|config] [args]',
+  description: 'ComfyUI pipeline setup — scaffold workflows, configure backend, manage templates. Use /image to generate.',
+  argumentHint: '[setup|config|workflow|list|fetch] [args]',
   load: () => import('./image-pipeline.js'),
 }
 

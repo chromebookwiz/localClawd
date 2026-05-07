@@ -4,8 +4,8 @@ const image: Command = {
   type: 'local-jsx',
   name: 'image',
   aliases: ['images'],
-  description: 'Generate an image via ComfyUI and save to ~/generatedimages/. Auto-detects local ComfyUI.',
-  argumentHint: '<prompt>',
+  description: 'Generate an image via ComfyUI. Use "name: prompt" to select a workflow. Run /image-pipeline setup first.',
+  argumentHint: '[workflow-name:] <prompt>',
   load: () => import('./images.js'),
 }
 

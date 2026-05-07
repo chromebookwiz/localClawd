@@ -93,6 +93,28 @@ export async function pollForCompletion(
   return null
 }
 
+export async function fetchServerWorkflowList(url: string): Promise<string[] | null> {
+  try {
+    const res = await fetch(`${url}/userdata?dir=workflows&recurse=true`)
+    if (!res.ok) return null
+    const data = (await res.json()) as string[]
+    return Array.isArray(data) ? data.filter(f => typeof f === 'string' && f.endsWith('.json')) : null
+  } catch {
+    return null
+  }
+}
+
+export async function fetchServerWorkflow(url: string, name: string): Promise<unknown | null> {
+  try {
+    const filename = name.endsWith('.json') ? name : `${name}.json`
+    const res = await fetch(`${url}/userdata/workflows/${encodeURIComponent(filename)}`)
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
 export function extractOutputImages(item: ComfyUIHistoryItem): string[] {
   const images: string[] = []
   for (const nodeOutput of Object.values(item.outputs)) {
