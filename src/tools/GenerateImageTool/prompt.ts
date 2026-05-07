@@ -1,8 +1,16 @@
 export const GENERATE_IMAGE_TOOL_NAME = 'GenerateImage'
 
-export const DESCRIPTION = `Generate an image using a local ComfyUI backend and save it to ~/generatedimages/.
+export const DESCRIPTION = `Generate an image using a local ComfyUI backend.
 
-Auto-detects ComfyUI at http://127.0.0.1:8188. Falls back to the backendUrl set in the project's .localclawd/image-pipeline/config.json when present.
+Backend resolution order:
+1. http://127.0.0.1:8188 (localhost default)
+2. backendUrl in .localclawd/image-pipeline/config.json (set via /image-pipeline config <url>)
+
+Output directory:
+- .localclawd/image-pipeline/generated/ when the pipeline is scaffolded (run /image-pipeline setup)
+- ~/generatedimages/ otherwise
+
+If ComfyUI is not reachable, ask the user to run /image-pipeline config <url> with their ComfyUI address.
 
 After generating, the image is returned visually in the tool result so you can review it.
 

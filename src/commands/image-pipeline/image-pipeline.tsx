@@ -94,15 +94,31 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     const workflows = await listWorkflows(projectRoot)
     const scaffolded = config !== null
 
-    const lines = [
-      active ? `● ComfyUI active at ${backendUrl}` : `○ ComfyUI not found at ${backendUrl}`,
-      scaffolded ? `  Scaffold: .localclawd/image-pipeline/ (${prompts.length} prompts, ${workflows.length} workflows)` : '  Not scaffolded — run /image-pipeline setup',
-      '',
-      '  /image-pipeline setup             scaffold project dirs',
-      '  /image-pipeline generate <prompt> generate and save image',
-      '  /image-pipeline config <url>      set ComfyUI URL',
-      '  /image-pipeline list              list templates',
-    ]
+    const lines: string[] = []
+
+    if (active) {
+      lines.push(`● ComfyUI active at ${backendUrl}`)
+    } else {
+      lines.push(`○ ComfyUI not found at ${backendUrl}`)
+      lines.push('')
+      lines.push('  To connect:')
+      lines.push('    /image-pipeline config http://<host>:8188')
+      lines.push('  Then scaffold the project:')
+      lines.push('    /image-pipeline setup')
+    }
+
+    if (scaffolded) {
+      lines.push(`  Scaffold: .localclawd/image-pipeline/ (${prompts.length} prompts, ${workflows.length} workflows)`)
+      lines.push(`  Output dir: .localclawd/image-pipeline/generated/`)
+    } else if (active) {
+      lines.push('  Not scaffolded — run /image-pipeline setup')
+    }
+
+    lines.push('')
+    lines.push('  /image-pipeline setup             scaffold project dirs')
+    lines.push('  /image-pipeline generate <prompt> generate and save image')
+    lines.push('  /image-pipeline config <url>      set ComfyUI URL')
+    lines.push('  /image-pipeline list              list templates')
 
     return (
       <PipelineCard
@@ -160,12 +176,15 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       return (
         <PipelineCard
           title="◆ Image Pipeline — Config"
-          lines={['Usage: /image-pipeline config http://<host>:8188']}
+          lines={['  Usage: /image-pipeline config http://<host>:8188']}
           color="yellow"
           onReady={() => onDone(undefined)}
         />
       )
     }
+
+    // Scaffold dirs first so saveConfig doesn't fail on missing directory
+    await scaffoldProject(projectRoot)
 
     const existing = (await loadConfig(projectRoot)) ?? {
       backendUrl: DEFAULT_COMFYUI_URL,
