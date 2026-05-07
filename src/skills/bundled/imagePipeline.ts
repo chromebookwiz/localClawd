@@ -434,7 +434,7 @@ export function registerImagePipelineSkill(): void {
       POWERSHELL_TOOL_NAME,
       ASK_USER_QUESTION_TOOL_NAME,
     ],
-    userInvocable: true,
+    userInvocable: false,
     files: SKILL_FILES,
     async getPromptForCommand(args) {
       const parts = [IMAGE_PIPELINE_PROMPT]

@@ -295,79 +295,59 @@ async function updateConfig(
   )
 }
 
-// ─── Setup / brief mode ───────────────────────────────────────────────────────
+// ─── Setup view ───────────────────────────────────────────────────────────────
 
 async function runSetup(
   onDone: Parameters<LocalJSXCommandCall>[0],
   projectRoot: string,
-  brief: string,
 ): Promise<React.ReactNode> {
   const { created, alreadyExisted } = await scaffoldProject(projectRoot)
 
-  let config = await loadConfig(projectRoot)
+  const config = await loadConfig(projectRoot)
   const configuredUrl = config?.backendUrl ?? DEFAULT_COMFYUI_URL
 
   const localActive = await detectComfyUI(DEFAULT_COMFYUI_URL)
   let activeUrl: string | null = null
   if (localActive) {
     activeUrl = DEFAULT_COMFYUI_URL
-    if (config && config.backendUrl !== DEFAULT_COMFYUI_URL) {
-      config.backendUrl = DEFAULT_COMFYUI_URL
-      await saveConfig(projectRoot, config)
-    }
-  } else if (configuredUrl !== DEFAULT_COMFYUI_URL) {
-    const configActive = await detectComfyUI(configuredUrl)
-    if (configActive) activeUrl = configuredUrl
+  } else if (configuredUrl !== DEFAULT_COMFYUI_URL && await detectComfyUI(configuredUrl)) {
+    activeUrl = configuredUrl
   }
 
-  const prompts = await listPrompts(projectRoot)
-  const workflows = await listWorkflows(projectRoot)
+  const comfyLine = activeUrl
+    ? `● ComfyUI active at ${activeUrl}`
+    : `○ ComfyUI not detected — run: /image-pipeline config <url>`
 
-  const comfyStatus = activeUrl
-    ? `ComfyUI is ACTIVE at ${activeUrl}`
-    : `ComfyUI not detected at ${configuredUrl}. Edit .localclawd/image-pipeline/config.json to set the URL, or run: /image-pipeline config <url>`
+  const lines: string[] = [
+    comfyLine,
+    '',
+    alreadyExisted
+      ? '  Pipeline already scaffolded.'
+      : `  Created ${created.length} files under .localclawd/image-pipeline/`,
+  ]
 
-  const systemContext = `\
-[IMAGE PIPELINE — Project Context]
+  if (!alreadyExisted) {
+    for (const f of created) lines.push(`    + ${f}`)
+  }
 
-ComfyUI Status: ${comfyStatus}
-Backend URL: ${activeUrl ?? configuredUrl}
-Scaffold: ${alreadyExisted ? 'already existed' : `created ${created.length} files`}
-Prompt templates: ${prompts.length} (${prompts.join(', ') || 'none'})
-Workflows: ${workflows.length} (${workflows.join(', ') || 'none'})
-Scripts: .localclawd/image-pipeline/scripts/generate.sh (bash) + generate.ps1 (PowerShell)
-Config: .localclawd/image-pipeline/config.json
-Workflow template: .localclawd/image-pipeline/workflows/txt2img.json (standard KSampler pipeline)
-
-Task brief: ${brief || '(general setup — scaffold and configure the image generation pipeline for this project)'}
-
-You are now the agent. Continue with the setup work:
-- If ComfyUI is active, verify the connection and show how to generate an image
-- If ComfyUI is not active, guide the user to start it or configure a remote URL
-- Customize the prompt templates and workflows based on the project context
-- Any follow-up generation or review work should use /image-pipeline generate
-`
-
-  const scaffoldLines = alreadyExisted
-    ? ['Pipeline already scaffolded — refreshing status.']
-    : created.map(f => `  + ${f}`)
+  lines.push(
+    '',
+    '  Commands:',
+    '    /image-pipeline                   — status',
+    '    /image-pipeline generate <prompt> — submit to ComfyUI',
+    '    /image-pipeline config <url>      — set backend URL',
+    '    /image-pipeline list              — list templates',
+    '    /image <prompt>                   — quick generate + save to ~/generatedimages/',
+  )
 
   return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text bold color="cyan">{'◆ Image Pipeline'}</Text>
-      <Text color={activeUrl ? 'green' : 'yellow'}>
-        {activeUrl ? `  ● ComfyUI active at ${activeUrl}` : `  ○ ComfyUI not found at ${configuredUrl}`}
-      </Text>
-      {!alreadyExisted && (
-        <>
-          <Text dimColor>{'  Scaffolded:'}</Text>
-          {scaffoldLines.map((l, i) => <Text key={i} dimColor>{l}</Text>)}
-        </>
-      )}
-      <Text dimColor>{'  Injecting context for agent...'}</Text>
-    </Box>
+    <Banner
+      title="◆ Image Pipeline — Setup"
+      lines={lines}
+      color={activeUrl ? 'green' : 'yellow'}
+      onReady={() => onDone(undefined)}
+    />
   )
-  // Note: onReady is handled below via handleReady
 }
 
 // ─── Command entry point ──────────────────────────────────────────────────────
@@ -397,81 +377,6 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     return runGenerate(onDone, projectRoot, promptText)
   }
 
-  // setup or any brief text — scaffold + inject AI context
-  const brief = subcmd === 'setup' ? restText : rawArgs
-
-  const { created, alreadyExisted } = await scaffoldProject(projectRoot)
-
-  let config = await loadConfig(projectRoot)
-  const configuredUrl = config?.backendUrl ?? DEFAULT_COMFYUI_URL
-
-  const localActive = await detectComfyUI(DEFAULT_COMFYUI_URL)
-  let activeUrl: string | null = null
-  if (localActive) {
-    activeUrl = DEFAULT_COMFYUI_URL
-    if (config && config.backendUrl !== DEFAULT_COMFYUI_URL) {
-      config.backendUrl = DEFAULT_COMFYUI_URL
-      await saveConfig(projectRoot, config)
-    }
-  } else if (configuredUrl !== DEFAULT_COMFYUI_URL) {
-    if (await detectComfyUI(configuredUrl)) activeUrl = configuredUrl
-  }
-
-  const prompts = await listPrompts(projectRoot)
-  const workflows = await listWorkflows(projectRoot)
-
-  const comfyStatus = activeUrl
-    ? `ComfyUI is ACTIVE at ${activeUrl}`
-    : `ComfyUI not detected at ${configuredUrl}. User can run: /image-pipeline config <url> to point to a remote backend.`
-
-  const systemContext = `\
-[IMAGE PIPELINE — Project Context Loaded]
-
-ComfyUI Status: ${comfyStatus}
-Backend URL: ${activeUrl ?? configuredUrl}
-Scaffold: ${alreadyExisted ? 'already existed' : `created ${created.length} files under .localclawd/image-pipeline/`}
-Templates available:
-  Prompts: ${prompts.length} (${prompts.map(p => `prompts/${p}`).join(', ') || 'none'})
-  Workflows: ${workflows.length} (${workflows.map(w => `workflows/${w}`).join(', ') || 'none'})
-Helper scripts:
-  .localclawd/image-pipeline/scripts/generate.sh   — bash (Linux/macOS/WSL)
-  .localclawd/image-pipeline/scripts/generate.ps1  — PowerShell (Windows)
-Config file: .localclawd/image-pipeline/config.json (edit backendUrl to point to remote ComfyUI)
-
-Task brief from user: ${brief || 'Set up the image generation pipeline for this project.'}
-
-Continue now. If ComfyUI is active, demonstrate a test generation. If not, guide the user to connect it. Customize the prompt and workflow templates to fit this project's needs.`
-
-  const scaffoldLines: string[] = alreadyExisted
-    ? [`Pipeline already scaffolded at .localclawd/image-pipeline/`]
-    : created.map(f => `  + ${f}`)
-
-  const handleReady = () => {
-    onDone(undefined, {
-      display: 'system',
-      shouldQuery: true,
-      metaMessages: [systemContext],
-    })
-  }
-
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text bold color="cyan">{'◆ Image Pipeline'}</Text>
-      <Text color={activeUrl ? 'green' : 'yellow'}>
-        {activeUrl ? `  ● ComfyUI active at ${activeUrl}` : `  ○ ComfyUI not detected (${configuredUrl})`}
-      </Text>
-      {scaffoldLines.map((line, i) => (
-        <Text key={i} dimColor>{line}</Text>
-      ))}
-      <SetupReady onReady={handleReady} />
-    </Box>
-  )
-}
-
-function SetupReady({ onReady }: { onReady: () => void }): React.ReactNode {
-  React.useEffect(() => {
-    const id = setTimeout(onReady, 0)
-    return () => clearTimeout(id)
-  }, [onReady])
-  return null
+  // setup or any unrecognised arg — scaffold + show status
+  return runSetup(onDone, projectRoot)
 }
