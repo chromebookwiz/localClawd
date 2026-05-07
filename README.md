@@ -19,6 +19,8 @@ localclawd keeps the parts of the upstream CLI that were operationally strong an
 - **Lattice memory scoring** — memory files tagged with `tags:` frontmatter are ranked using Jaccard similarity and co-occurrence lattice math. Works offline as a fallback when a hosted side-query model is unavailable.
 - **`/keepgoing`** — autonomous task continuation loop. The model works through all outstanding steps without waiting for user input and re-queues itself after each response. Stops when the model emits `TASK COMPLETE:` or `NEEDS INPUT:`. Aliases: `/kg`, `/continue`.
 - **`/buddy`** — spawns a named ASCII animal companion for the session with a personality. Use `/buddy pet` to hear their thoughts on the current codebase.
+- **`/images`** — quick-start slash command that forwards into the project-local image pipeline setup flow, with ComfyUI-first defaults and helper scaffolding.
+- **`/image-pipeline`** — scaffolds and uses a project-local image generation workflow for game textures, sprites, and related art assets under `.localclawd/image-pipeline/`, then visually reviews outputs when the current model/runtime supports image reads.
 - **`/thinkharder`** — enables careful mode: the model double-checks its reasoning at each step, verifies assumptions by reading files, and queries memory more frequently. Use `/thinknormal` to return to the default pipeline.
 - **`/thinknormal`** — resets to the default pipeline. Lattice memory is fallback-only, as designed. Alias: `/tn`.
 
@@ -167,6 +169,16 @@ Then run:
 localclawd
 ```
 
+## Project-local image workflow
+
+localclawd can now scaffold a reproducible local art pipeline inside each repo under `.localclawd/image-pipeline/`.
+
+- Use `/images` to bootstrap the workflow quickly with ComfyUI-first defaults.
+- Use `/images setup pixel-art UI icons` to scaffold prompts, helper files, and workflow placeholders tailored to a concrete asset brief.
+- Use `/images review stone floor texture batch` to review the latest generated images and write a tighter next-pass prompt.
+
+The bundled workflow keeps prompts, generated outputs, reviews, and backend config in the project. It prefers ComfyUI on `http://127.0.0.1:8188`, falls back to Automatic1111 on `http://127.0.0.1:7860`, and can use a project-defined custom command when needed. When the current runtime supports image reads, generated images are reviewed visually instead of only by prompt text or filenames.
+
 ## No account required
 
 localclawd does not require any account, login, or subscription. Connect it to a local model (vLLM, Ollama) or any OpenAI-compatible endpoint and start coding immediately. Use `/setup` at any time to configure or change your backend.
@@ -175,23 +187,12 @@ If you want to use the Anthropic API directly, set `ANTHROPIC_API_KEY` in your e
 
 ## Release status
 
-`v1.1.20` is live on npm. Install globally with `npm install -g localclawd` or run without installing with `npx localclawd`.
+`v1.7.2` is live on npm. Install globally with `npm install -g localclawd` or run without installing with `npx localclawd`.
 
-**Changelog**
-- `1.1.20` — Fix interactive startup crash: hoist `cliAgents` variable to outer scope so it is in scope when building `resumeContext` after the try block; this caused a ReferenceError on every interactive launch.
-- `1.1.19` — Fix all startup crashes: hoist all try-block-scoped variables (effectiveModel, agentDefinitions, root, etc.) to outer scope; fix undefined model strings for local provider; add missing prompt() methods to custom tools (Secrets, Crypto, LocalWebSearch, WebScreenshot).
-- `1.1.18` — Fix `commands is not defined` crash: moved commands/agentDefinitions declarations outside try block to fix block-scoping issue; purge remaining mixed-case branding.
-- `1.1.17` — Fix startup crash: Command.hideHelp() not available in Commander.js v14 — use { hidden: true } option instead.
-- `1.1.16` — Complete branding purge (no Claude/Anthropic references anywhere in UI or prompts); Grove data-sharing and subscription features fully disabled; MCP client identity updated to localclawd; all cloud-only error messages reworded to be backend-agnostic.
-- `1.1.15` — Full branding cleanup (no Anthropic/Claude references in UI); global crash handler shows errors instead of silent exit; auth commands hidden (use env vars or /setup); all startup errors surfaced with actionable messages.
-- `1.1.14` — Error handling for all startup awaits; clean build artifacts before rebuild to prevent stale cache issues.
-- `1.1.13` — Go straight to dashboard on launch; /setup for configuration; fix all stuck menus; useRef guards everywhere.
-- `1.1.12` — Fix onboarding blank screen; no stuck menus; VSCode Enter handling.
-- `1.1.11` — Ctrl+C everywhere; clean command list; lint fixes.
-- `1.1.10` — Fix Enter key on VSCode/ConPTY.
-- `1.0.5` — Geometric algebra lattice; /keepgoing upgraded with subagent support; /thinkharder 4-phase pipeline.
-- `1.0.4` — Fix `util is not defined` crash; add `/buddy`, `/thinkharder`, `/thinknormal`; fix `/keepgoing`.
-- `1.0.0` — Initial release.
+**Recent changes**
+- `1.7.2` — add `/images` as a quick-start command, ship the bundled `/image-pipeline` skill, scaffold a project-local `.localclawd/image-pipeline/` workflow, include a ComfyUI helper/template set, and require visual image review when the current runtime supports image reads.
+- `1.7.1` — ship the autonomous `/keepgoing` loop, the `/buddy` companion flow, lattice-ranked local memory fallback, and the paired `/thinkharder` / `/thinknormal` operating modes.
+- `1.0.0` — initial public localclawd release.
 
 External native update metadata is now expected under `release-manifests/`, the main verification workflow lives in `.github/workflows/ci.yml`, and the native asset publication workflow lives in `.github/workflows/publish-release-assets.yml`. See `docs/release.md` for the expected asset set and publish sequence.
 

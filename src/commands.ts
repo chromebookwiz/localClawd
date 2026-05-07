@@ -18,6 +18,7 @@ import diff from './commands/diff/index.js'
 import ctx_viz from './commands/ctx_viz/index.js'
 import doctor from './commands/doctor/index.js'
 import buddy from './commands/buddy/index.js'
+import images from './commands/images/index.js'
 import keepgoing from './commands/keepgoing/index.js'
 import telegram from './commands/telegram/index.js'
 import slack from './commands/slack/index.js'
@@ -329,6 +330,7 @@ const COMMANDS = memoize((): Command[] => [
   usageReport,
   vim,
   buddy,
+  images,
   telegram,
   slack,
   discord,

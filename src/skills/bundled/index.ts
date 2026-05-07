@@ -1,6 +1,7 @@
 import { feature } from 'bun:bundle'
 import { registerBatchSkill } from './batch.js'
 import { registerDebugSkill } from './debug.js'
+import { registerImagePipelineSkill } from './imagePipeline.js'
 import { registerKeybindingsSkill } from './keybindings.js'
 import { registerLoremIpsumSkill } from './loremIpsum.js'
 import { registerRememberSkill } from './remember.js'
@@ -24,6 +25,7 @@ export function initBundledSkills(): void {
   registerKeybindingsSkill()
   registerVerifySkill()
   registerDebugSkill()
+  registerImagePipelineSkill()
   registerLoremIpsumSkill()
   registerSkillifySkill()
   registerRememberSkill()
