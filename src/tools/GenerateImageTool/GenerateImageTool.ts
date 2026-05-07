@@ -11,7 +11,7 @@ import {
   pollForCompletion,
   extractOutputImages,
 } from '../../services/imagePipeline/comfyUI.js'
-import { loadConfig } from '../../services/imagePipeline/imagePipeline.js'
+import { loadConfig, loadWorkflow, injectPrompt, DEFAULT_WORKFLOW } from '../../services/imagePipeline/imagePipeline.js'
 import { getCwd } from '../../utils/cwd.js'
 import { DESCRIPTION, GENERATE_IMAGE_TOOL_NAME } from './prompt.js'
 import {
@@ -26,6 +26,7 @@ const inputSchema = lazySchema(() =>
   z.strictObject({
     prompt: z.string().describe('Positive text prompt describing the image to generate'),
     negative_prompt: z.string().optional().describe('What to exclude from the image (optional)'),
+    workflow: z.string().optional().describe('Workflow name from .localclawd/image-pipeline/workflows/ (without .json). Omit to use default.'),
     width: z.number().int().min(64).max(2048).optional().describe('Width in pixels (default: 512)'),
     height: z.number().int().min(64).max(2048).optional().describe('Height in pixels (default: 512)'),
     steps: z.number().int().min(1).max(150).optional().describe('Sampling steps (default: 20)'),
@@ -133,29 +134,21 @@ export const GenerateImageTool = buildTool({
     const height = input.height ?? config?.defaultHeight ?? 512
     const steps = input.steps ?? config?.defaultSteps ?? 20
     const cfg = input.cfg ?? config?.defaultCfg ?? 7
-    const sampler = config?.defaultSampler ?? 'euler'
     const seed = input.seed ?? Math.floor(Math.random() * 2 ** 32)
     const negativePrompt = input.negative_prompt ?? 'blurry, low quality, watermark, deformed'
 
-    const workflow: Record<string, unknown> = {
-      '4': { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: model } },
-      '5': { class_type: 'EmptyLatentImage', inputs: { width, height, batch_size: 1 } },
-      '6': { class_type: 'CLIPTextEncode', inputs: { clip: ['4', 1], text: input.prompt } },
-      '7': { class_type: 'CLIPTextEncode', inputs: { clip: ['4', 1], text: negativePrompt } },
-      '3': {
-        class_type: 'KSampler',
-        inputs: {
-          model: ['4', 0], positive: ['6', 0], negative: ['7', 0], latent_image: ['5', 0],
-          seed, steps, cfg, sampler_name: sampler, scheduler: 'normal', denoise: 1,
-        },
-      },
-      '8': { class_type: 'VAEDecode', inputs: { samples: ['3', 0], vae: ['4', 2] } },
-      '9': { class_type: 'SaveImage', inputs: { filename_prefix: 'localclawd', images: ['8', 0] } },
-    }
+    const workflowName = input.workflow ?? config?.defaultWorkflow
+    const workflowBase = workflowName ? await loadWorkflow(projectRoot, workflowName) : null
+    const workflow = injectPrompt(
+      workflowBase ?? DEFAULT_WORKFLOW,
+      input.prompt,
+      negativePrompt,
+      { seed, model, width, height, steps, cfg },
+    )
 
     let queued: Awaited<ReturnType<typeof queuePrompt>>
     try {
-      queued = await queuePrompt(backendUrl, workflow)
+      queued = await queuePrompt(backendUrl, workflow as Record<string, unknown>)
     } catch (e) {
       return {
         data: { path: '', filename: '', promptId: '', seed, backend: backendUrl, error: `Queue failed: ${String(e)}` },

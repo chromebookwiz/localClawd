@@ -2,6 +2,12 @@ import { mkdir, writeFile, readFile, access } from 'fs/promises'
 import { join } from 'path'
 import { DEFAULT_COMFYUI_URL } from './comfyUI.js'
 
+export interface WorkflowNode {
+  class_type: string
+  inputs: Record<string, unknown>
+  _meta?: Record<string, unknown>
+}
+
 export interface PipelineConfig {
   backendUrl: string
   defaultWidth: number
@@ -11,6 +17,7 @@ export interface PipelineConfig {
   defaultSampler: string
   defaultModel: string
   outputDir: string
+  defaultWorkflow?: string
 }
 
 const DEFAULT_CONFIG: PipelineConfig = {
@@ -21,7 +28,7 @@ const DEFAULT_CONFIG: PipelineConfig = {
   defaultCfg: 7,
   defaultSampler: 'euler',
   defaultModel: '',
-  outputDir: '.localclawd/image-pipeline/outputs',
+  outputDir: '.localclawd/image-pipeline/generated',
 }
 
 const EXAMPLE_PROMPT = {
@@ -36,7 +43,7 @@ const EXAMPLE_PROMPT = {
   sampler: 'euler',
 }
 
-const TXT2IMG_WORKFLOW = {
+export const DEFAULT_WORKFLOW: Record<string, WorkflowNode> = {
   '4': {
     class_type: 'CheckpointLoaderSimple',
     inputs: { ckpt_name: 'v1-5-pruned-emaonly.safetensors' },
@@ -76,6 +83,85 @@ const TXT2IMG_WORKFLOW = {
     class_type: 'SaveImage',
     inputs: { filename_prefix: 'localclawd', images: ['8', 0] },
   },
+}
+
+export function injectPrompt(
+  workflow: Record<string, WorkflowNode>,
+  positivePrompt: string,
+  negativePrompt: string,
+  params: {
+    seed?: number
+    width?: number
+    height?: number
+    steps?: number
+    cfg?: number
+    model?: string
+  } = {},
+): Record<string, WorkflowNode> {
+  // Step 1: deep clone + text template substitution
+  const wf = replaceTemplatesDeep(JSON.parse(JSON.stringify(workflow)), {
+    positive_prompt: positivePrompt,
+    negative_prompt: negativePrompt,
+  }) as Record<string, WorkflowNode>
+
+  // Step 2: graph traversal for numeric/config params
+  for (const node of Object.values(wf)) {
+    const ct = node.class_type
+    if (ct === 'KSampler' || ct === 'KSamplerAdvanced') {
+      const posRef = node.inputs.positive as [string, number] | undefined
+      const negRef = node.inputs.negative as [string, number] | undefined
+      // Graph-based prompt injection (for workflows without {{}} templates)
+      if (posRef?.[0] && wf[posRef[0]]?.class_type === 'CLIPTextEncode') {
+        wf[posRef[0]].inputs.text = positivePrompt
+      }
+      if (negRef?.[0] && wf[negRef[0]]?.class_type === 'CLIPTextEncode') {
+        wf[negRef[0]].inputs.text = negativePrompt
+      }
+      if (params.seed !== undefined) node.inputs.seed = params.seed
+      if (params.steps !== undefined) node.inputs.steps = params.steps
+      if (params.cfg !== undefined) node.inputs.cfg = params.cfg
+    }
+    if (node.class_type === 'EmptyLatentImage') {
+      if (params.width !== undefined) node.inputs.width = params.width
+      if (params.height !== undefined) node.inputs.height = params.height
+    }
+    if (node.class_type === 'CheckpointLoaderSimple' && params.model) {
+      node.inputs.ckpt_name = params.model
+    }
+  }
+
+  return wf
+}
+
+function replaceTemplatesDeep(obj: unknown, vars: Record<string, string>): unknown {
+  if (typeof obj === 'string') {
+    let s = obj
+    for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{{${k}}}`, v)
+    return s
+  }
+  if (Array.isArray(obj)) return obj.map(item => replaceTemplatesDeep(item, vars))
+  if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj as Record<string, unknown>).map(([k, v]) => [k, replaceTemplatesDeep(v, vars)])
+    )
+  }
+  return obj
+}
+
+export async function loadWorkflow(
+  projectRoot: string,
+  name: string,
+): Promise<Record<string, WorkflowNode> | null> {
+  const filename = name.endsWith('.json') ? name : `${name}.json`
+  try {
+    const data = await readFile(
+      join(projectRoot, '.localclawd', 'image-pipeline', 'workflows', filename),
+      'utf-8',
+    )
+    return JSON.parse(data) as Record<string, WorkflowNode>
+  } catch {
+    return null
+  }
 }
 
 const GENERATE_SH = `#!/usr/bin/env bash
@@ -135,8 +221,8 @@ Project-local image generation configuration for localclawd + ComfyUI.
 
 1. Start ComfyUI on this machine (default port 8000)
 2. Run \`/image-pipeline\` in localclawd to check status
-3. Use \`/image-pipeline generate "your prompt"\` to submit a job
-4. Or run \`bash .localclawd/image-pipeline/scripts/generate.sh "prompt"\`
+3. Use \`/image a misty forest at dawn\` to generate an image
+4. Use \`/image txt2img: a misty forest at dawn\` to use a specific workflow
 
 ## Structure
 
@@ -144,7 +230,7 @@ Project-local image generation configuration for localclawd + ComfyUI.
 config.json       — backend URL and default params
 prompts/          — reusable prompt templates (JSON)
 workflows/        — full ComfyUI workflow JSON files
-outputs/          — local output reference (actual files saved by ComfyUI)
+generated/        — locally downloaded output images
 scripts/          — generate.sh / generate.ps1 helpers
 \`\`\`
 
@@ -156,8 +242,12 @@ Edit \`config.json\` → set \`backendUrl\` to your remote URL, e.g.:
 ## Workflow Templates
 
 \`workflows/txt2img.json\` is a standard KSampler workflow.
-Load it in ComfyUI via Menu → Load, customize, and save new workflows here.
-Replace \`{{positive_prompt}}\` / \`{{negative_prompt}}\` placeholders before submitting.
+To use a workflow: \`/image <workflow-name>: <prompt>\`
+To set a default workflow: \`/image-pipeline workflow <name>\`
+
+Export workflows from ComfyUI via the Save (API format) button.
+Workflows with \`{{positive_prompt}}\` / \`{{negative_prompt}}\` placeholders
+are injected automatically; raw ComfyUI exports work via graph traversal.
 `
 
 export async function scaffoldProject(projectRoot: string): Promise<{
@@ -175,7 +265,7 @@ export async function scaffoldProject(projectRoot: string): Promise<{
     // fresh install
   }
 
-  const dirs = [base, join(base, 'prompts'), join(base, 'workflows'), join(base, 'outputs'), join(base, 'scripts')]
+  const dirs = [base, join(base, 'prompts'), join(base, 'workflows'), join(base, 'generated'), join(base, 'scripts')]
   for (const dir of dirs) {
     await mkdir(dir, { recursive: true })
   }
@@ -190,7 +280,7 @@ export async function scaffoldProject(projectRoot: string): Promise<{
     await writeFile(join(base, 'prompts', 'example.json'), JSON.stringify(EXAMPLE_PROMPT, null, 2), 'utf-8')
     created.push('.localclawd/image-pipeline/prompts/example.json')
 
-    await writeFile(join(base, 'workflows', 'txt2img.json'), JSON.stringify(TXT2IMG_WORKFLOW, null, 2), 'utf-8')
+    await writeFile(join(base, 'workflows', 'txt2img.json'), JSON.stringify(DEFAULT_WORKFLOW, null, 2), 'utf-8')
     created.push('.localclawd/image-pipeline/workflows/txt2img.json')
 
     await writeFile(join(base, 'scripts', 'generate.sh'), GENERATE_SH, 'utf-8')

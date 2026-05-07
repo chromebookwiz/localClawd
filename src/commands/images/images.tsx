@@ -1,9 +1,6 @@
 /**
- * /image <prompt> — generate an image via ComfyUI and save locally.
- *
- * Auto-detects ComfyUI at http://127.0.0.1:8000.
- * Falls back to the URL in .localclawd/image-pipeline/config.json if set.
- * Saves to .localclawd/image-pipeline/generated/ if scaffolded, else ~/generatedimages/.
+ * /image <prompt>          — generate via default workflow
+ * /image <name>: <prompt>  — generate via named workflow from .localclawd/image-pipeline/workflows/
  */
 
 import type { LocalJSXCommandCall } from '../../types/command.js'
@@ -17,7 +14,13 @@ import {
   pollForCompletion,
   extractOutputImages,
 } from '../../services/imagePipeline/comfyUI.js'
-import { loadConfig } from '../../services/imagePipeline/imagePipeline.js'
+import {
+  loadConfig,
+  loadWorkflow,
+  injectPrompt,
+  DEFAULT_WORKFLOW,
+  listWorkflows,
+} from '../../services/imagePipeline/imagePipeline.js'
 
 function timestamp(): string {
   const d = new Date()
@@ -30,28 +33,59 @@ function slugify(text: string, maxLen = 40): string {
 }
 
 export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
-  const prompt = args?.trim() ?? ''
-
-  if (!prompt) {
-    onDone(
-      [
-        '◆ /image — Generate an image via ComfyUI',
-        '',
-        '  Usage:   /image <prompt>',
-        '  Example: /image a misty forest at dawn, cinematic lighting',
-        '',
-        '  ComfyUI must be running. To set a remote URL:',
-        '    /image-pipeline config http://<host>:8000',
-        '  To scaffold the project output folder:',
-        '    /image-pipeline setup',
-      ].join('\n'),
-      { display: 'system' },
-    )
-    return null
-  }
+  const raw = args?.trim() ?? ''
 
   const { getOriginalCwd } = await import('../../bootstrap/state.js')
   const projectRoot = getOriginalCwd() ?? process.cwd()
+
+  if (!raw) {
+    const config = await loadConfig(projectRoot)
+    const workflows = await listWorkflows(projectRoot)
+    const defaultWf = config?.defaultWorkflow ?? '(built-in txt2img)'
+    const lines = [
+      '◆ /image — Generate an image via ComfyUI',
+      '',
+      '  Usage:   /image <prompt>',
+      '  Workflow: /image <name>: <prompt>',
+      '',
+      '  Examples:',
+      '    /image a misty forest at dawn, cinematic lighting',
+      '    /image txt2img: an elderly scholar by candlelight',
+      '',
+      `  Default workflow: ${defaultWf}`,
+    ]
+    if (workflows.length > 0) {
+      lines.push('  Available workflows:')
+      for (const w of workflows) lines.push(`    • ${w.replace(/\.json$/, '')}`)
+    } else {
+      lines.push('  No project workflows — run /image-pipeline setup to scaffold')
+    }
+    lines.push('')
+    lines.push('  ComfyUI must be running. To configure:')
+    lines.push('    /image-pipeline setup        — scaffold project folders')
+    lines.push('    /image-pipeline config <url> — set backend URL')
+    lines.push('    /image-pipeline workflow <n> — set default workflow')
+    onDone(lines.join('\n'), { display: 'system' })
+    return null
+  }
+
+  // Parse optional workflow prefix: "name: prompt text"
+  let workflowName: string | undefined
+  let promptText = raw
+  const colonIdx = raw.indexOf(':')
+  if (colonIdx > 0) {
+    const candidate = raw.slice(0, colonIdx).trim()
+    if (/^[\w-]+$/.test(candidate)) {
+      workflowName = candidate
+      promptText = raw.slice(colonIdx + 1).trim()
+    }
+  }
+
+  if (!promptText) {
+    onDone('◆ /image — Prompt required\n\n  Usage: /image <name>: <prompt>', { display: 'system' })
+    return null
+  }
+
   const config = await loadConfig(projectRoot)
   const configuredUrl = config?.backendUrl ?? DEFAULT_COMFYUI_URL
 
@@ -65,9 +99,9 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
   if (!backendUrl) {
     onDone(
       [
-        '◆ /image — No Backend',
+        '◆ /image — ComfyUI not found',
         '',
-        `  ComfyUI not found at ${configuredUrl}`,
+        `  Tried: ${configuredUrl}`,
         '  Start ComfyUI, then try again.',
         '  To set a remote URL: /image-pipeline config http://<host>:8000',
       ].join('\n'),
@@ -76,33 +110,37 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     return null
   }
 
+  const effectiveWorkflowName = workflowName ?? config?.defaultWorkflow
+  let workflow = effectiveWorkflowName ? await loadWorkflow(projectRoot, effectiveWorkflowName) : null
+
+  if (effectiveWorkflowName && !workflow) {
+    onDone(
+      [
+        `◆ /image — Workflow not found: "${effectiveWorkflowName}"`,
+        '',
+        '  Run /image-pipeline list to see available workflows.',
+        '  Falling back to built-in txt2img workflow.',
+      ].join('\n'),
+      { display: 'system' },
+    )
+    // fall through to built-in
+  }
+
+  if (!workflow) workflow = DEFAULT_WORKFLOW
+
   const model = config?.defaultModel || 'v1-5-pruned-emaonly.safetensors'
   const width = config?.defaultWidth ?? 512
   const height = config?.defaultHeight ?? 512
   const steps = config?.defaultSteps ?? 20
   const cfg = config?.defaultCfg ?? 7
-  const sampler = config?.defaultSampler ?? 'euler'
   const seed = Math.floor(Math.random() * 2 ** 32)
+  const negative = 'blurry, low quality, watermark, deformed'
 
-  const workflow: Record<string, unknown> = {
-    '4': { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: model } },
-    '5': { class_type: 'EmptyLatentImage', inputs: { width, height, batch_size: 1 } },
-    '6': { class_type: 'CLIPTextEncode', inputs: { clip: ['4', 1], text: prompt } },
-    '7': { class_type: 'CLIPTextEncode', inputs: { clip: ['4', 1], text: 'blurry, low quality, watermark, deformed' } },
-    '3': {
-      class_type: 'KSampler',
-      inputs: {
-        model: ['4', 0], positive: ['6', 0], negative: ['7', 0], latent_image: ['5', 0],
-        seed, steps, cfg, sampler_name: sampler, scheduler: 'normal', denoise: 1,
-      },
-    },
-    '8': { class_type: 'VAEDecode', inputs: { samples: ['3', 0], vae: ['4', 2] } },
-    '9': { class_type: 'SaveImage', inputs: { filename_prefix: 'localclawd', images: ['8', 0] } },
-  }
+  const finalWorkflow = injectPrompt(workflow, promptText, negative, { seed, model, width, height, steps, cfg })
 
   let queued: Awaited<ReturnType<typeof queuePrompt>>
   try {
-    queued = await queuePrompt(backendUrl, workflow)
+    queued = await queuePrompt(backendUrl, finalWorkflow as Record<string, unknown>)
   } catch (e) {
     onDone(
       `◆ /image — Queue Error\n\n  ${String(e)}\n  Is a model loaded in ComfyUI?`,
@@ -125,7 +163,6 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     return null
   }
 
-  // Save to project generated/ if scaffolded, else ~/generatedimages/
   const projectGenDir = join(projectRoot, '.localclawd', 'image-pipeline', 'generated')
   const useProjectDir = await access(projectGenDir).then(() => true).catch(() => false)
   const outputDir = useProjectDir ? projectGenDir : join(homedir(), 'generatedimages')
@@ -142,7 +179,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       const params = new URLSearchParams({ filename: imgFilename, subfolder, type: 'output' })
       const res = await fetch(`${backendUrl}/view?${params}`)
       if (res.ok) {
-        const outName = `${timestamp()}_${slugify(prompt)}.png`
+        const outName = `${timestamp()}_${slugify(promptText)}.png`
         await writeFile(join(outputDir, outName), Buffer.from(await res.arrayBuffer()))
         savedPaths.push(join(outputDir, outName))
       }
@@ -151,19 +188,20 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     }
   }
 
+  const usedWorkflow = effectiveWorkflowName ?? 'built-in txt2img'
   const lines = savedPaths.length > 0
     ? [
         '◆ /image — Done',
         '',
         `  Saved to: ${savedPaths.join('\n            ')}`,
-        `  Seed: ${seed}  ·  ${steps} steps  ·  ${width}×${height}  ·  ${model}`,
+        `  Workflow: ${usedWorkflow}  ·  Seed: ${seed}  ·  ${steps} steps  ·  ${width}×${height}`,
       ]
     : [
         '◆ /image — Done (download failed)',
         '',
-        `  Job complete but image download failed.`,
+        '  Job complete but image download failed.',
         `  ComfyUI filenames: ${comfyImages.join(', ') || '(none)'}`,
-        `  Seed: ${seed}`,
+        `  Workflow: ${usedWorkflow}  ·  Seed: ${seed}`,
       ]
 
   onDone(lines.join('\n'), { display: 'system' })
