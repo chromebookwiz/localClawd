@@ -1,13 +1,12 @@
 import type { Command } from '../../commands.js'
 
-const images: Command = {
+const image: Command = {
   type: 'local-jsx',
-  name: 'images',
-  aliases: ['image'],
-  description:
-    'Set up the local image pipeline for this project. Defaults to a ComfyUI-friendly project-local workflow under .localclawd/image-pipeline/.',
-  argumentHint: '[setup|help|review] [brief]',
+  name: 'image',
+  aliases: ['images'],
+  description: 'Generate an image via ComfyUI and save to ~/generatedimages/. Auto-detects local ComfyUI.',
+  argumentHint: '<prompt>',
   load: () => import('./images.js'),
 }
 
-export default images
+export default image
