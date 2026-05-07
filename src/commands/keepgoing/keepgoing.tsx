@@ -1,11 +1,11 @@
 /**
  * /keepgoing — ultimate persistent autonomous mode.
  *
+ * Runs fully autonomously with all tool permissions bypassed.
+ * A warning is shown on entry. Permissions are restored when the loop ends.
+ *
  * Works standalone or combined with /thinkharder:
- *   /thinkharder → /keepgoing   Each round uses the full 4-layer cognition
- *                               loop + 5-phase pipeline. The model primes
- *                               memory, verifies invariants, and writes only
- *                               after formal verification on every iteration.
+ *   /thinkharder → /keepgoing   Each round uses the full 5-phase verification pipeline.
  *
  * Telegram bridge: if TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set, the
  * agent sends a status update after each round and any messages you send
@@ -21,6 +21,7 @@
 import * as React from 'react'
 import { Box, Text } from '../../ink.js'
 import type { LocalJSXCommandCall } from '../../types/command.js'
+import type { PermissionMode } from '../../types/permissions.js'
 import { isThinkHarderMode, THINKHARDER_ROUND_PROMPT } from '../thinkharder/thinkharder.js'
 import {
   getPendingTelegramMessage,
@@ -49,10 +50,12 @@ import { enqueue } from '../../utils/messageQueueManager.js'
 
 let sessionRound = 0
 let sessionFocus = ''
+let sessionOriginalMode: PermissionMode = 'default'
 
-function resetSession(focus: string): void {
+function resetSession(focus: string, originalMode: PermissionMode): void {
   sessionRound = 0
   sessionFocus = focus
+  sessionOriginalMode = originalMode
 }
 
 function incrementRound(): number {
@@ -144,7 +147,7 @@ function buildContinuationPrompt(
   return `\
 [KEEP GOING — AUTONOMOUS OPERATION — ${roundInfo}${modeTag}]
 ${focusLine}${telegramSection}${thinkHarderSection}
-You are in full autonomous mode. Work continuously until all tasks are done.
+You are in full autonomous mode with all permissions bypassed. Work continuously until all tasks are done.
 
 ━━━ CAPABILITIES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 You have access to ALL tools:
@@ -161,7 +164,7 @@ SPAWN SUBAGENTS when:
   → You need specialized work done concurrently (e.g., research + implement)
 
 ━━━ AUTONOMOUS RULES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. DO NOT ask for confirmation between steps — proceed immediately
+1. ALL PERMISSIONS ARE BYPASSED — proceed with every tool use without asking
 2. After completing a major milestone, state: "Completed: <what was done>"
 3. After significant changes, run tests/builds to verify correctness
 4. Use git commits after each logical unit of work
@@ -184,6 +187,7 @@ function KeepGoingBanner({
   focus,
   thinkHarder,
   telegram,
+  showBypassWarning,
   onReady,
 }: {
   round: number
@@ -191,6 +195,7 @@ function KeepGoingBanner({
   focus: string
   thinkHarder: boolean
   telegram: boolean
+  showBypassWarning: boolean
   onReady: () => void
 }): React.ReactNode {
   React.useEffect(() => {
@@ -209,13 +214,21 @@ function KeepGoingBanner({
 
   return (
     <Box flexDirection="column" marginTop={1}>
+      {showBypassWarning && (
+        <Box flexDirection="column" marginBottom={1} borderStyle="round" borderColor="yellow" paddingX={1}>
+          <Text bold color="yellow">{'⚠  Keep Going — Autonomous Mode'}</Text>
+          <Text color="yellow">{'   All tool permissions are bypassed for this session.'}</Text>
+          <Text dimColor>{'   The agent will execute Bash, file writes, and all other tools'}</Text>
+          <Text dimColor>{'   without asking. Press Ctrl+C at any time to interrupt.'}</Text>
+        </Box>
+      )}
       <Text bold color="cyan">
         {`◆ Keep Going  [round ${roundDisplay}]${badgeStr}`}
       </Text>
       {focus ? (
         <Text dimColor color="cyan">{`  ↳ Focus: ${focus}`}</Text>
       ) : (
-        <Text dimColor>{'  ↳ Press Ctrl+C or type to intervene at any time'}</Text>
+        <Text dimColor>{'  ↳ All permissions bypassed · Ctrl+C to interrupt'}</Text>
       )}
     </Box>
   )
@@ -241,6 +254,7 @@ function KeepGoingDone({
         {`◆ Keep Going — stopped after ${round} rounds`}
       </Text>
       <Text dimColor>{`  Reason: ${reason}`}</Text>
+      <Text dimColor>{'  Permissions restored to previous mode.'}</Text>
     </Box>
   )
 }
@@ -269,6 +283,7 @@ function KeepGoingCapReached({
         {`◆ Keep Going — round cap reached (${round}/${maxRounds})`}
       </Text>
       <Text dimColor>{`  Type ${resumeCmd} to continue for another ${maxRounds} rounds.`}</Text>
+      <Text dimColor>{'  Permissions restored to previous mode.'}</Text>
     </Box>
   )
 }
@@ -277,11 +292,9 @@ function KeepGoingCapReached({
 
 export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const rawArgs = args?.trim() ?? ''
-  const { extractChain, validateCommandChain, parseCommandChain, chainWarning } =
+  const { extractChain } =
     await import('../../utils/commandChaining.js')
-  const { ownArgs: chainedArgs, nextCmd: _nextCmdFromChain } = extractChain(rawArgs)
-  // keepgoing is a loop — it absorbs all chain commands as part of the loop context
-  // and warns if an incompatible command follows it
+  const { ownArgs: chainedArgs } = extractChain(rawArgs)
   const { maxRounds, focus } = parseMaxRounds(chainedArgs)
 
   if (sessionRound === 0 && !focus) {
@@ -292,9 +305,20 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     return null
   }
 
-  if (sessionRound === 0 || (focus && focus !== sessionFocus)) {
-    resetSession(focus)
+  const isNewSession = sessionRound === 0 || (focus && focus !== sessionFocus)
+  if (isNewSession) {
+    const currentMode = context.getAppState().toolPermissionContext.mode
+    resetSession(focus, currentMode)
   }
+
+  // ── Activate bypass permissions mode for this session ───────────────────
+  context.setAppState(prev => ({
+    ...prev,
+    toolPermissionContext: {
+      ...prev.toolPermissionContext,
+      mode: 'bypassPermissions' as PermissionMode,
+    },
+  }))
 
   // ── Detect stop signal from the last model response ──────────────────────
   let stopReason: string | null = null
@@ -326,7 +350,13 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
 
   if (stopReason !== null) {
     const finalRound = sessionRound
-    resetSession('')
+    const savedMode = sessionOriginalMode
+    resetSession('', 'default')
+    // Restore original permission mode
+    context.setAppState(prev => ({
+      ...prev,
+      toolPermissionContext: { ...prev.toolPermissionContext, mode: savedMode },
+    }))
     const stopMsg = `✅ *keepgoing stopped*\nRound ${finalRound} · ${stopReason}`
     if (isTelegramActive()) void sendTelegramMessage(stopMsg)
     if (isSlackActive()) void sendSlackMessage(stopMsg)
@@ -343,10 +373,17 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
 
   // ── Increment round and check cap ────────────────────────────────────────
   const round = incrementRound()
+  const showBypassWarning = round === 1
 
   if (isFinite(maxRounds) && round > maxRounds) {
     const finalRound = sessionRound
-    resetSession('')
+    const savedMode = sessionOriginalMode
+    resetSession('', 'default')
+    // Restore original permission mode
+    context.setAppState(prev => ({
+      ...prev,
+      toolPermissionContext: { ...prev.toolPermissionContext, mode: savedMode },
+    }))
     const pauseMsg = `⏸ *keepgoing paused*\nRound cap ${finalRound}/${maxRounds} reached.`
     if (isTelegramActive()) void sendTelegramMessage(pauseMsg)
     if (isSlackActive()) void sendSlackMessage(pauseMsg)
@@ -381,8 +418,6 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const metaMessages = [prompt]
 
   const handleReady = () => {
-    // Queue the next keepgoing invocation as a hidden meta command —
-    // the user won't see "/keepgoing" appear in their input.
     enqueue({ value: nextCmd, mode: 'prompt', isMeta: true })
     onDone(undefined, {
       display: 'system',
@@ -398,6 +433,7 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
       focus={focus}
       thinkHarder={isThinkHarderMode}
       telegram={isTelegramActive()}
+      showBypassWarning={showBypassWarning}
       onReady={handleReady}
     />
   )
