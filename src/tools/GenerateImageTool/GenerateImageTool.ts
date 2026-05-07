@@ -64,6 +64,143 @@ function timestamp(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`
 }
 
+async function callInner(input: z.infer<ReturnType<typeof inputSchema>>, abortController: AbortController) {
+  const projectRoot = getCwd()
+  const config = await loadConfig(projectRoot)
+  const configuredUrl = config?.backendUrl ?? DEFAULT_COMFYUI_URL
+
+  // Auto-detect backend: localhost first, then configured URL
+  let backendUrl = DEFAULT_COMFYUI_URL
+  if (!await detectComfyUI(DEFAULT_COMFYUI_URL)) {
+    if (configuredUrl !== DEFAULT_COMFYUI_URL && await detectComfyUI(configuredUrl)) {
+      backendUrl = configuredUrl
+    } else {
+      return {
+        data: {
+          path: '', filename: '', promptId: '', seed: 0, backend: configuredUrl,
+          error: `ComfyUI not reachable at ${DEFAULT_COMFYUI_URL}${configuredUrl !== DEFAULT_COMFYUI_URL ? ` or ${configuredUrl}` : ''}. Start ComfyUI or run /image-pipeline config <url>.`,
+        },
+      }
+    }
+  }
+
+  if (abortController.signal.aborted) {
+    return { data: { path: '', filename: '', promptId: '', seed: 0, backend: backendUrl, error: 'Aborted' } }
+  }
+
+  const seed = input.seed ?? Math.floor(Math.random() * 2 ** 32)
+  const negativePrompt = input.negative_prompt ?? 'blurry, low quality, watermark, deformed'
+
+  const workflowName = input.workflow ?? config?.defaultWorkflow
+  const workflowBase = workflowName ? await loadWorkflow(projectRoot, workflowName) : null
+  const usingBuiltIn = !workflowBase
+
+  // For named workflows: only inject prompt + seed — preserve the workflow's steps/cfg/size/model
+  // For the built-in fallback: inject all config defaults (generic SD1.5 workflow)
+  const injectParams = usingBuiltIn
+    ? {
+        seed,
+        model: input.model ?? config?.defaultModel ?? 'v1-5-pruned-emaonly.safetensors',
+        width: input.width ?? config?.defaultWidth ?? 512,
+        height: input.height ?? config?.defaultHeight ?? 512,
+        steps: input.steps ?? config?.defaultSteps ?? 20,
+        cfg: input.cfg ?? config?.defaultCfg ?? 7,
+      }
+    : {
+        seed,
+        // Still allow explicit overrides from the tool call even for named workflows
+        ...(input.model && { model: input.model }),
+        ...(input.width && { width: input.width }),
+        ...(input.height && { height: input.height }),
+        ...(input.steps && { steps: input.steps }),
+        ...(input.cfg && { cfg: input.cfg }),
+      }
+
+  const workflow = injectPrompt(
+    workflowBase ?? DEFAULT_WORKFLOW,
+    input.prompt,
+    negativePrompt,
+    injectParams,
+  )
+
+  let queued: Awaited<ReturnType<typeof queuePrompt>>
+  try {
+    queued = await queuePrompt(backendUrl, workflow as Record<string, unknown>)
+  } catch (e) {
+    return {
+      data: { path: '', filename: '', promptId: '', seed, backend: backendUrl, error: `Queue failed: ${String(e)}` },
+    }
+  }
+
+  if (abortController.signal.aborted) {
+    return { data: { path: '', filename: '', promptId: queued.prompt_id, seed, backend: backendUrl, error: 'Aborted' } }
+  }
+
+  const result = await pollForCompletion(backendUrl, queued.prompt_id)
+  if (!result) {
+    return {
+      data: {
+        path: '', filename: '', promptId: queued.prompt_id, seed, backend: backendUrl,
+        error: `Timed out. Check ComfyUI: ${backendUrl}/history/${queued.prompt_id}`,
+      },
+    }
+  }
+
+  const comfyImages = extractOutputImages(result)
+  const firstImage = comfyImages[0]
+  if (!firstImage) {
+    return {
+      data: { path: '', filename: '', promptId: queued.prompt_id, seed, backend: backendUrl, error: 'Job completed but no output images found' },
+    }
+  }
+
+  const allImageMeta = Object.values(result.outputs).flatMap(o => o.images ?? [])
+  const imgMeta = allImageMeta.find(img => img.filename === firstImage)
+  const subfolder = imgMeta?.subfolder ?? ''
+  const imgType = imgMeta?.type ?? 'output'
+
+  // Download from ComfyUI
+  let rawBytes: Buffer | null = null
+  try {
+    const params = new URLSearchParams({ filename: firstImage, subfolder, type: imgType })
+    const res = await fetch(`${backendUrl}/view?${params}`)
+    if (res.ok) {
+      rawBytes = Buffer.from(await res.arrayBuffer())
+    }
+  } catch {
+    // download failed — proceed without image bytes
+  }
+
+  const outputDir = join(getCwd(), '.localclawd', 'image-pipeline', 'generated').replace(/\\/g, '/')
+  await mkdir(outputDir, { recursive: true })
+  const outName = `${timestamp()}_${slugify(input.prompt)}.png`
+  const savedPath = join(outputDir, outName).replace(/\\/g, '/')
+
+  if (rawBytes) {
+    await writeFile(savedPath, rawBytes)
+  }
+
+  const data: Output = {
+    path: savedPath,
+    filename: outName,
+    promptId: queued.prompt_id,
+    seed,
+    backend: backendUrl,
+  }
+
+  // Store image bytes in side-channel for mapToolResultToToolResultBlockParam.
+  // If we don't have the bytes from download, try reading the saved file.
+  const imageBytes = rawBytes ?? await readFile(savedPath).catch(() => null)
+  if (imageBytes && imageBytes.length > 0) {
+    imageDataCache.set(data, {
+      base64: imageBytes.toString('base64'),
+      mediaType: 'image/png',
+    })
+  }
+
+  return { data }
+}
+
 export const GenerateImageTool = buildTool({
   name: GENERATE_IMAGE_TOOL_NAME,
   searchHint: 'generate an image using ComfyUI',
@@ -95,7 +232,7 @@ export const GenerateImageTool = buildTool({
   async checkPermissions(_input, _context) {
     return {
       behavior: 'ask' as const,
-      message: 'localclawd wants to generate an image via ComfyUI and save it to ~/generatedimages/.',
+      message: 'localclawd wants to generate an image via ComfyUI and save it to .localclawd/image-pipeline/generated/.',
     }
   },
   async prompt() {
@@ -105,140 +242,14 @@ export const GenerateImageTool = buildTool({
   renderToolUseErrorMessage,
   renderToolResultMessage,
   async call(input, { abortController }) {
-    const projectRoot = getCwd()
-    const config = await loadConfig(projectRoot)
-    const configuredUrl = config?.backendUrl ?? DEFAULT_COMFYUI_URL
-
-    // Auto-detect backend: localhost first, then configured URL
-    let backendUrl = DEFAULT_COMFYUI_URL
-    if (!await detectComfyUI(DEFAULT_COMFYUI_URL)) {
-      if (configuredUrl !== DEFAULT_COMFYUI_URL && await detectComfyUI(configuredUrl)) {
-        backendUrl = configuredUrl
-      } else {
-        return {
-          data: {
-            path: '', filename: '', promptId: '', seed: 0, backend: configuredUrl,
-            error: `ComfyUI not reachable at ${DEFAULT_COMFYUI_URL}${configuredUrl !== DEFAULT_COMFYUI_URL ? ` or ${configuredUrl}` : ''}. Start ComfyUI or run /image-pipeline config <url>.`,
-          },
-        }
-      }
-    }
-
-    if (abortController.signal.aborted) {
-      return { data: { path: '', filename: '', promptId: '', seed: 0, backend: backendUrl, error: 'Aborted' } }
-    }
-
-    const seed = input.seed ?? Math.floor(Math.random() * 2 ** 32)
-    const negativePrompt = input.negative_prompt ?? 'blurry, low quality, watermark, deformed'
-
-    const workflowName = input.workflow ?? config?.defaultWorkflow
-    const workflowBase = workflowName ? await loadWorkflow(projectRoot, workflowName) : null
-    const usingBuiltIn = !workflowBase
-
-    // For named workflows: only inject prompt + seed — preserve the workflow's steps/cfg/size/model
-    // For the built-in fallback: inject all config defaults (generic SD1.5 workflow)
-    const injectParams = usingBuiltIn
-      ? {
-          seed,
-          model: input.model ?? config?.defaultModel ?? 'v1-5-pruned-emaonly.safetensors',
-          width: input.width ?? config?.defaultWidth ?? 512,
-          height: input.height ?? config?.defaultHeight ?? 512,
-          steps: input.steps ?? config?.defaultSteps ?? 20,
-          cfg: input.cfg ?? config?.defaultCfg ?? 7,
-        }
-      : {
-          seed,
-          // Still allow explicit overrides from the tool call even for named workflows
-          ...(input.model && { model: input.model }),
-          ...(input.width && { width: input.width }),
-          ...(input.height && { height: input.height }),
-          ...(input.steps && { steps: input.steps }),
-          ...(input.cfg && { cfg: input.cfg }),
-        }
-
-    const workflow = injectPrompt(
-      workflowBase ?? DEFAULT_WORKFLOW,
-      input.prompt,
-      negativePrompt,
-      injectParams,
-    )
-
-    let queued: Awaited<ReturnType<typeof queuePrompt>>
     try {
-      queued = await queuePrompt(backendUrl, workflow as Record<string, unknown>)
+      return await callInner(input, abortController)
     } catch (e) {
+      const msg = e instanceof Error ? (e.message || e.constructor.name) : (e != null ? String(e) : 'unknown error')
       return {
-        data: { path: '', filename: '', promptId: '', seed, backend: backendUrl, error: `Queue failed: ${String(e)}` },
+        data: { path: '', filename: '', promptId: '', seed: 0, backend: DEFAULT_COMFYUI_URL, error: `GenerateImage failed: ${msg}` },
       }
     }
-
-    if (abortController.signal.aborted) {
-      return { data: { path: '', filename: '', promptId: queued.prompt_id, seed, backend: backendUrl, error: 'Aborted' } }
-    }
-
-    const result = await pollForCompletion(backendUrl, queued.prompt_id)
-    if (!result) {
-      return {
-        data: {
-          path: '', filename: '', promptId: queued.prompt_id, seed, backend: backendUrl,
-          error: `Timed out. Check ComfyUI: ${backendUrl}/history/${queued.prompt_id}`,
-        },
-      }
-    }
-
-    const comfyImages = extractOutputImages(result)
-    const firstImage = comfyImages[0]
-    if (!firstImage) {
-      return {
-        data: { path: '', filename: '', promptId: queued.prompt_id, seed, backend: backendUrl, error: 'Job completed but no output images found' },
-      }
-    }
-
-    const allImageMeta = Object.values(result.outputs).flatMap(o => o.images ?? [])
-    const imgMeta = allImageMeta.find(img => img.filename === firstImage)
-    const subfolder = imgMeta?.subfolder ?? ''
-    const imgType = imgMeta?.type ?? 'output'
-
-    // Download from ComfyUI
-    let rawBytes: Buffer | null = null
-    try {
-      const params = new URLSearchParams({ filename: firstImage, subfolder, type: imgType })
-      const res = await fetch(`${backendUrl}/view?${params}`)
-      if (res.ok) {
-        rawBytes = Buffer.from(await res.arrayBuffer())
-      }
-    } catch {
-      // download failed — proceed without image bytes
-    }
-
-    const outputDir = join(getCwd(), '.localclawd', 'image-pipeline', 'generated').replace(/\\/g, '/')
-    await mkdir(outputDir, { recursive: true })
-    const outName = `${timestamp()}_${slugify(input.prompt)}.png`
-    const savedPath = join(outputDir, outName).replace(/\\/g, '/')
-
-    if (rawBytes) {
-      await writeFile(savedPath, rawBytes)
-    }
-
-    const data: Output = {
-      path: savedPath,
-      filename: outName,
-      promptId: queued.prompt_id,
-      seed,
-      backend: backendUrl,
-    }
-
-    // Store image bytes in side-channel for mapToolResultToToolResultBlockParam.
-    // If we don't have the bytes from download, try reading the saved file.
-    const imageBytes = rawBytes ?? await readFile(savedPath).catch(() => null)
-    if (imageBytes && imageBytes.length > 0) {
-      imageDataCache.set(data, {
-        base64: imageBytes.toString('base64'),
-        mediaType: 'image/png',
-      })
-    }
-
-    return { data }
   },
   mapToolResultToToolResultBlockParam(output, toolUseID) {
     if (output.error) {

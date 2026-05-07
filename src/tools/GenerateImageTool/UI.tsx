@@ -16,8 +16,9 @@ export function renderToolUseMessage(
   return input.prompt ?? null
 }
 
-export function renderToolUseErrorMessage(error: Error): React.ReactNode {
-  return <Text color="red">{`GenerateImage error: ${error.message}`}</Text>
+export function renderToolUseErrorMessage(error: unknown): React.ReactNode {
+  const msg = error instanceof Error ? (error.message ?? 'unknown error') : (error != null ? String(error) : 'unknown error')
+  return <Text color="red">{`GenerateImage error: ${msg}`}</Text>
 }
 
 export function renderToolResultMessage(output: Output): React.ReactNode {
