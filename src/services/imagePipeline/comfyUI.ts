@@ -104,15 +104,32 @@ export async function fetchServerWorkflowList(url: string): Promise<string[] | n
   }
 }
 
-export async function fetchServerWorkflow(url: string, name: string): Promise<unknown | null> {
-  try {
-    const filename = name.endsWith('.json') ? name : `${name}.json`
-    const res = await fetch(`${url}/userdata/workflows/${encodeURIComponent(filename)}`)
-    if (!res.ok) return null
-    return res.json()
-  } catch {
-    return null
+export async function fetchServerWorkflow(
+  url: string,
+  name: string,
+): Promise<{ data: unknown } | { error: string }> {
+  const filename = name.endsWith('.json') ? name : `${name}.json`
+  // Try both path formats — ComfyUI version differences
+  const candidates = [
+    `${url}/userdata/workflows/${encodeURIComponent(filename)}`,
+    `${url}/userdata/${encodeURIComponent(filename)}`,
+  ]
+  for (const candidate of candidates) {
+    try {
+      const res = await fetch(candidate)
+      if (res.ok) {
+        try {
+          const data = await res.json()
+          return { data }
+        } catch {
+          return { error: `HTTP 200 but response is not JSON at ${candidate}` }
+        }
+      }
+    } catch {
+      // network error — try next
+    }
   }
+  return { error: `Not found. Tried:\n  ${candidates.join('\n  ')}` }
 }
 
 export function extractOutputImages(item: ComfyUIHistoryItem): string[] {

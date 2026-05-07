@@ -292,14 +292,15 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       return null
     }
 
-    const workflowData = await fetchServerWorkflow(backendUrl, name)
-    if (!workflowData) {
+    const fetchResult = await fetchServerWorkflow(backendUrl, name)
+    if ('error' in fetchResult) {
       onDone(
         [
           `◆ Image Pipeline — Fetch Failed: "${name}"`,
           '',
-          `  Could not fetch from ${backendUrl}/userdata/workflows/${name}.json`,
-          '  Check ComfyUI is running and the workflow name is correct.',
+          `  ${fetchResult.error}`,
+          '',
+          '  Make sure ComfyUI is running and the workflow exists.',
           '  Run /image-pipeline fetch (no args) to list available workflows.',
         ].join('\n'),
         { display: 'system' },
@@ -311,7 +312,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     const filename = name.endsWith('.json') ? name : `${name}.json`
     const outPath = join(projectRoot, '.localclawd', 'image-pipeline', 'workflows', filename)
     await mkdir(join(projectRoot, '.localclawd', 'image-pipeline', 'workflows'), { recursive: true })
-    await writeFile(outPath, JSON.stringify(workflowData, null, 2), 'utf-8')
+    await writeFile(outPath, JSON.stringify(fetchResult.data, null, 2), 'utf-8')
 
     onDone(
       [
