@@ -55,14 +55,7 @@ import { startToolRpcServer } from './services/rpc/toolRpcServer.js'
 import { startScheduler } from './services/schedule/scheduler.js'
 import { initProjectMemory } from './services/project/projectMemory.js'
 import { initSecretStore } from './services/secrets/secretStore.js'
-import { queryLocalProviderContextLength } from './services/api/localBackend.js'
 import { setLocalProviderContextWindow } from './utils/context.js'
-import {
-  getLocalLLMBaseUrl,
-  getLocalLLMModel,
-  getLocalLLMApiKey,
-  getLocalLLMProvider,
-} from './utils/model/providers.js'
 import {
   createTmuxSessionForWorktree,
   createWorktreeForSession,
@@ -327,30 +320,13 @@ export async function setup(
       void initProjectMemory(getOriginalCwd())
     } catch { /* non-critical */ }
     initSecretStore() // Initialize encrypted secret store
-    // Restore persisted context window immediately (sync) so thresholds are
-    // correct from the very first turn — before async detection completes.
+    // Restore the user's persisted context window setting so thresholds are
+    // correct from the very first turn. Set via /contextsize <size>.
     const persistedCtx = getGlobalConfig().compactContextWindowTokens
     if (persistedCtx && persistedCtx > 0) {
       setLocalProviderContextWindow(persistedCtx)
       logForDebugging(`[context] Restored context window from config: ${persistedCtx} tokens`)
     }
-    // Query local provider for actual context window size (fire-and-forget).
-    // Overwrites the persisted value if the provider reports something different.
-    void (async () => {
-      try {
-        const provider = getLocalLLMProvider()
-        const baseUrl = getLocalLLMBaseUrl(provider)
-        const model = getLocalLLMModel(provider) ?? ''
-        const apiKey = getLocalLLMApiKey(provider)
-        const contextLen = await queryLocalProviderContextLength(baseUrl, model, apiKey, provider)
-        if (contextLen && contextLen > 0) {
-          setLocalProviderContextWindow(contextLen)
-          logForDebugging(`[context] Local provider context window: ${contextLen} tokens`)
-        }
-      } catch {
-        // Non-fatal — persisted value already applied above
-      }
-    })()
     initSessionMemory() // Synchronous - registers hook, gate check happens lazily
     if (feature('CONTEXT_COLLAPSE')) {
       /* eslint-disable @typescript-eslint/no-require-imports */

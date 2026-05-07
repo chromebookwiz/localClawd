@@ -9,9 +9,9 @@ function getEnvAlias(localKey: string, legacyKey: string): string | undefined {
   return process.env[localKey] ?? process.env[legacyKey]
 }
 
-// Default context window when no model capability or provider detection is available.
-// 262144 = 256k — a common real-world limit for local models (vLLM, Ollama).
-export const MODEL_CONTEXT_WINDOW_DEFAULT = 262_144
+// Default context window when no model capability or local config is set.
+// 131072 = 128k — conservative default; set via /contextsize to match your model.
+export const MODEL_CONTEXT_WINDOW_DEFAULT = 131_072
 export const COMPACT_CONTEXT_WINDOW_CHOICES = [
   32_000,
   64_000,
@@ -133,9 +133,9 @@ export function getContextWindowForModel(
   if (_localProviderContextWindow && _localProviderContextWindow > 0) {
     return _localProviderContextWindow
   }
-  // Fall back to persisted config (set via /contextsize or auto-detected on
-  // a previous session). This ensures thresholds are correct even if the
-  // in-memory value hasn't been restored yet (e.g. very early in startup).
+  // Fall back to persisted config (set via /contextsize). This ensures
+  // thresholds are correct even if the in-memory value hasn't been restored
+  // yet (e.g. very early in startup).
   const persisted = getGlobalConfig().compactContextWindowTokens
   if (persisted && persisted > 0) {
     return persisted
