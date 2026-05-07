@@ -32,17 +32,6 @@ const DEFAULT_CONFIG: PipelineConfig = {
   defaultWorkflow: 'z_image_turbo',
 }
 
-const EXAMPLE_PROMPT = {
-  name: 'example-character',
-  description: 'Character portrait template',
-  positive: 'a fantasy warrior, detailed armor, dramatic lighting, 4k, highly detailed',
-  negative: 'blurry, low quality, text, watermark, deformed',
-  width: 512,
-  height: 512,
-  steps: 20,
-  cfg: 7,
-  sampler: 'euler',
-}
 
 export const DEFAULT_WORKFLOW: Record<string, WorkflowNode> = {
   '4': {
@@ -213,91 +202,6 @@ export const Z_IMAGE_TURBO_WORKFLOW: Record<string, WorkflowNode> = {
   '9': { class_type: 'SaveImage', inputs: { filename_prefix: 'z-image-turbo', images: ['8', 0] } },
 }
 
-const GENERATE_SH = `#!/usr/bin/env bash
-# localclawd image pipeline — quick generate helper
-# Usage: ./scripts/generate.sh "positive prompt" "negative prompt"
-
-set -e
-BACKEND="\${COMFYUI_URL:-http://127.0.0.1:8000}"
-POSITIVE="\${1:-a fantasy warrior}"
-NEGATIVE="\${2:-blurry, low quality}"
-SEED=\${RANDOM}
-
-echo "Submitting to \$BACKEND ..."
-curl -s -X POST "\$BACKEND/prompt" -H "Content-Type: application/json" -d '{
-  "prompt": {
-    "4": {"class_type":"CheckpointLoaderSimple","inputs":{"ckpt_name":"v1-5-pruned-emaonly.safetensors"}},
-    "5": {"class_type":"EmptyLatentImage","inputs":{"width":512,"height":512,"batch_size":1}},
-    "6": {"class_type":"CLIPTextEncode","inputs":{"clip":["4",1],"text":"'"$POSITIVE"'"}},
-    "7": {"class_type":"CLIPTextEncode","inputs":{"clip":["4",1],"text":"'"$NEGATIVE"'"}},
-    "3": {"class_type":"KSampler","inputs":{"model":["4",0],"positive":["6",0],"negative":["7",0],"latent_image":["5",0],"seed":'"$SEED"',"steps":20,"cfg":7,"sampler_name":"euler","scheduler":"normal","denoise":1}},
-    "8": {"class_type":"VAEDecode","inputs":{"samples":["3",0],"vae":["4",2]}},
-    "9": {"class_type":"SaveImage","inputs":{"filename_prefix":"localclawd","images":["8",0]}}
-  }
-}' | python3 -m json.tool
-echo "Check ComfyUI output folder or /history endpoint for results."
-`
-
-const GENERATE_PS1 = `# localclawd image pipeline — quick generate helper (PowerShell)
-# Usage: .\\scripts\\generate.ps1 "positive prompt" "negative prompt"
-param(
-  [string]$Positive = "a fantasy warrior",
-  [string]$Negative = "blurry, low quality"
-)
-$Backend = if ($env:COMFYUI_URL) { $env:COMFYUI_URL } else { "http://127.0.0.1:8000" }
-$Seed = Get-Random
-Write-Host "Submitting to $Backend ..."
-$body = @{
-  prompt = @{
-    "4" = @{ class_type = "CheckpointLoaderSimple"; inputs = @{ ckpt_name = "v1-5-pruned-emaonly.safetensors" } }
-    "5" = @{ class_type = "EmptyLatentImage"; inputs = @{ width = 512; height = 512; batch_size = 1 } }
-    "6" = @{ class_type = "CLIPTextEncode"; inputs = @{ clip = @("4",1); text = $Positive } }
-    "7" = @{ class_type = "CLIPTextEncode"; inputs = @{ clip = @("4",1); text = $Negative } }
-    "3" = @{ class_type = "KSampler"; inputs = @{ model = @("4",0); positive = @("6",0); negative = @("7",0); latent_image = @("5",0); seed = $Seed; steps = 20; cfg = 7; sampler_name = "euler"; scheduler = "normal"; denoise = 1 } }
-    "8" = @{ class_type = "VAEDecode"; inputs = @{ samples = @("3",0); vae = @("4",2) } }
-    "9" = @{ class_type = "SaveImage"; inputs = @{ filename_prefix = "localclawd"; images = @("8",0) } }
-  }
-} | ConvertTo-Json -Depth 10
-Invoke-RestMethod -Uri "$Backend/prompt" -Method POST -ContentType "application/json" -Body $body
-Write-Host "Done! Check ComfyUI output folder."
-`
-
-const README_CONTENT = `# Image Pipeline — .localclawd/image-pipeline/
-
-Project-local image generation configuration for localclawd + ComfyUI.
-
-## Quick Start
-
-1. Start ComfyUI on this machine (default port 8000)
-2. Run \`/image-pipeline\` in localclawd to check status
-3. Use \`/image a misty forest at dawn\` to generate an image
-4. Use \`/image txt2img: a misty forest at dawn\` to use a specific workflow
-
-## Structure
-
-\`\`\`
-config.json       — backend URL and default params
-prompts/          — reusable prompt templates (JSON)
-workflows/        — full ComfyUI workflow JSON files
-generated/        — locally downloaded output images
-scripts/          — generate.sh / generate.ps1 helpers
-\`\`\`
-
-## Remote ComfyUI
-
-Edit \`config.json\` → set \`backendUrl\` to your remote URL, e.g.:
-\`http://192.168.1.50:8000\`  or  \`http://mymachine.local:8000\`
-
-## Workflow Templates
-
-\`workflows/txt2img.json\` is a standard KSampler workflow.
-To use a workflow: \`/image <workflow-name>: <prompt>\`
-To set a default workflow: \`/image-pipeline workflow <name>\`
-
-Export workflows from ComfyUI via the Save (API format) button.
-Workflows with \`{{positive_prompt}}\` / \`{{negative_prompt}}\` placeholders
-are injected automatically; raw ComfyUI exports work via graph traversal.
-`
 
 export async function scaffoldProject(projectRoot: string): Promise<{
   configPath: string
@@ -314,7 +218,7 @@ export async function scaffoldProject(projectRoot: string): Promise<{
     // fresh install
   }
 
-  const dirs = [base, join(base, 'prompts'), join(base, 'workflows'), join(base, 'generated'), join(base, 'scripts')]
+  const dirs = [base, join(base, 'workflows'), join(base, 'generated')]
   for (const dir of dirs) {
     await mkdir(dir, { recursive: true })
   }
@@ -325,18 +229,6 @@ export async function scaffoldProject(projectRoot: string): Promise<{
   if (!alreadyExisted) {
     await writeFile(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf-8')
     created.push('.localclawd/image-pipeline/config.json')
-
-    await writeFile(join(base, 'prompts', 'example.json'), JSON.stringify(EXAMPLE_PROMPT, null, 2), 'utf-8')
-    created.push('.localclawd/image-pipeline/prompts/example.json')
-
-    await writeFile(join(base, 'scripts', 'generate.sh'), GENERATE_SH, 'utf-8')
-    created.push('.localclawd/image-pipeline/scripts/generate.sh')
-
-    await writeFile(join(base, 'scripts', 'generate.ps1'), GENERATE_PS1, 'utf-8')
-    created.push('.localclawd/image-pipeline/scripts/generate.ps1')
-
-    await writeFile(join(base, 'README.md'), README_CONTENT, 'utf-8')
-    created.push('.localclawd/image-pipeline/README.md')
   }
 
   // Always ensure bundled workflow templates exist (idempotent, never overwrites user files)

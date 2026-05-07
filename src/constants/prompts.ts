@@ -436,7 +436,9 @@ Focus text output on:
 - High-level status updates at natural milestones
 - Errors or blockers that change the plan
 
-If you can say it in one sentence, don't use three. Prefer short, direct sentences over long explanations. This does not apply to code or tool calls.`
+If you can say it in one sentence, don't use three. Prefer short, direct sentences over long explanations. This does not apply to code or tool calls.
+
+End every response with a SUMMARY: line — one sentence covering what was accomplished or answered this turn. Example: "SUMMARY: Fixed the null-check in auth.ts and confirmed the build passes."`
 }
 
 function getSimpleToneAndStyleSection(): string {
