@@ -1,119 +1,53 @@
-/**
- * /daytona-run <workspace> -- <command>
- *
- * Runs a command via `daytona ssh`. The workspace must already exist
- * and be accessible — create one with `daytona create` outside of
- * localclawd if needed.
- */
-
-import * as React from 'react'
-import { Box, Text } from '../../ink.js'
 import type { LocalJSXCommandCall } from '../../types/command.js'
 import { daytonaRun, isDaytonaAvailable } from '../../services/backend/daytonaBackend.js'
-import { AutoDone } from '../../components/AutoDone.js'
-
-function Result({
-  workspace, command, exitCode, stdout, stderr, onReady,
-}: {
-  workspace: string
-  command: string
-  exitCode: number | null
-  stdout: string
-  stderr: string
-  onReady: () => void
-}): React.ReactNode {
-  React.useEffect(() => {
-    const id = setTimeout(onReady, 0)
-    return () => clearTimeout(id)
-  }, [onReady])
-
-  const ok = exitCode === 0
-  const outLines = stdout.trim().split('\n').slice(-20)
-  const errLines = stderr.trim().split('\n').slice(-10)
-
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text bold color={ok ? 'green' : 'red'}>
-        {`◆ daytona ${workspace}  [exit ${exitCode ?? 'timed out'}]`}
-      </Text>
-      <Text dimColor>{`  $ ${command}`}</Text>
-      {outLines[0] && (
-        <Box flexDirection="column" marginLeft={2} marginTop={1}>
-          <Text bold>{'stdout:'}</Text>
-          {outLines.map((l, i) => <Text key={i} dimColor>{`  ${l}`}</Text>)}
-        </Box>
-      )}
-      {errLines[0] && (
-        <Box flexDirection="column" marginLeft={2} marginTop={1}>
-          <Text bold color="red">{'stderr:'}</Text>
-          {errLines.map((l, i) => <Text key={i} color="red">{`  ${l}`}</Text>)}
-        </Box>
-      )}
-    </Box>
-  )
-}
 
 export const call: LocalJSXCommandCall = async (onDone, _ctx, args) => {
   const input = (args ?? '').trim()
   if (!input) {
-    return (
-      <AutoDone onDone={onDone}>
-        <Box marginTop={1}>
-          <Text color="yellow" wrap="wrap">
-            {'Usage: /daytona-run <workspace> -- <command>\n' +
-              'Example: /daytona-run my-workspace -- npm test'}
-          </Text>
-        </Box>
-      </AutoDone>
-    )
+    onDone('Usage: /daytona-run <workspace> -- <command>\nExample: /daytona-run my-workspace -- npm test', { display: 'system' })
+    return null
   }
 
   if (!isDaytonaAvailable()) {
-    return (
-      <AutoDone onDone={onDone}>
-        <Box marginTop={1}>
-          <Text color="red">{'✗ daytona CLI not found on PATH.'}</Text>
-        </Box>
-      </AutoDone>
-    )
+    onDone('✗ daytona CLI not found on PATH.')
+    return null
   }
 
   const sepIdx = input.indexOf(' -- ')
   if (sepIdx < 0) {
-    return (
-      <AutoDone onDone={onDone}>
-        <Box marginTop={1}><Text color="red">{'/daytona-run requires " -- " between workspace and command.'}</Text></Box>
-      </AutoDone>
-    )
+    onDone('/daytona-run requires " -- " between workspace and command.', { display: 'system' })
+    return null
   }
   const workspace = input.slice(0, sepIdx).trim()
   const command = input.slice(sepIdx + 4).trim()
   if (!workspace || !command) {
-    return (
-      <AutoDone onDone={onDone}>
-        <Box marginTop={1}><Text color="red">{'Both a workspace name and a command are required.'}</Text></Box>
-      </AutoDone>
-    )
+    onDone('Both a workspace name and a command are required.', { display: 'system' })
+    return null
   }
 
   let result: Awaited<ReturnType<typeof daytonaRun>>
   try {
     result = await daytonaRun({ workspace, command })
   } catch (e) {
-    return (
-      <AutoDone onDone={onDone}>
-        <Box marginTop={1}><Text color="red">{`✗ daytona-run failed: ${e instanceof Error ? e.message : String(e)}`}</Text></Box>
-      </AutoDone>
-    )
+    onDone(`✗ daytona-run failed: ${e instanceof Error ? e.message : String(e)}`)
+    return null
   }
-  return (
-    <Result
-      workspace={workspace}
-      command={command}
-      exitCode={result.exitCode}
-      stdout={result.stdout}
-      stderr={result.stderr}
-      onReady={() => onDone(undefined)}
-    />
-  )
+
+  const lines: string[] = [
+    `◆ daytona ${workspace}  [exit ${result.exitCode ?? 'timed out'}]`,
+    `  $ ${command}`,
+  ]
+  const outLines = result.stdout.trim().split('\n').filter(Boolean).slice(-20)
+  const errLines = result.stderr.trim().split('\n').filter(Boolean).slice(-10)
+  if (outLines.length > 0) {
+    lines.push('stdout:')
+    for (const l of outLines) lines.push(`  ${l}`)
+  }
+  if (errLines.length > 0) {
+    lines.push('stderr:')
+    for (const l of errLines) lines.push(`  ${l}`)
+  }
+
+  onDone(lines.join('\n'))
+  return null
 }

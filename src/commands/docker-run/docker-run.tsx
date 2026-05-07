@@ -1,142 +1,54 @@
-/**
- * /docker-run <image> -- <command>
- *
- * Run a command in a throwaway container. Bind-mounts the current
- * working directory at /workspace so the command can read/write project
- * files.
- *
- * Examples:
- *   /docker-run python:3.12 -- python -c "print('hi')"
- *   /docker-run node:20-alpine -- npm test
- *   /docker-run ghcr.io/my/cli:latest -- my-cli --help
- */
-
-import * as React from 'react'
-import { Box, Text } from '../../ink.js'
 import type { LocalJSXCommandCall } from '../../types/command.js'
 import { dockerRun, isDockerAvailable } from '../../services/backend/dockerBackend.js'
 import { getOriginalCwd } from '../../bootstrap/state.js'
-import { AutoDone } from '../../components/AutoDone.js'
-
-function Result({
-  image,
-  command,
-  exitCode,
-  stdout,
-  stderr,
-  onReady,
-}: {
-  image: string
-  command: string
-  exitCode: number | null
-  stdout: string
-  stderr: string
-  onReady: () => void
-}): React.ReactNode {
-  React.useEffect(() => {
-    const id = setTimeout(onReady, 0)
-    return () => clearTimeout(id)
-  }, [onReady])
-
-  const ok = exitCode === 0
-  const outLines = stdout.trim().split('\n').slice(-20)
-  const errLines = stderr.trim().split('\n').slice(-10)
-
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text bold color={ok ? 'green' : 'red'}>
-        {`◆ docker-run ${image}  [exit ${exitCode ?? 'timed out'}]`}
-      </Text>
-      <Text dimColor>{`  $ ${command}`}</Text>
-      {outLines.length > 0 && outLines[0] && (
-        <Box flexDirection="column" marginLeft={2} marginTop={1}>
-          <Text bold>{'stdout:'}</Text>
-          {outLines.map((line, i) => (
-            <Text key={i} dimColor>{`  ${line}`}</Text>
-          ))}
-        </Box>
-      )}
-      {errLines.length > 0 && errLines[0] && (
-        <Box flexDirection="column" marginLeft={2} marginTop={1}>
-          <Text bold color="red">{'stderr:'}</Text>
-          {errLines.map((line, i) => (
-            <Text key={i} color="red">{`  ${line}`}</Text>
-          ))}
-        </Box>
-      )}
-    </Box>
-  )
-}
 
 export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
   const input = (args ?? '').trim()
   if (!input) {
-    return (
-      <AutoDone onDone={onDone}>
-        <Box marginTop={1}>
-          <Text color="yellow" wrap="wrap">
-            {'Usage: /docker-run <image> -- <command>\n' +
-              'Example: /docker-run python:3.12 -- python -c "print(\'hi\')"'}
-          </Text>
-        </Box>
-      </AutoDone>
-    )
+    onDone('Usage: /docker-run <image> -- <command>\nExample: /docker-run python:3.12 -- python -c "print(\'hi\')"', { display: 'system' })
+    return null
   }
 
   if (!isDockerAvailable()) {
-    return (
-      <AutoDone onDone={onDone}>
-        <Box marginTop={1}>
-          <Text color="red">{'✗ docker CLI not found on PATH. Install Docker Desktop or the docker package.'}</Text>
-        </Box>
-      </AutoDone>
-    )
+    onDone('✗ docker CLI not found on PATH. Install Docker Desktop or the docker package.')
+    return null
   }
 
-  // Split on the first " -- " — anything before is the image, anything after is the command
   const sepIdx = input.indexOf(' -- ')
   if (sepIdx < 0) {
-    return (
-      <AutoDone onDone={onDone}>
-        <Box marginTop={1}>
-          <Text color="red">{'/docker-run requires " -- " between the image and the command.'}</Text>
-        </Box>
-      </AutoDone>
-    )
+    onDone('/docker-run requires " -- " between the image and the command.\nUsage: /docker-run <image> -- <command>', { display: 'system' })
+    return null
   }
   const image = input.slice(0, sepIdx).trim()
   const command = input.slice(sepIdx + 4).trim()
   if (!image || !command) {
-    return (
-      <AutoDone onDone={onDone}>
-        <Box marginTop={1}>
-          <Text color="red">{'Both an image and a command are required.'}</Text>
-        </Box>
-      </AutoDone>
-    )
+    onDone('Both an image and a command are required.', { display: 'system' })
+    return null
   }
 
   let result: Awaited<ReturnType<typeof dockerRun>>
   try {
     result = await dockerRun({ image, command, workdir: getOriginalCwd() })
   } catch (e) {
-    return (
-      <AutoDone onDone={onDone}>
-        <Box marginTop={1}>
-          <Text color="red">{`✗ docker-run failed: ${e instanceof Error ? e.message : String(e)}`}</Text>
-        </Box>
-      </AutoDone>
-    )
+    onDone(`✗ docker-run failed: ${e instanceof Error ? e.message : String(e)}`)
+    return null
   }
 
-  return (
-    <Result
-      image={image}
-      command={command}
-      exitCode={result.exitCode}
-      stdout={result.stdout}
-      stderr={result.stderr}
-      onReady={() => onDone(undefined)}
-    />
-  )
+  const lines: string[] = [
+    `◆ docker-run ${image}  [exit ${result.exitCode ?? 'timed out'}]`,
+    `  $ ${command}`,
+  ]
+  const outLines = result.stdout.trim().split('\n').filter(Boolean).slice(-20)
+  const errLines = result.stderr.trim().split('\n').filter(Boolean).slice(-10)
+  if (outLines.length > 0) {
+    lines.push('stdout:')
+    for (const l of outLines) lines.push(`  ${l}`)
+  }
+  if (errLines.length > 0) {
+    lines.push('stderr:')
+    for (const l of errLines) lines.push(`  ${l}`)
+  }
+
+  onDone(lines.join('\n'))
+  return null
 }

@@ -1,16 +1,5 @@
-/**
- * /skill-stats — show how often each skill has been used.
- *
- * Highlights skills that may be ripe for distillation/refinement.
- */
-
-import * as React from 'react'
-import { Box, Text } from '../../ink.js'
 import type { LocalJSXCommandCall } from '../../types/command.js'
-import {
-  getSkillUsage,
-  shouldNudgeDistillation,
-} from '../../services/skills/skillUsage.js'
+import { getSkillUsage, shouldNudgeDistillation } from '../../services/skills/skillUsage.js'
 
 function timeAgo(ts: number): string {
   if (ts === 0) return 'never'
@@ -23,35 +12,11 @@ function timeAgo(ts: number): string {
   return `${Math.floor(hr / 24)}d ago`
 }
 
-function StatsView({
-  lines,
-  onReady,
-}: {
-  lines: string[]
-  onReady: () => void
-}): React.ReactNode {
-  React.useEffect(() => {
-    const id = setTimeout(onReady, 0)
-    return () => clearTimeout(id)
-  }, [onReady])
-
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text bold color="#6366f1">{'◆ Skill Usage'}</Text>
-      <Box flexDirection="column" marginLeft={2}>
-        {lines.map((line, i) => (
-          <Text key={i} dimColor={line.startsWith('  ')}>{line}</Text>
-        ))}
-      </Box>
-    </Box>
-  )
-}
-
 export const call: LocalJSXCommandCall = async (onDone) => {
   const records = await getSkillUsage()
   const nudge = await shouldNudgeDistillation()
 
-  const lines: string[] = []
+  const lines: string[] = ['◆ Skill Usage', '']
   if (records.length === 0) {
     lines.push('No skill invocations recorded yet.')
     lines.push('Skills become trackable once you invoke them via /skills.')
@@ -59,9 +24,7 @@ export const call: LocalJSXCommandCall = async (onDone) => {
     lines.push(`Total skills tracked: ${records.length}`)
     lines.push('')
     for (const r of records.slice(0, 15)) {
-      const ok = r.outcomes.success
-      const bad = r.outcomes.aborted
-      const summary = `${r.invocations}× (${ok}✓ ${bad}✗)  · last ${timeAgo(r.lastUsed)}`
+      const summary = `${r.invocations}× (${r.outcomes.success}✓ ${r.outcomes.aborted}✗)  · last ${timeAgo(r.lastUsed)}`
       lines.push(`  ${r.skillName.padEnd(28)} ${summary}`)
     }
   }
@@ -71,5 +34,6 @@ export const call: LocalJSXCommandCall = async (onDone) => {
     lines.push(`💡 ${nudge.reason}`)
   }
 
-  return <StatsView lines={lines} onReady={() => onDone(undefined)} />
+  onDone(lines.join('\n'), { display: 'system' })
+  return null
 }
