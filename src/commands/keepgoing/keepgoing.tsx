@@ -413,15 +413,16 @@ async function callInner(
 
   const handleReady = () => {
     try {
-      // nextInput + submitNextInput: true queues the next /keepgoing call AFTER
-      // the model responds (processed in handlePromptSubmit after onQuery returns).
-      // Direct enqueue() before onDone() races with the query and fires too early.
+      // Enqueue the next /keepgoing call BEFORE onDone so ESC (popAllEditable)
+      // can pull it out of the queue and cancel the loop. With isMeta: false
+      // (default), the queued command is editable — pressing ESC during the
+      // model response moves it to the input box where the user can clear it.
+      // The query guard prevents it from being processed until onQuery returns.
+      enqueue({ value: nextCmd, mode: 'prompt' })
       onDone(undefined, {
         display: 'system',
         shouldQuery: true,
         metaMessages: [prompt],
-        nextInput: nextCmd,
-        submitNextInput: true,
       })
     } catch (e) {
       logKgCrash(e, 'handleReady')

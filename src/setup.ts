@@ -345,8 +345,6 @@ export async function setup(
         const contextLen = await queryLocalProviderContextLength(baseUrl, model, apiKey, provider)
         if (contextLen && contextLen > 0) {
           setLocalProviderContextWindow(contextLen)
-          // Persist so it survives restarts without requiring re-detection
-          saveGlobalConfig(c => ({ ...c, compactContextWindowTokens: contextLen }))
           logForDebugging(`[context] Local provider context window: ${contextLen} tokens`)
         }
       } catch {
