@@ -22,7 +22,7 @@ export interface ComfyUIObjectInfo {
   }
 }
 
-export const DEFAULT_COMFYUI_URL = 'http://127.0.0.1:8188'
+export const DEFAULT_COMFYUI_URL = 'http://127.0.0.1:8000'
 const PROBE_TIMEOUT_MS = 3000
 
 export async function detectComfyUI(url = DEFAULT_COMFYUI_URL): Promise<boolean> {

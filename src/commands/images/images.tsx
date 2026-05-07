@@ -1,7 +1,7 @@
 /**
  * /image <prompt> — generate an image via ComfyUI and save locally.
  *
- * Auto-detects ComfyUI at http://127.0.0.1:8188.
+ * Auto-detects ComfyUI at http://127.0.0.1:8000.
  * Falls back to the URL in .localclawd/image-pipeline/config.json if set.
  * Saves to .localclawd/image-pipeline/generated/ if scaffolded, else ~/generatedimages/.
  */
@@ -41,7 +41,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
         '  Example: /image a misty forest at dawn, cinematic lighting',
         '',
         '  ComfyUI must be running. To set a remote URL:',
-        '    /image-pipeline config http://<host>:8188',
+        '    /image-pipeline config http://<host>:8000',
         '  To scaffold the project output folder:',
         '    /image-pipeline setup',
       ].join('\n'),
@@ -69,7 +69,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
         '',
         `  ComfyUI not found at ${configuredUrl}`,
         '  Start ComfyUI, then try again.',
-        '  To set a remote URL: /image-pipeline config http://<host>:8188',
+        '  To set a remote URL: /image-pipeline config http://<host>:8000',
       ].join('\n'),
       { display: 'system' },
     )

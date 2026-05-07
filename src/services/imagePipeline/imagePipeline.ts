@@ -83,7 +83,7 @@ const GENERATE_SH = `#!/usr/bin/env bash
 # Usage: ./scripts/generate.sh "positive prompt" "negative prompt"
 
 set -e
-BACKEND="\${COMFYUI_URL:-http://127.0.0.1:8188}"
+BACKEND="\${COMFYUI_URL:-http://127.0.0.1:8000}"
 POSITIVE="\${1:-a fantasy warrior}"
 NEGATIVE="\${2:-blurry, low quality}"
 SEED=\${RANDOM}
@@ -109,7 +109,7 @@ param(
   [string]$Positive = "a fantasy warrior",
   [string]$Negative = "blurry, low quality"
 )
-$Backend = if ($env:COMFYUI_URL) { $env:COMFYUI_URL } else { "http://127.0.0.1:8188" }
+$Backend = if ($env:COMFYUI_URL) { $env:COMFYUI_URL } else { "http://127.0.0.1:8000" }
 $Seed = Get-Random
 Write-Host "Submitting to $Backend ..."
 $body = @{
@@ -133,7 +133,7 @@ Project-local image generation configuration for localclawd + ComfyUI.
 
 ## Quick Start
 
-1. Start ComfyUI on this machine (default port 8188)
+1. Start ComfyUI on this machine (default port 8000)
 2. Run \`/image-pipeline\` in localclawd to check status
 3. Use \`/image-pipeline generate "your prompt"\` to submit a job
 4. Or run \`bash .localclawd/image-pipeline/scripts/generate.sh "prompt"\`
@@ -151,7 +151,7 @@ scripts/          — generate.sh / generate.ps1 helpers
 ## Remote ComfyUI
 
 Edit \`config.json\` → set \`backendUrl\` to your remote URL, e.g.:
-\`http://192.168.1.50:8188\`  or  \`http://mymachine.local:8188\`
+\`http://192.168.1.50:8000\`  or  \`http://mymachine.local:8000\`
 
 ## Workflow Templates
 

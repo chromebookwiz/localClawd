@@ -66,7 +66,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       lines.push(`  ● ComfyUI active at ${backendUrl}`)
     } else {
       lines.push(`  ○ ComfyUI not found at ${backendUrl}`)
-      lines.push(`  → Run: /image-pipeline config http://<host>:8188`)
+      lines.push(`  → Run: /image-pipeline config http://<host>:8000`)
     }
 
     if (scaffolded) {
@@ -101,7 +101,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       lines.push(`  ● ComfyUI active at ${backendUrl}`)
     } else {
       lines.push(`  ○ ComfyUI not detected at ${backendUrl}`)
-      lines.push(`  → To connect: /image-pipeline config http://<host>:8188`)
+      lines.push(`  → To connect: /image-pipeline config http://<host>:8000`)
     }
 
     lines.push('')
@@ -125,7 +125,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     const newUrl = restText
     if (!newUrl || !newUrl.startsWith('http')) {
       onDone(
-        '◆ Image Pipeline — Config\n\n  Usage: /image-pipeline config http://<host>:8188\n  Example: /image-pipeline config http://192.168.1.50:8188',
+        '◆ Image Pipeline — Config\n\n  Usage: /image-pipeline config http://<host>:8000\n  Example: /image-pipeline config http://192.168.1.50:8000',
         { display: 'system' },
       )
       return null
@@ -197,7 +197,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
         '',
         `  ComfyUI not reachable at ${tried}`,
         '  Start ComfyUI, then run: /image-pipeline generate <prompt>',
-        '  Or set a remote URL:    /image-pipeline config http://<host>:8188',
+        '  Or set a remote URL:    /image-pipeline config http://<host>:8000',
       ].join('\n'),
       { display: 'system' },
     )
