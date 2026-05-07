@@ -4,16 +4,14 @@
  * Usage:
  *   /image-pipeline              — show status + help
  *   /image-pipeline setup        — scaffold project dirs, detect ComfyUI
- *   /image-pipeline generate <p> — submit prompt, save to .localclawd/image-pipeline/generated/
+ *   /image-pipeline generate <p> — generate image, save to project generated/ folder
  *   /image-pipeline list         — list saved prompts and workflows
  *   /image-pipeline config <url> — set ComfyUI backend URL
  */
 
-import * as React from 'react'
-import { Box, Text } from '../../ink.js'
 import type { LocalJSXCommandCall } from '../../types/command.js'
-import { mkdir, writeFile } from 'fs/promises'
 import { join } from 'path'
+import { mkdir, writeFile } from 'fs/promises'
 import {
   detectComfyUI,
   DEFAULT_COMFYUI_URL,
@@ -29,36 +27,6 @@ import {
   listWorkflows,
 } from '../../services/imagePipeline/imagePipeline.js'
 
-// ─── UI ──────────────────────────────────────────────────────────────────────
-
-function PipelineCard({
-  title,
-  lines,
-  color,
-  onReady,
-}: {
-  title: string
-  lines: string[]
-  color?: string
-  onReady: () => void
-}): React.ReactNode {
-  React.useEffect(() => {
-    const id = setTimeout(onReady, 0)
-    return () => clearTimeout(id)
-  }, [onReady])
-
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text bold color={color ?? 'cyan'}>{title}</Text>
-      {lines.map((line, i) => (
-        <Text key={i} dimColor={line === ''}>{line}</Text>
-      ))}
-    </Box>
-  )
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 function timestamp(): string {
   const d = new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -70,13 +38,11 @@ function slugify(text: string, maxLen = 40): string {
 }
 
 async function pickBackend(config: Awaited<ReturnType<typeof loadConfig>>): Promise<string | null> {
-  const configured = config?.backendUrl ?? DEFAULT_COMFYUI_URL
   if (await detectComfyUI(DEFAULT_COMFYUI_URL)) return DEFAULT_COMFYUI_URL
-  if (configured !== DEFAULT_COMFYUI_URL && await detectComfyUI(configured)) return configured
+  const configured = config?.backendUrl
+  if (configured && configured !== DEFAULT_COMFYUI_URL && await detectComfyUI(configured)) return configured
   return null
 }
-
-// ─── Command ─────────────────────────────────────────────────────────────────
 
 export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
   const { getOriginalCwd } = await import('../../bootstrap/state.js')
@@ -85,49 +51,40 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
   const [subcmd, ...rest] = rawArgs ? rawArgs.split(/\s+/) : ['']
   const restText = rest.join(' ').trim()
 
-  // ── status (no args) ──────────────────────────────────────────────────────
+  // ── status ────────────────────────────────────────────────────────────────
   if (!subcmd) {
     const config = await loadConfig(projectRoot)
     const backendUrl = config?.backendUrl ?? DEFAULT_COMFYUI_URL
     const active = await detectComfyUI(backendUrl)
-    const prompts = await listPrompts(projectRoot)
-    const workflows = await listWorkflows(projectRoot)
     const scaffolded = config !== null
+    const prompts = scaffolded ? await listPrompts(projectRoot) : []
+    const workflows = scaffolded ? await listWorkflows(projectRoot) : []
 
-    const lines: string[] = []
+    const lines: string[] = ['◆ Image Pipeline', '']
 
     if (active) {
-      lines.push(`● ComfyUI active at ${backendUrl}`)
+      lines.push(`  ● ComfyUI active at ${backendUrl}`)
     } else {
-      lines.push(`○ ComfyUI not found at ${backendUrl}`)
-      lines.push('')
-      lines.push('  To connect:')
-      lines.push('    /image-pipeline config http://<host>:8188')
-      lines.push('  Then scaffold the project:')
-      lines.push('    /image-pipeline setup')
+      lines.push(`  ○ ComfyUI not found at ${backendUrl}`)
+      lines.push(`  → Run: /image-pipeline config http://<host>:8188`)
     }
 
     if (scaffolded) {
-      lines.push(`  Scaffold: .localclawd/image-pipeline/ (${prompts.length} prompts, ${workflows.length} workflows)`)
-      lines.push(`  Output dir: .localclawd/image-pipeline/generated/`)
-    } else if (active) {
-      lines.push('  Not scaffolded — run /image-pipeline setup')
+      lines.push(`  Scaffold: .localclawd/image-pipeline/  (${prompts.length} prompts, ${workflows.length} workflows)`)
+      lines.push(`  Output:   .localclawd/image-pipeline/generated/`)
+    } else {
+      lines.push(`  Not scaffolded — run: /image-pipeline setup`)
     }
 
     lines.push('')
-    lines.push('  /image-pipeline setup             scaffold project dirs')
-    lines.push('  /image-pipeline generate <prompt> generate and save image')
-    lines.push('  /image-pipeline config <url>      set ComfyUI URL')
-    lines.push('  /image-pipeline list              list templates')
+    lines.push('  Commands:')
+    lines.push('    /image-pipeline setup             — create project dirs and templates')
+    lines.push('    /image-pipeline config <url>      — set ComfyUI backend URL')
+    lines.push('    /image-pipeline generate <prompt> — generate image and save to project')
+    lines.push('    /image-pipeline list              — list prompt/workflow templates')
 
-    return (
-      <PipelineCard
-        title="◆ Image Pipeline"
-        lines={lines}
-        color={active ? 'green' : 'yellow'}
-        onReady={() => onDone(undefined)}
-      />
-    )
+    onDone(lines.join('\n'), { display: 'system' })
+    return null
   }
 
   // ── setup ─────────────────────────────────────────────────────────────────
@@ -136,12 +93,18 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     const config = await loadConfig(projectRoot)
     const backendUrl = config?.backendUrl ?? DEFAULT_COMFYUI_URL
     const active = await detectComfyUI(backendUrl)
+    const outputDir = join(projectRoot, '.localclawd', 'image-pipeline', 'generated')
 
-    const lines: string[] = [
-      active ? `● ComfyUI active at ${backendUrl}` : `○ ComfyUI not detected at ${backendUrl}`,
-      '',
-    ]
+    const lines: string[] = ['◆ Image Pipeline — Setup', '']
 
+    if (active) {
+      lines.push(`  ● ComfyUI active at ${backendUrl}`)
+    } else {
+      lines.push(`  ○ ComfyUI not detected at ${backendUrl}`)
+      lines.push(`  → To connect: /image-pipeline config http://<host>:8188`)
+    }
+
+    lines.push('')
     if (alreadyExisted) {
       lines.push('  Pipeline already scaffolded.')
     } else {
@@ -149,43 +112,26 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       for (const f of created) lines.push(`    + ${f}`)
     }
 
-    if (!active) {
-      lines.push('', '  To connect ComfyUI:', '    /image-pipeline config http://<host>:8188')
-    }
+    lines.push('')
+    lines.push(`  Generated images will be saved to:`)
+    lines.push(`    ${outputDir}`)
 
-    lines.push(
-      '',
-      '  Generated images will be saved to:',
-      `    ${join(projectRoot, '.localclawd', 'image-pipeline', 'generated')}`,
-    )
-
-    return (
-      <PipelineCard
-        title="◆ Image Pipeline — Setup"
-        lines={lines}
-        color={active ? 'green' : 'yellow'}
-        onReady={() => onDone(undefined)}
-      />
-    )
+    onDone(lines.join('\n'), { display: 'system' })
+    return null
   }
 
   // ── config ────────────────────────────────────────────────────────────────
   if (subcmd === 'config') {
     const newUrl = restText
     if (!newUrl || !newUrl.startsWith('http')) {
-      return (
-        <PipelineCard
-          title="◆ Image Pipeline — Config"
-          lines={['  Usage: /image-pipeline config http://<host>:8188']}
-          color="yellow"
-          onReady={() => onDone(undefined)}
-        />
+      onDone(
+        '◆ Image Pipeline — Config\n\n  Usage: /image-pipeline config http://<host>:8188\n  Example: /image-pipeline config http://192.168.1.50:8188',
+        { display: 'system' },
       )
+      return null
     }
 
-    // Scaffold dirs first so saveConfig doesn't fail on missing directory
     await scaffoldProject(projectRoot)
-
     const existing = (await loadConfig(projectRoot)) ?? {
       backendUrl: DEFAULT_COMFYUI_URL,
       defaultWidth: 512, defaultHeight: 512, defaultSteps: 20, defaultCfg: 7,
@@ -195,26 +141,25 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     await saveConfig(projectRoot, existing)
     const active = await detectComfyUI(newUrl)
 
-    return (
-      <PipelineCard
-        title="◆ Image Pipeline — Config Saved"
-        lines={[
-          `  Backend URL: ${newUrl}`,
-          active ? '  ● ComfyUI reachable' : '  ○ ComfyUI not reachable (saved anyway)',
-        ]}
-        color={active ? 'green' : 'yellow'}
-        onReady={() => onDone(undefined)}
-      />
-    )
+    const lines = [
+      '◆ Image Pipeline — Config Saved',
+      '',
+      `  Backend URL: ${newUrl}`,
+      active ? '  ● ComfyUI is reachable' : '  ○ ComfyUI not reachable yet (URL saved — start ComfyUI to connect)',
+    ]
+
+    onDone(lines.join('\n'), { display: 'system' })
+    return null
   }
 
   // ── list ──────────────────────────────────────────────────────────────────
   if (subcmd === 'list') {
     const [prompts, workflows] = await Promise.all([listPrompts(projectRoot), listWorkflows(projectRoot)])
-    const lines: string[] = []
+    const lines: string[] = ['◆ Image Pipeline — Templates', '']
 
     if (prompts.length === 0 && workflows.length === 0) {
-      lines.push('  No templates yet — run /image-pipeline setup')
+      lines.push('  No templates yet.')
+      lines.push('  Run /image-pipeline setup to scaffold the project.')
     } else {
       if (prompts.length > 0) {
         lines.push('  Prompt templates:')
@@ -226,43 +171,37 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       }
     }
 
-    return (
-      <PipelineCard
-        title="◆ Image Pipeline — Templates"
-        lines={lines}
-        onReady={() => onDone(undefined)}
-      />
-    )
+    onDone(lines.join('\n'), { display: 'system' })
+    return null
   }
 
   // ── generate ──────────────────────────────────────────────────────────────
   const promptText = (subcmd === 'generate' || subcmd === 'gen') ? restText : rawArgs
+
   if (!promptText) {
-    return (
-      <PipelineCard
-        title="◆ Image Pipeline — Generate"
-        lines={['  Usage: /image-pipeline generate <prompt>']}
-        color="yellow"
-        onReady={() => onDone(undefined)}
-      />
+    onDone(
+      '◆ Image Pipeline — Generate\n\n  Usage: /image-pipeline generate <prompt>\n  Example: /image-pipeline generate a misty mountain at dawn, cinematic',
+      { display: 'system' },
     )
+    return null
   }
 
   const config = await loadConfig(projectRoot)
   const backend = await pickBackend(config)
+
   if (!backend) {
     const tried = config?.backendUrl ?? DEFAULT_COMFYUI_URL
-    return (
-      <PipelineCard
-        title="◆ Image Pipeline — No Backend"
-        lines={[
-          `  ComfyUI not reachable at ${tried}`,
-          '  Start ComfyUI or run: /image-pipeline config <url>',
-        ]}
-        color="red"
-        onReady={() => onDone(undefined)}
-      />
+    onDone(
+      [
+        '◆ Image Pipeline — No Backend',
+        '',
+        `  ComfyUI not reachable at ${tried}`,
+        '  Start ComfyUI, then run: /image-pipeline generate <prompt>',
+        '  Or set a remote URL:    /image-pipeline config http://<host>:8188',
+      ].join('\n'),
+      { display: 'system' },
     )
+    return null
   }
 
   const model = config?.defaultModel || 'v1-5-pruned-emaonly.safetensors'
@@ -293,32 +232,27 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
   try {
     queued = await queuePrompt(backend, workflow)
   } catch (e) {
-    return (
-      <PipelineCard
-        title="◆ Image Pipeline — Queue Error"
-        lines={[`  ${String(e)}`]}
-        color="red"
-        onReady={() => onDone(undefined)}
-      />
+    onDone(
+      `◆ Image Pipeline — Queue Error\n\n  ${String(e)}\n  Is ComfyUI running and a model loaded?`,
+      { display: 'system' },
     )
+    return null
   }
 
   const result = await pollForCompletion(backend, queued.prompt_id)
   if (!result) {
-    return (
-      <PipelineCard
-        title="◆ Image Pipeline — Timed Out"
-        lines={[
-          `  Job queued: ${queued.prompt_id}`,
-          `  Check: ${backend}/history/${queued.prompt_id}`,
-        ]}
-        color="yellow"
-        onReady={() => onDone(undefined)}
-      />
+    onDone(
+      [
+        '◆ Image Pipeline — Timed Out',
+        '',
+        `  Job queued: ${queued.prompt_id}`,
+        `  Check: ${backend}/history/${queued.prompt_id}`,
+      ].join('\n'),
+      { display: 'system' },
     )
+    return null
   }
 
-  // Download and save to <projectRoot>/.localclawd/image-pipeline/generated/
   const outputDir = join(projectRoot, '.localclawd', 'image-pipeline', 'generated')
   await mkdir(outputDir, { recursive: true })
 
@@ -334,9 +268,8 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       const res = await fetch(`${backend}/view?${params}`)
       if (res.ok) {
         const outName = `${timestamp()}_${slugify(promptText)}.png`
-        const outPath = join(outputDir, outName)
-        await writeFile(outPath, Buffer.from(await res.arrayBuffer()))
-        savedPaths.push(outPath)
+        await writeFile(join(outputDir, outName), Buffer.from(await res.arrayBuffer()))
+        savedPaths.push(join(outputDir, outName))
       }
     } catch {
       // skip failed downloads
@@ -345,22 +278,20 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
 
   const lines = savedPaths.length > 0
     ? [
+        '◆ Image Pipeline — Done',
+        '',
         `  Saved ${savedPaths.length} image${savedPaths.length !== 1 ? 's' : ''}:`,
         ...savedPaths.map(p => `    ${p}`),
         `  Seed: ${seed}  ·  ${steps} steps  ·  ${width}×${height}  ·  ${model}`,
       ]
     : [
-        `  Job complete — download failed, images in ComfyUI output folder.`,
-        `  ComfyUI filenames: ${comfyImages.join(', ') || '(none)'}`,
+        '◆ Image Pipeline — Done (download failed)',
+        '',
+        `  Job complete but image download failed.`,
+        `  Check ComfyUI output folder for: ${comfyImages.join(', ') || '(filenames unknown)'}`,
         `  Seed: ${seed}`,
       ]
 
-  return (
-    <PipelineCard
-      title="◆ Image Pipeline — Done"
-      lines={lines}
-      color={savedPaths.length > 0 ? 'green' : 'yellow'}
-      onReady={() => onDone(undefined)}
-    />
-  )
+  onDone(lines.join('\n'), { display: 'system' })
+  return null
 }
