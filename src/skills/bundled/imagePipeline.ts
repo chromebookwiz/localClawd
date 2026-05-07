@@ -418,7 +418,7 @@ Use this whenever the user asks to:
 
 export function registerImagePipelineSkill(): void {
   registerBundledSkill({
-    name: 'image-pipeline',
+    name: 'local-image-gen',
     description:
       'Set up and operate a project-local image generation and review pipeline for game textures, sprites, and other art assets.',
     whenToUse:
