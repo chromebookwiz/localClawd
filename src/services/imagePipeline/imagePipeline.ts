@@ -81,8 +81,8 @@ export const DEFAULT_WORKFLOW: Record<string, WorkflowNode> = {
     inputs: { samples: ['3', 0], vae: ['4', 2] },
   },
   '9': {
-    class_type: 'PreviewImage',
-    inputs: { images: ['8', 0] },
+    class_type: 'SaveImage',
+    inputs: { filename_prefix: 'localclawd', images: ['8', 0] },
   },
 }
 
@@ -210,7 +210,7 @@ export const Z_IMAGE_TURBO_WORKFLOW: Record<string, WorkflowNode> = {
     },
   },
   '8': { class_type: 'VAEDecode', inputs: { samples: ['3', 0], vae: ['29', 0] } },
-  '9': { class_type: 'PreviewImage', inputs: { images: ['8', 0] } },
+  '9': { class_type: 'SaveImage', inputs: { filename_prefix: 'z-image-turbo', images: ['8', 0] } },
 }
 
 const GENERATE_SH = `#!/usr/bin/env bash

@@ -126,17 +126,26 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     // fall through to built-in
   }
 
+  const usingBuiltIn = !workflow
   if (!workflow) workflow = DEFAULT_WORKFLOW
 
-  const model = config?.defaultModel || 'v1-5-pruned-emaonly.safetensors'
-  const width = config?.defaultWidth ?? 512
-  const height = config?.defaultHeight ?? 512
-  const steps = config?.defaultSteps ?? 20
-  const cfg = config?.defaultCfg ?? 7
   const seed = Math.floor(Math.random() * 2 ** 32)
   const negative = 'blurry, low quality, watermark, deformed'
 
-  const finalWorkflow = injectPrompt(workflow, promptText, negative, { seed, model, width, height, steps, cfg })
+  // For named workflows: only inject prompt + seed — preserve the workflow's own steps/cfg/size/model
+  // For the built-in fallback: inject all config defaults (it's a generic SD1.5 workflow)
+  const injectParams = usingBuiltIn
+    ? {
+        seed,
+        model: config?.defaultModel || 'v1-5-pruned-emaonly.safetensors',
+        width: config?.defaultWidth ?? 512,
+        height: config?.defaultHeight ?? 512,
+        steps: config?.defaultSteps ?? 20,
+        cfg: config?.defaultCfg ?? 7,
+      }
+    : { seed }
+
+  const finalWorkflow = injectPrompt(workflow, promptText, negative, injectParams)
 
   let queued: Awaited<ReturnType<typeof queuePrompt>>
   try {
@@ -196,7 +205,9 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
         '◆ /image — Done',
         '',
         `  Saved to: ${savedPaths.join('\n            ')}`,
-        `  Workflow: ${usedWorkflow}  ·  Seed: ${seed}  ·  ${steps} steps  ·  ${width}×${height}`,
+        `  Workflow: ${usedWorkflow}`,
+        `  Prompt:   ${promptText.length > 80 ? promptText.slice(0, 80) + '…' : promptText}`,
+        `  Seed:     ${seed}`,
       ]
     : [
         '◆ /image — Done (download failed)',
@@ -204,6 +215,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
         '  Job complete but image download failed.',
         `  ComfyUI filenames: ${comfyImages.join(', ') || '(none)'}`,
         `  Workflow: ${usedWorkflow}  ·  Seed: ${seed}`,
+        `  Try fetching manually: ${backendUrl}/view?filename=${comfyImages[0] ?? ''}&type=output`,
       ]
 
   onDone(lines.join('\n'), { display: 'system' })

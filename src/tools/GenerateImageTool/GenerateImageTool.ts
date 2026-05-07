@@ -129,21 +129,39 @@ export const GenerateImageTool = buildTool({
       return { data: { path: '', filename: '', promptId: '', seed: 0, backend: backendUrl, error: 'Aborted' } }
     }
 
-    const model = input.model ?? config?.defaultModel ?? 'v1-5-pruned-emaonly.safetensors'
-    const width = input.width ?? config?.defaultWidth ?? 512
-    const height = input.height ?? config?.defaultHeight ?? 512
-    const steps = input.steps ?? config?.defaultSteps ?? 20
-    const cfg = input.cfg ?? config?.defaultCfg ?? 7
     const seed = input.seed ?? Math.floor(Math.random() * 2 ** 32)
     const negativePrompt = input.negative_prompt ?? 'blurry, low quality, watermark, deformed'
 
     const workflowName = input.workflow ?? config?.defaultWorkflow
     const workflowBase = workflowName ? await loadWorkflow(projectRoot, workflowName) : null
+    const usingBuiltIn = !workflowBase
+
+    // For named workflows: only inject prompt + seed — preserve the workflow's steps/cfg/size/model
+    // For the built-in fallback: inject all config defaults (generic SD1.5 workflow)
+    const injectParams = usingBuiltIn
+      ? {
+          seed,
+          model: input.model ?? config?.defaultModel ?? 'v1-5-pruned-emaonly.safetensors',
+          width: input.width ?? config?.defaultWidth ?? 512,
+          height: input.height ?? config?.defaultHeight ?? 512,
+          steps: input.steps ?? config?.defaultSteps ?? 20,
+          cfg: input.cfg ?? config?.defaultCfg ?? 7,
+        }
+      : {
+          seed,
+          // Still allow explicit overrides from the tool call even for named workflows
+          ...(input.model && { model: input.model }),
+          ...(input.width && { width: input.width }),
+          ...(input.height && { height: input.height }),
+          ...(input.steps && { steps: input.steps }),
+          ...(input.cfg && { cfg: input.cfg }),
+        }
+
     const workflow = injectPrompt(
       workflowBase ?? DEFAULT_WORKFLOW,
       input.prompt,
       negativePrompt,
-      { seed, model, width, height, steps, cfg },
+      injectParams,
     )
 
     let queued: Awaited<ReturnType<typeof queuePrompt>>
