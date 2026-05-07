@@ -461,7 +461,7 @@ export async function getSystemPrompt(
 ): Promise<string[]> {
   if (isEnvTruthy(process.env.CLAUDE_CODE_SIMPLE)) {
     return [
-      `You are localclawd, a local-first coding CLI running against user-controlled models.\n\nCWD: ${getCwd()}\nDate: ${getSessionStartDate()}`,
+      `You are localclawd, a local-first coding CLI running against user-controlled models.\n\nCWD: ${getCwd().replace(/\\/g, '/')}\nDate: ${getSessionStartDate()}`,
     ]
   }
 
@@ -654,7 +654,7 @@ export async function computeEnvInfo(
 
   return `Here is useful information about the environment you are running in:
 <env>
-Working directory: ${getCwd()}
+Working directory: ${getCwd().replace(/\\/g, '/')}
 Is directory a git repo: ${isGit ? 'Yes' : 'No'}
 ${additionalDirsInfo}Platform: ${env.platform}
 ${getShellInfoLine()}
@@ -686,7 +686,7 @@ export async function computeSimpleEnvInfo(
     ? `Assistant knowledge cutoff is ${cutoff}.`
     : null
 
-  const cwd = getCwd()
+  const cwd = getCwd().replace(/\\/g, '/')
   const isWorktree = getCurrentWorktreeSession() !== null
 
   const envItems = [

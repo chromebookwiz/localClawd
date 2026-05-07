@@ -215,10 +215,10 @@ export const GenerateImageTool = buildTool({
     // Save to project pipeline folder if scaffolded, else ~/generatedimages/
     const projectGenDir = join(getCwd(), '.localclawd', 'image-pipeline', 'generated')
     const useProjectDir = await access(projectGenDir).then(() => true).catch(() => false)
-    const outputDir = useProjectDir ? projectGenDir : join(homedir(), 'generatedimages')
+    const outputDir = (useProjectDir ? projectGenDir : join(homedir(), 'generatedimages')).replace(/\\/g, '/')
     await mkdir(outputDir, { recursive: true })
     const outName = `${timestamp()}_${slugify(input.prompt)}.png`
-    const savedPath = join(outputDir, outName)
+    const savedPath = join(outputDir, outName).replace(/\\/g, '/')
 
     if (rawBytes) {
       await writeFile(savedPath, rawBytes)

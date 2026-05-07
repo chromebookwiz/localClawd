@@ -86,7 +86,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     const config = await loadConfig(projectRoot)
     const backendUrl = config?.backendUrl ?? DEFAULT_COMFYUI_URL
     const active = await detectComfyUI(backendUrl)
-    const generatedDir = join(projectRoot, '.localclawd', 'image-pipeline', 'generated')
+    const generatedDir = join(projectRoot, '.localclawd', 'image-pipeline', 'generated').replace(/\\/g, '/')
 
     const lines: string[] = ['◆ Image Pipeline — Setup', '']
 
@@ -208,7 +208,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
         lines.push('  No local workflows found.')
         lines.push('  Run /image-pipeline setup to add bundled templates.')
         lines.push('  Or export a workflow from ComfyUI (API Format) and drop it into:')
-        lines.push(`    ${join(projectRoot, '.localclawd', 'image-pipeline', 'workflows')}`)
+        lines.push(`    ${join(projectRoot, '.localclawd', 'image-pipeline', 'workflows').replace(/\\/g, '/')}`)
       }
       onDone(lines.join('\n'), { display: 'system' })
       return null
@@ -309,7 +309,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
 
     const fetchResult = await fetchServerWorkflow(backendUrl, name)
     if ('error' in fetchResult) {
-      const wfDir = join(projectRoot, '.localclawd', 'image-pipeline', 'workflows', 'comfyui')
+      const wfDir = join(projectRoot, '.localclawd', 'image-pipeline', 'workflows', 'comfyui').replace(/\\/g, '/')
       onDone(
         [
           `◆ Image Pipeline — Fetch Failed: "${name}"`,

@@ -638,7 +638,7 @@ export const FileReadTool = buildTool({
 
         const similarFilename = findSimilarFile(fullFilePath)
         const cwdSuggestion = await suggestPathUnderCwd(fullFilePath)
-        let message = `File does not exist. ${FILE_NOT_FOUND_CWD_NOTE} ${getCwd()}.`
+        let message = `File does not exist. ${FILE_NOT_FOUND_CWD_NOTE} ${getCwd().replace(/\\/g, '/')}.`
         if (cwdSuggestion) {
           message += ` Did you mean ${cwdSuggestion}?`
         } else if (similarFilename) {

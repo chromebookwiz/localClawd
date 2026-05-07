@@ -223,7 +223,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
 
   const projectGenDir = join(projectRoot, '.localclawd', 'image-pipeline', 'generated')
   const useProjectDir = await access(projectGenDir).then(() => true).catch(() => false)
-  const outputDir = useProjectDir ? projectGenDir : join(homedir(), 'generatedimages')
+  const outputDir = (useProjectDir ? projectGenDir : join(homedir(), 'generatedimages')).replace(/\\/g, '/')
   await mkdir(outputDir, { recursive: true })
 
   const comfyImages = extractOutputImages(result)

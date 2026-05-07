@@ -214,7 +214,7 @@ export const GrepTool = buildTool({
       } catch (e: unknown) {
         if (isENOENT(e)) {
           const cwdSuggestion = await suggestPathUnderCwd(absolutePath)
-          let message = `Path does not exist: ${path}. ${FILE_NOT_FOUND_CWD_NOTE} ${getCwd()}.`
+          let message = `Path does not exist: ${path}. ${FILE_NOT_FOUND_CWD_NOTE} ${getCwd().replace(/\\/g, '/')}.`
           if (cwdSuggestion) {
             message += ` Did you mean ${cwdSuggestion}?`
           }
