@@ -135,13 +135,15 @@ TodoCreate, TodoUpdate
 · Run builds/tests after significant changes
 · If genuinely blocked: state the blocker clearly, spawn a subagent to research it, or try an alternative approach — do NOT stall
 
-━━━ SELF-DIRECTIVE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-At the END of every response, write exactly this line:
+━━━ REQUIRED ENDING ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+At the END of every response, write exactly these two lines:
 
+SUMMARY: <1-2 sentences of what you accomplished this round>
 NEXT: <1–3 sentences describing your specific plan for the next round>
 
-This becomes your only prompt next round. Be precise about what to do,
-what files to touch, and what outcome to verify.`
+Both lines are required every round without exception.
+NEXT: becomes your only prompt next round — be precise about files,
+actions, and outcomes to verify.`
 }
 
 // Sent on rounds 2+ when the model has written a NEXT: directive.
@@ -166,6 +168,7 @@ DIRECTIVE:
 ${directive}
 
 Proceed. End your response with:
+SUMMARY: <what you accomplished this round>
 NEXT: <your plan for the following round>`
 }
 

@@ -4,8 +4,7 @@
  */
 
 import type { LocalJSXCommandCall } from '../../types/command.js'
-import { homedir } from 'os'
-import { access, mkdir, writeFile } from 'fs/promises'
+import { mkdir, writeFile } from 'fs/promises'
 import { join } from 'path'
 import {
   detectComfyUI,
@@ -221,9 +220,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     return null
   }
 
-  const projectGenDir = join(projectRoot, '.localclawd', 'image-pipeline', 'generated')
-  const useProjectDir = await access(projectGenDir).then(() => true).catch(() => false)
-  const outputDir = (useProjectDir ? projectGenDir : join(homedir(), 'generatedimages')).replace(/\\/g, '/')
+  const outputDir = join(projectRoot, '.localclawd', 'image-pipeline', 'generated').replace(/\\/g, '/')
   await mkdir(outputDir, { recursive: true })
 
   const comfyImages = extractOutputImages(result)

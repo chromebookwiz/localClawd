@@ -1,8 +1,7 @@
 import { z } from 'zod/v4'
 import { buildTool, type ToolDef } from '../../Tool.js'
 import { lazySchema } from '../../utils/lazySchema.js'
-import { homedir } from 'os'
-import { access, mkdir, readFile, writeFile } from 'fs/promises'
+import { mkdir, readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 import {
   detectComfyUI,
@@ -212,10 +211,7 @@ export const GenerateImageTool = buildTool({
       // download failed — proceed without image bytes
     }
 
-    // Save to project pipeline folder if scaffolded, else ~/generatedimages/
-    const projectGenDir = join(getCwd(), '.localclawd', 'image-pipeline', 'generated')
-    const useProjectDir = await access(projectGenDir).then(() => true).catch(() => false)
-    const outputDir = (useProjectDir ? projectGenDir : join(homedir(), 'generatedimages')).replace(/\\/g, '/')
+    const outputDir = join(getCwd(), '.localclawd', 'image-pipeline', 'generated').replace(/\\/g, '/')
     await mkdir(outputDir, { recursive: true })
     const outName = `${timestamp()}_${slugify(input.prompt)}.png`
     const savedPath = join(outputDir, outName).replace(/\\/g, '/')
