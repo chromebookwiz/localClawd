@@ -1,0 +1,12 @@
+{
+  "name": "node-domexception",
+  "version": "1.0.0",
+  "description": "Local shim: re-exports native globalThis.DOMException (Node 20+).",
+  "exports": {
+    ".": {
+      "import": "./index.mjs",
+      "require": "./index.cjs"
+    }
+  },
+  "main": "index.cjs"
+}
