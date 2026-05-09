@@ -1,12 +1,14 @@
 /**
- * Encrypted Secret Store
+ * Per-project Encrypted Secret Store
  *
- * Secrets are stored encrypted (AES-256-GCM) in ~/.localclawd/secrets.enc.
- * The encryption key is derived via PBKDF2 from LOCALCLAWD_SECRET_KEY env var.
- * The plaintext value NEVER touches disk — only the ciphertext is persisted.
+ * Secrets are stored AES-256-GCM encrypted in <project>/.localclawd/secrets.enc.
  *
- * If LOCALCLAWD_SECRET_KEY is not set, secrets are kept in-memory only
- * (lost on restart) and the model is warned.
+ * Key derivation:
+ *   1. LOCALCLAWD_SECRET_KEY env var — explicit passphrase (CI/CD, shared machines)
+ *   2. Auto-generated per-project key stored in ~/.localclawd/keys/<project-id>.key
+ *      (machine-local, never committed to the project directory)
+ *
+ * Both paths persist across restarts with no user configuration required.
  *
  * File format (binary):
  *   [4 bytes magic 'LCSC'] [1 byte version=1]
@@ -21,7 +23,8 @@ import {
 } from 'crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
-import { join } from 'path'
+import { basename, join, resolve } from 'path'
+import { getProjectRoot } from '../../bootstrap/state.js'
 import { logForDebugging } from '../../utils/debug.js'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -29,36 +32,71 @@ import { logForDebugging } from '../../utils/debug.js'
 const MAGIC = Buffer.from('LCSC')
 const VERSION = 1
 const PBKDF2_ITERATIONS = 200_000
-const SECRETS_DIR = join(homedir(), '.localclawd')
-const SECRETS_FILE = join(SECRETS_DIR, 'secrets.enc')
+
+/** Machine-local key store — outside the project so keys are never committed. */
+const MACHINE_KEYS_DIR = join(homedir(), '.localclawd', 'keys')
+
+// ─── Path helpers (lazy — depend on project root set during setup) ────────────
+
+function getProjectId(): string {
+  const root = getProjectRoot()
+  return basename(resolve(root))
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 64) || 'default'
+}
+
+function getSecretsFile(): string {
+  return join(getProjectRoot(), '.localclawd', 'secrets.enc')
+}
+
+function getSecretsDir(): string {
+  return join(getProjectRoot(), '.localclawd')
+}
+
+// ─── Key management ───────────────────────────────────────────────────────────
+
+/**
+ * Returns the passphrase for the current project.
+ * - If LOCALCLAWD_SECRET_KEY is set, use it directly.
+ * - Otherwise, load or generate a per-project key in ~/.localclawd/keys/.
+ */
+function getOrCreatePassphrase(): string {
+  const envKey = process.env.LOCALCLAWD_SECRET_KEY
+  if (envKey) return envKey
+
+  const keyFile = join(MACHINE_KEYS_DIR, `${getProjectId()}.key`)
+  if (existsSync(keyFile)) {
+    return readFileSync(keyFile, 'utf-8').trim()
+  }
+
+  const newKey = randomBytes(32).toString('hex')
+  mkdirSync(MACHINE_KEYS_DIR, { recursive: true })
+  writeFileSync(keyFile, newKey, { mode: 0o600 })
+  logForDebugging(`[secrets] Generated new project key for ${getProjectId()}`)
+  return newKey
+}
 
 // ─── In-memory store ──────────────────────────────────────────────────────────
 
 let _secrets: Map<string, string> = new Map()
 let _loaded = false
-let _persistent = false
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export function isSecretStorePersistent(): boolean {
-  return _persistent
+  return true  // Always persistent in per-project mode
 }
 
-/** Initialize the store. Called once at startup. */
+/** Initialize the store. Called once at startup after project root is set. */
 export function initSecretStore(): void {
-  const key = process.env.LOCALCLAWD_SECRET_KEY
-  if (!key) {
-    logForDebugging('[secrets] LOCALCLAWD_SECRET_KEY not set — using session-only store')
-    _persistent = false
-    _loaded = true
-    return
-  }
-  _persistent = true
   try {
-    _secrets = loadFromDisk(key)
-    logForDebugging(`[secrets] Loaded ${_secrets.size} secret(s) from encrypted store`)
+    const passphrase = getOrCreatePassphrase()
+    _secrets = loadFromDisk(passphrase)
+    logForDebugging(`[secrets] Loaded ${_secrets.size} secret(s) from ${getSecretsFile()}`)
   } catch (e) {
-    logForDebugging(`[secrets] Failed to load secrets (may be first run): ${e}`)
+    logForDebugging(`[secrets] No existing secrets file (first run): ${e}`)
     _secrets = new Map()
   }
   _loaded = true
@@ -67,7 +105,7 @@ export function initSecretStore(): void {
 export function setSecret(name: string, value: string): void {
   ensureLoaded()
   _secrets.set(name, value)
-  maybePersist()
+  persist()
 }
 
 export function getSecret(name: string): string | undefined {
@@ -79,7 +117,7 @@ export function deleteSecret(name: string): boolean {
   ensureLoaded()
   const existed = _secrets.has(name)
   _secrets.delete(name)
-  if (existed) maybePersist()
+  if (existed) persist()
   return existed
 }
 
@@ -99,11 +137,9 @@ function ensureLoaded(): void {
   if (!_loaded) initSecretStore()
 }
 
-function maybePersist(): void {
-  const key = process.env.LOCALCLAWD_SECRET_KEY
-  if (!_persistent || !key) return
+function persist(): void {
   try {
-    saveToDisk(key)
+    saveToDisk(getOrCreatePassphrase())
   } catch (e) {
     logForDebugging(`[secrets] Failed to persist secrets: ${e}`, { level: 'warn' })
   }
@@ -129,16 +165,16 @@ function saveToDisk(passphrase: string): void {
   const header = Buffer.from([VERSION])
   const file = Buffer.concat([MAGIC, header, salt, iv, authTag, ciphertext])
 
-  mkdirSync(SECRETS_DIR, { recursive: true })
-  writeFileSync(SECRETS_FILE, file, { mode: 0o600 })
+  mkdirSync(getSecretsDir(), { recursive: true })
+  writeFileSync(getSecretsFile(), file, { mode: 0o600 })
 }
 
 function loadFromDisk(passphrase: string): Map<string, string> {
-  if (!existsSync(SECRETS_FILE)) return new Map()
+  const secretsFile = getSecretsFile()
+  if (!existsSync(secretsFile)) return new Map()
 
-  const file = readFileSync(SECRETS_FILE)
+  const file = readFileSync(secretsFile)
 
-  // Validate magic
   if (!file.slice(0, 4).equals(MAGIC)) {
     throw new Error('Invalid secrets file format')
   }

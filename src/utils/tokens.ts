@@ -1,6 +1,7 @@
 import type { BetaUsage as Usage } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
 import { roughTokenCountEstimationForMessages } from '../services/tokenEstimation.js'
 import type { AssistantMessage, Message } from '../types/message.js'
+import { getContextWindowForModel, getLocalProviderContextWindow, MODEL_CONTEXT_WINDOW_DEFAULT } from './context.js'
 import { SYNTHETIC_MESSAGES, SYNTHETIC_MODEL } from './messages.js'
 import { jsonStringify } from './slowOperations.js'
 
@@ -156,16 +157,26 @@ export function getCurrentUsage(messages: Message[]): {
   return null
 }
 
-export function doesMostRecentAssistantMessageExceed200k(
+/**
+ * Returns true when the most recent assistant message's input token count exceeds half
+ * the configured context window. Used to gate model-switching in plan mode.
+ * Threshold is always derived from the live context window so no number is hardcoded here.
+ */
+export function doesMostRecentAssistantMessageExceedHalfContext(
   messages: Message[],
+  model?: string,
 ): boolean {
-  const THRESHOLD = 200_000
+  const contextWindow = model
+    ? getContextWindowForModel(model, [])
+    : (getLocalProviderContextWindow() ?? MODEL_CONTEXT_WINDOW_DEFAULT)
+  const threshold = Math.floor(contextWindow / 2)
 
   const lastAsst = messages.findLast(m => m.type === 'assistant')
   if (!lastAsst) return false
   const usage = getTokenUsage(lastAsst)
-  return usage ? getTokenCountFromUsage(usage) > THRESHOLD : false
+  return usage ? getTokenCountFromUsage(usage) > threshold : false
 }
+
 
 /**
  * Calculate the character content length of an assistant message.

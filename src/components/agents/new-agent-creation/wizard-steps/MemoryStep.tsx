@@ -33,38 +33,18 @@ export function MemoryStep() {
     t0 = $[0];
   }
   useKeybinding("confirm:no", goBack, t0);
-  const isUserScope = wizardData.location === "userSettings";
   let t1;
-  if ($[1] !== isUserScope) {
-    t1 = isUserScope ? [{
-      label: "User scope (~/.claude/agent-memory/) (Recommended)",
-      value: "user"
-    }, {
-      label: "None (no persistent memory)",
-      value: "none"
-    }, {
-      label: "Project scope (.claude/agent-memory/)",
-      value: "project"
-    }, {
-      label: "Local scope (.claude/agent-memory-local/)",
-      value: "local"
-    }] : [{
-      label: "Project scope (.claude/agent-memory/) (Recommended)",
+  if ($[1] === Symbol.for("react.memo_cache_sentinel")) {
+    t1 = [{
+      label: "Project scope (.localclawd/agent-memory/) (Recommended)",
       value: "project"
     }, {
       label: "None (no persistent memory)",
       value: "none"
-    }, {
-      label: "User scope (~/.claude/agent-memory/)",
-      value: "user"
-    }, {
-      label: "Local scope (.claude/agent-memory-local/)",
-      value: "local"
     }];
-    $[1] = isUserScope;
-    $[2] = t1;
+    $[1] = t1;
   } else {
-    t1 = $[2];
+    t1 = $[1];
   }
   const memoryOptions = t1;
   let t2;

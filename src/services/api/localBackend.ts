@@ -386,7 +386,8 @@ function mapFinishReason(reason: string | null | undefined): string | null {
   }
 }
 
-function toAnthropicUsage(usage: OpenAIChatResponse['usage'] | OpenAIStreamChunk['usage']) {
+/** Maps OpenAI-format usage to the internal token counter format for the user's display. */
+function mapLocalUsage(usage: OpenAIChatResponse['usage'] | OpenAIStreamChunk['usage']) {
   return {
     input_tokens: usage?.prompt_tokens ?? 0,
     output_tokens: usage?.completion_tokens ?? 0,
@@ -424,7 +425,7 @@ function buildAnthropicMessageFromOpenAI(response: OpenAIChatResponse, model: st
     content,
     stop_reason: mapFinishReason(choice?.finish_reason),
     stop_sequence: null,
-    usage: toAnthropicUsage(response.usage),
+    usage: mapLocalUsage(response.usage),
   }
 }
 
@@ -631,7 +632,7 @@ function createStreamingResponse(
       // status bar have a reasonable count while the model generates. The real
       // prompt_tokens arrive in the final usage chunk and overwrite this via
       // the message_delta event below.
-      let finalUsage = { ...toAnthropicUsage(undefined), input_tokens: estimatedInputTokens }
+      let finalUsage = { ...mapLocalUsage(undefined), input_tokens: estimatedInputTokens }
       let finalStopReason: string | null = null
 
       controller.enqueue(
@@ -658,7 +659,16 @@ function createStreamingResponse(
         for await (const rawPayload of iterateSseEvents(upstream.body)) {
           const chunk = JSON.parse(rawPayload) as OpenAIStreamChunk
           if (chunk.usage) {
-            finalUsage = toAnthropicUsage(chunk.usage)
+            const realUsage = mapLocalUsage(chunk.usage)
+            finalUsage = {
+              ...realUsage,
+              // Preserve the pre-stream estimate when the backend omits prompt_tokens
+              // (Ollama, some vLLM configs). mapLocalUsage returns input_tokens: 0
+              // in that case, destroying the estimate and causing premature compaction.
+              input_tokens: realUsage.input_tokens > 0
+                ? realUsage.input_tokens
+                : finalUsage.input_tokens,
+            }
           }
           const choice = chunk.choices?.[0]
           if (!choice) {

@@ -39,7 +39,7 @@ import {
   getMcpInstructionsDeltaAttachment,
 } from '../../utils/attachments.js'
 import { getMemoryPath } from '../../utils/config.js'
-import { COMPACT_MAX_OUTPUT_TOKENS } from '../../utils/context.js'
+import { COMPACT_MAX_OUTPUT_TOKENS, getContextWindowForModel } from '../../utils/context.js'
 import {
   analyzeContext,
   tokenStatsToStatsigMetrics,
@@ -1138,7 +1138,7 @@ export function createCompactCanUseTool(): CanUseToolFn {
  * Skips tool calls, images, attachments — keeps only human-readable text.
  * Truncates to maxChars to keep the clean-room request manageable.
  */
-function serializeMessagesForCleanRoom(messages: Message[], maxChars = 240_000): string {
+function serializeMessagesForCleanRoom(messages: Message[], maxChars: number): string {
   const parts: string[] = []
   for (const msg of messages) {
     if (msg.type === 'user') {
@@ -1186,7 +1186,12 @@ async function tryCleanRoomCompactSummary({
   preCompactTokenCount: number
 }): Promise<AssistantMessage | null> {
   try {
-    const serialized = serializeMessagesForCleanRoom(messages)
+    const model = context.options.mainLoopModel
+    // Derive char budget from the live context window: tokens × ~3.5 chars/token,
+    // minus output reserve and a small overhead for the compact prompt + XML tags.
+    const contextTokens = getContextWindowForModel(model, [])
+    const charBudget = Math.floor((contextTokens - COMPACT_MAX_OUTPUT_TOKENS - 2_000) * 3.5)
+    const serialized = serializeMessagesForCleanRoom(messages, charBudget)
     if (!serialized.trim()) return null
 
     // Extract the compact prompt text from the summary request
@@ -1205,7 +1210,6 @@ async function tryCleanRoomCompactSummary({
     })
 
     const appState = context.getAppState()
-    const model = context.options.mainLoopModel
 
     const streamingGen = queryModelWithStreaming({
       messages: [cleanRequest],
@@ -1832,9 +1836,9 @@ function shouldExcludeFromPostCompactRestore(
     // If we can't get plan file path, continue with other checks
   }
 
-  // Exclude all types of claude.md files
+  // Exclude all types of LOCALCLAWD.md files
   // TODO: Refactor to use isMemoryFilePath() from claudemd.ts for consistency
-  // and to also match child directory memory files (.claude/rules/*.md, etc.)
+  // and to also match child directory memory files (.localclawd/rules/*.md, etc.)
   try {
     const normalizedMemoryPaths = new Set(
       MEMORY_TYPE_VALUES.map(type => expandPath(getMemoryPath(type))),

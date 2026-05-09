@@ -336,8 +336,8 @@ export const FileWriteTool = buildTool({
       limit: undefined,
     })
 
-    // Log when writing to CLAUDE.md
-    if (fullFilePath.endsWith(`${sep}CLAUDE.md`)) {
+    // Log when writing to LOCALCLAWD.md
+    if (fullFilePath.endsWith(`${sep}LOCALCLAWD.md`)) {
       logEvent('tengu_write_claudemd', {})
     }
 

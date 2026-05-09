@@ -83,7 +83,7 @@ export function getAgentModel(
     return getRuntimeMainLoopModel({
       permissionMode: permissionMode ?? 'default',
       mainLoopModel: parentModel,
-      exceeds200kTokens: false,
+      exceedsHalfContext: false,
     })
   }
 

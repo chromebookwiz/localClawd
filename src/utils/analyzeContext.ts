@@ -321,7 +321,7 @@ async function countMemoryFileTokens(): Promise<{
   memoryFileDetails: MemoryFile[]
   claudeMdTokens: number
 }> {
-  // Simple mode disables CLAUDE.md loading, so don't report tokens for them
+  // Simple mode disables LOCALCLAWD.md loading, so don't report tokens for them
   if (isEnvTruthy(process.env.CLAUDE_CODE_SIMPLE)) {
     return { memoryFileDetails: [], claudeMdTokens: 0 }
   }
@@ -1174,8 +1174,8 @@ export async function analyzeContextUsage(
   const finalTotalTokens = totalFromAPI ?? totalIncludingReserved
 
   // Pre-calculate grid based on model context window and terminal width
-  // For narrow screens (< 80 cols), use 5x5 for 200k models, 5x10 for 1M+ models
-  // For normal screens, use 10x10 for 200k models, 20x10 for 1M+ models
+  // For narrow screens (< 80 cols), use 5x5 for sub-1M models, 5x10 for 1M+ models
+  // For normal screens, use 10x10 for sub-1M models, 20x10 for 1M+ models
   const isNarrowScreen = terminalWidth && terminalWidth < 80
   const GRID_WIDTH =
     contextWindow >= 1000000

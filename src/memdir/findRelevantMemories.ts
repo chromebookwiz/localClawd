@@ -87,6 +87,21 @@ async function selectRelevantMemories(
 
   const manifest = formatMemoryManifest(memories)
 
+  const latticeSelected = topLatticeMemories(query, memories)
+    .map(m => m.filename)
+    .filter(f => validFilenames.has(f))
+  if (latticeSelected.length > 0) {
+    void logRetrievals(latticeSelected)
+    return isThinkHarderMode
+      ? mergeThinkHarderSelections(
+          memories,
+          validFilenames,
+          [],
+          latticeSelected,
+        )
+      : latticeSelected
+  }
+
   // When localclawd is actively using a tool (e.g. mcp__X__spawn),
   // surfacing that tool's reference docs is noise — the conversation
   // already contains working usage.  The selector otherwise matches
@@ -139,8 +154,8 @@ async function selectRelevantMemories(
     const sonnetSelected = parsed.selected_memories.filter(f => validFilenames.has(f))
 
     // In thinkharder mode: merge Sonnet + lattice results and reserve a small
-    // amount of space for fresher project/feedback/user memories so the mode
-    // adds explicit episodic + procedural recall, not only semantic recall.
+    // amount of space for fresher project memories so the mode adds explicit
+    // episodic + procedural recall, not only semantic recall.
     if (isThinkHarderMode) {
       const latticeSelected = await latticePromise
       const merged = mergeThinkHarderSelections(
@@ -213,7 +228,7 @@ function pickLayeredMemoryAdditions(
 ): string[] {
   const selected = new Set(existing)
   const additions: string[] = []
-  const priorityTypes: readonly MemoryType[] = ['project', 'feedback', 'user']
+  const priorityTypes: readonly MemoryType[] = ['project']
 
   for (const type of priorityTypes) {
     const candidate = memories.find(

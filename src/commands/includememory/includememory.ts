@@ -7,10 +7,10 @@ import {
 } from '../../utils/git/gitignore.js'
 
 const MEMORY_GITIGNORE_PATTERNS = [
-  'CLAUDE.local.md',
-  './CLAUDE.local.md',
-  '/CLAUDE.local.md',
-  '**/CLAUDE.local.md',
+  'LOCALCLAWD.local.md',
+  './LOCALCLAWD.local.md',
+  '/LOCALCLAWD.local.md',
+  '**/LOCALCLAWD.local.md',
 ] as const
 
 export const call: LocalCommandCall = async () => {
@@ -34,7 +34,7 @@ export const call: LocalCommandCall = async () => {
         ]
       : [
           'Local memory was not gitignored.',
-          'CLAUDE.local.md can already be added to git if it exists.',
+          'LOCALCLAWD.local.md can already be added to git if it exists.',
         ]
 
   return { type: 'text', value: lines.join('\n') }

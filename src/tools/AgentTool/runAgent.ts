@@ -382,17 +382,20 @@ export async function* runAgent({
     override?.systemContext ?? getSystemContext(),
   ])
 
-  // Read-only agents (Explore, Plan) don't act on commit/PR/lint rules from
-  // CLAUDE.md — the main agent has full context and interprets their output.
-  // Dropping claudeMd here saves ~5-15 Gtok/week across 34M+ Explore spawns.
+  // Read-only agents (Explore, Plan) do not act on commit/PR/lint rules from
+  // LOCALCLAWD.md; the main agent has full context and interprets their output.
+  // Dropping localclawdMd here keeps subagent prompts small.
   // Explicit override.userContext from callers is preserved untouched.
   // Kill-switch defaults true; flip tengu_slim_subagent_claudemd=false to revert.
   const shouldOmitClaudeMd =
     agentDefinition.omitClaudeMd &&
     !override?.userContext &&
     getFeatureValue_CACHED_MAY_BE_STALE('tengu_slim_subagent_claudemd', true)
-  const { claudeMd: _omittedClaudeMd, ...userContextNoClaudeMd } =
-    baseUserContext
+  const {
+    claudeMd: _omittedClaudeMd,
+    localclawdMd: _omittedLocalclawdMd,
+    ...userContextNoClaudeMd
+  } = baseUserContext
   const resolvedUserContext = shouldOmitClaudeMd
     ? userContextNoClaudeMd
     : baseUserContext

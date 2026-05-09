@@ -10,7 +10,7 @@ import {
   isAutoCompactEnabled,
   type AutoCompactTrackingState,
 } from './services/compact/autoCompact.js'
-import { buildPostCompactMessages } from './services/compact/compact.js'
+import { buildPostCompactMessages, compactConversation } from './services/compact/compact.js'
 /* eslint-disable @typescript-eslint/no-require-imports */
 const reactiveCompact = feature('REACTIVE_COMPACT')
   ? (require('./services/compact/reactiveCompact.js') as typeof import('./services/compact/reactiveCompact.js'))
@@ -54,6 +54,7 @@ import {
   createToolUseSummaryMessage,
   createMicrocompactBoundaryMessage,
   stripSignatureBlocks,
+  createMemorySavedMessage,
 } from './utils/messages.js'
 import { generateToolUseSummary } from './services/toolUseSummary/toolUseSummaryGenerator.js'
 import { prependUserContext, appendSystemContext } from './utils/api.js'
@@ -62,6 +63,7 @@ import {
   filterDuplicateMemoryAttachments,
   getAttachmentMessages,
   startRelevantMemoryPrefetch,
+  type MemoryPrefetch,
 } from './utils/attachments.js'
 /* eslint-disable @typescript-eslint/no-require-imports */
 const skillPrefetch = feature('EXPERIMENTAL_SKILL_SEARCH')
@@ -83,7 +85,7 @@ import {
   renderModelName,
 } from './utils/model/model.js'
 import {
-  doesMostRecentAssistantMessageExceed200k,
+  doesMostRecentAssistantMessageExceedHalfContext,
   finalContextTokensFromLastResponse,
   tokenCountWithEstimation,
 } from './utils/tokens.js'
@@ -113,6 +115,7 @@ import {
 import { createBudgetTracker, checkTokenBudget } from './query/tokenBudget.js'
 import { count } from './utils/array.js'
 import { notifySessionMetadataChanged } from './utils/sessionState.js'
+import { saveTurnMemory } from './memdir/turnMemory.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const snipModule = feature('HISTORY_SNIP')
@@ -399,6 +402,39 @@ function shouldAutoContinueTurn(params: {
   return hasTurnHistory
 }
 
+async function collectMemoryPrefetchMessages(params: {
+  pendingMemoryPrefetch: MemoryPrefetch | undefined
+  readFileState: ToolUseContext['readFileState']
+  iteration: number
+  waitMs: number
+}): Promise<AttachmentMessage[]> {
+  const { pendingMemoryPrefetch, readFileState, iteration, waitMs } = params
+  if (
+    !pendingMemoryPrefetch ||
+    pendingMemoryPrefetch.consumedOnIteration !== -1
+  ) {
+    return []
+  }
+  if (pendingMemoryPrefetch.settledAt === null && waitMs > 0) {
+    await Promise.race([
+      pendingMemoryPrefetch.promise.then(() => undefined),
+      new Promise<void>(resolve => {
+        const timer = setTimeout(resolve, waitMs)
+        timer.unref?.()
+      }),
+    ])
+  }
+  if (pendingMemoryPrefetch.settledAt === null) {
+    return []
+  }
+  const memoryAttachments = filterDuplicateMemoryAttachments(
+    await pendingMemoryPrefetch.promise,
+    readFileState,
+  )
+  pendingMemoryPrefetch.consumedOnIteration = iteration
+  return memoryAttachments.map(attachment => createAttachmentMessage(attachment))
+}
+
 export async function* query(
   params: QueryParams,
 ): AsyncGenerator<
@@ -629,6 +665,17 @@ async function* queryLoop(
       messagesForQuery = collapseResult.messages
     }
 
+    const earlyMemoryMessages = await collectMemoryPrefetchMessages({
+      pendingMemoryPrefetch,
+      readFileState: toolUseContext.readFileState,
+      iteration: turnCount - 1,
+      waitMs: turnCount === 1 ? 200 : 0,
+    })
+    for (const msg of earlyMemoryMessages) {
+      yield msg
+      messagesForQuery.push(msg)
+    }
+
     const fullSystemPrompt = asSystemPrompt(
       appendSystemContext(systemPrompt, systemContext),
     )
@@ -755,9 +802,9 @@ async function* queryLoop(
     let currentModel = getRuntimeMainLoopModel({
       permissionMode,
       mainLoopModel: toolUseContext.options.mainLoopModel,
-      exceeds200kTokens:
+      exceedsHalfContext:
         permissionMode === 'plan' &&
-        doesMostRecentAssistantMessageExceed200k(messagesForQuery),
+        doesMostRecentAssistantMessageExceedHalfContext(messagesForQuery, toolUseContext.options.mainLoopModel),
     })
 
     queryCheckpoint('query_setup_end')
@@ -992,6 +1039,10 @@ async function* queryLoop(
               }
             }
             if (reactiveCompact?.isWithheldPromptTooLong(message)) {
+              withheld = true
+            }
+            // Fallback: withhold prompt-too-long when reactiveCompact is not compiled in
+            if (!reactiveCompact && message.type === 'assistant' && message.isApiErrorMessage && isPromptTooLongMessage(message)) {
               withheld = true
             }
             if (
@@ -1365,6 +1416,46 @@ async function* queryLoop(
         return { reason: 'prompt_too_long' }
       }
 
+      // Fallback reactive compact when reactiveCompact feature is not compiled in
+      if (isWithheld413 && !reactiveCompact && !hasAttemptedReactiveCompact) {
+        try {
+          const compactionResult = await compactConversation(
+            messagesForQuery,
+            toolUseContext,
+            {
+              systemPrompt,
+              userContext,
+              systemContext,
+              toolUseContext,
+              forkContextMessages: messagesForQuery,
+            },
+            true,
+            undefined,
+            true,
+          )
+          const postCompactMessages = buildPostCompactMessages(compactionResult)
+          for (const msg of postCompactMessages) {
+            yield msg
+          }
+          state = {
+            messages: postCompactMessages,
+            toolUseContext,
+            autoCompactTracking: undefined,
+            maxOutputTokensRecoveryCount,
+            hasAttemptedReactiveCompact: true,
+            maxOutputTokensOverride: undefined,
+            pendingToolUseSummary: undefined,
+            stopHookActive: undefined,
+            turnCount,
+            transition: { reason: 'reactive_compact_retry' },
+          }
+          continue
+        } catch (compactErr) {
+          logError(compactErr)
+          // Fall through to surface the error
+        }
+      }
+
       // Check for max_output_tokens and inject recovery message. The error
       // was withheld from the stream above; only surface it if recovery
       // exhausts.
@@ -1504,6 +1595,20 @@ async function* queryLoop(
       notifySessionMetadataChanged({
         post_turn_summary: postTurnSummary.metadata,
       })
+
+      const savedMemory = await saveTurnMemory({
+        messagesForQuery,
+        assistantMessages,
+        summary: postTurnSummary.metadata.description as string,
+        querySource,
+        agentId: toolUseContext.agentId,
+      }).catch(error => {
+        logError(error)
+        return null
+      })
+      if (savedMemory) {
+        yield createMemorySavedMessage([savedMemory.path])
+      }
 
       if (stopHookResult.preventContinuation) {
         return { reason: 'stop_hook_prevented' }

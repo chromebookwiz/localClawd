@@ -89,7 +89,7 @@ const AgentJsonSchema = lazySchema(() =>
     maxTurns: z.number().int().positive().optional(),
     skills: z.array(z.string()).optional(),
     initialPrompt: z.string().optional(),
-    memory: z.enum(['user', 'project', 'local']).optional(),
+    memory: z.enum(['project']).optional(),
     background: z.boolean().optional(),
     isolation: (process.env.USER_TYPE === 'ant'
       ? z.enum(['worktree', 'remote'])
@@ -125,9 +125,9 @@ export type BaseAgentDefinition = {
   memory?: AgentMemoryScope // Persistent memory scope
   isolation?: 'worktree' | 'remote' // Run in an isolated git worktree, or remotely in CCR (ant-only)
   pendingSnapshotUpdate?: { snapshotTimestamp: string }
-  /** Omit CLAUDE.md hierarchy from the agent's userContext. Read-only agents
+  /** Omit LOCALCLAWD.md hierarchy from the agent's userContext. Read-only agents
    * (Explore, Plan) don't need commit/PR/lint guidelines — the main agent has
-   * full CLAUDE.md and interprets their output. Saves ~5-15 Gtok/week across
+   * full LOCALCLAWD.md and interprets their output. Saves ~5-15 Gtok/week across
    * 34M+ Explore spawns. Kill-switch: tengu_slim_subagent_claudemd. */
   omitClaudeMd?: boolean
 }
@@ -289,7 +289,7 @@ async function initializeAgentMemorySnapshots(
 ): Promise<void> {
   await Promise.all(
     agents.map(async agent => {
-      if (agent.memory !== 'user') return
+      if (agent.memory !== 'local') return
       const result = await checkAgentMemorySnapshot(
         agent.agentType,
         agent.memory,
@@ -633,7 +633,7 @@ export function parseAgentFromMarkdown(
       backgroundRaw === 'true' || backgroundRaw === true ? true : undefined
 
     // Parse memory scope
-    const VALID_MEMORY_SCOPES: AgentMemoryScope[] = ['user', 'project', 'local']
+    const VALID_MEMORY_SCOPES: AgentMemoryScope[] = ['project']
     const memoryRaw = frontmatter['memory'] as string | undefined
     let memory: AgentMemoryScope | undefined
     if (memoryRaw !== undefined) {

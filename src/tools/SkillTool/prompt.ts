@@ -16,11 +16,11 @@ import { logForDebugging } from '../../utils/debug.js'
 import { toError } from '../../utils/errors.js'
 import { truncate } from '../../utils/format.js'
 import { logError } from '../../utils/log.js'
+import { MODEL_CONTEXT_WINDOW_DEFAULT } from '../../utils/context.js'
 
 // Skill listing gets 1% of the context window (in characters)
 export const SKILL_BUDGET_CONTEXT_PERCENT = 0.01
 export const CHARS_PER_TOKEN = 4
-export const DEFAULT_CHAR_BUDGET = 8_000 // Fallback: 1% of 200k × 4
 
 // Per-entry hard cap. The listing is for discovery only — the Skill tool loads
 // full content on invoke, so verbose whenToUse strings waste turn-1 cache_creation
@@ -32,12 +32,8 @@ export function getCharBudget(contextWindowTokens?: number): number {
   if (Number(process.env.SLASH_COMMAND_TOOL_CHAR_BUDGET)) {
     return Number(process.env.SLASH_COMMAND_TOOL_CHAR_BUDGET)
   }
-  if (contextWindowTokens) {
-    return Math.floor(
-      contextWindowTokens * CHARS_PER_TOKEN * SKILL_BUDGET_CONTEXT_PERCENT,
-    )
-  }
-  return DEFAULT_CHAR_BUDGET
+  const tokens = contextWindowTokens ?? MODEL_CONTEXT_WINDOW_DEFAULT
+  return Math.floor(tokens * CHARS_PER_TOKEN * SKILL_BUDGET_CONTEXT_PERCENT)
 }
 
 function getCommandDescription(cmd: Command): string {

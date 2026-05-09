@@ -155,7 +155,7 @@ The CLI is built for longer coding loops, not only one-shot prompts.
 - `/keepgoing` continues through pending work until the model emits a completion or input-needed signal.
 - `/thinkharder` increases verification rigor and model self-checking for complex changes.
 - `/buddy` creates a persistent ASCII companion persona for the current session.
-- `/includememory` removes `CLAUDE.local.md` from gitignore so local memory can be committed when you want to share it.
+- `/includememory` removes `LOCALCLAWD.local.md` from gitignore so local memory can be committed when you want to share it.
 
 ### Project-local image workflow
 

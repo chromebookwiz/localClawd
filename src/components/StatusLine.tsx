@@ -24,7 +24,7 @@ import { createBaseHookInput, executeStatusLineCommand } from '../utils/hooks.js
 import { getLastAssistantMessage } from '../utils/messages.js';
 import { getRuntimeMainLoopModel, type ModelName, renderModelName } from '../utils/model/model.js';
 import { getCurrentSessionTitle } from '../utils/sessionStorage.js';
-import { doesMostRecentAssistantMessageExceed200k, getCurrentUsage } from '../utils/tokens.js';
+import { doesMostRecentAssistantMessageExceedHalfContext, getCurrentUsage } from '../utils/tokens.js';
 import { getCurrentWorktreeSession } from '../utils/worktree.js';
 import { isVimModeEnabled } from './PromptInput/utils.js';
 export function statusLineShouldDisplay(settings: ReadonlySettings): boolean {
@@ -33,13 +33,13 @@ export function statusLineShouldDisplay(settings: ReadonlySettings): boolean {
   if (feature('KAIROS') && getKairosActive()) return false;
   return settings?.statusLine !== undefined;
 }
-function buildStatusLineCommandInput(permissionMode: PermissionMode, exceeds200kTokens: boolean, settings: ReadonlySettings, messages: Message[], addedDirs: string[], mainLoopModel: ModelName, vimMode?: VimMode): StatusLineCommandInput {
+function buildStatusLineCommandInput(permissionMode: PermissionMode, exceedsHalfContext: boolean, settings: ReadonlySettings, messages: Message[], addedDirs: string[], mainLoopModel: ModelName, vimMode?: VimMode): StatusLineCommandInput {
   const agentType = getMainThreadAgentType();
   const worktreeSession = getCurrentWorktreeSession();
   const runtimeModel = getRuntimeMainLoopModel({
     permissionMode,
     mainLoopModel,
-    exceeds200kTokens
+    exceedsHalfContext
   });
   const outputStyleName = settings?.outputStyle || DEFAULT_OUTPUT_STYLE_NAME;
   const currentUsage = getCurrentUsage(messages);
@@ -95,7 +95,7 @@ function buildStatusLineCommandInput(permissionMode: PermissionMode, exceeds200k
       used_percentage: contextPercentages.used,
       remaining_percentage: contextPercentages.remaining
     },
-    exceeds_200k_tokens: exceeds200kTokens,
+    exceeds_half_context: exceedsHalfContext,
     ...((rateLimits.five_hour || rateLimits.seven_day) && {
       rate_limits: rateLimits
     }),
@@ -169,13 +169,13 @@ function StatusLineInner({
   // Track previous state to detect changes and cache expensive calculations
   const previousStateRef = useRef<{
     messageId: string | null;
-    exceeds200kTokens: boolean;
+    exceedsHalfContext: boolean;
     permissionMode: PermissionMode;
     vimMode: VimMode | undefined;
     mainLoopModel: ModelName;
   }>({
     messageId: null,
-    exceeds200kTokens: false,
+    exceedsHalfContext: false,
     permissionMode,
     vimMode,
     mainLoopModel
@@ -197,16 +197,16 @@ function StatusLineInner({
     const logResult = logNextResultRef.current;
     logNextResultRef.current = false;
     try {
-      let exceeds200kTokens = previousStateRef.current.exceeds200kTokens;
+      let exceedsHalfContext = previousStateRef.current.exceedsHalfContext;
 
-      // Only recalculate 200k check if messages changed
+      // Only recalculate context-threshold check if messages changed
       const currentMessageId = getLastAssistantMessageId(msgs);
       if (currentMessageId !== previousStateRef.current.messageId) {
-        exceeds200kTokens = doesMostRecentAssistantMessageExceed200k(msgs);
+        exceedsHalfContext = doesMostRecentAssistantMessageExceedHalfContext(msgs, mainLoopModelRef.current);
         previousStateRef.current.messageId = currentMessageId;
-        previousStateRef.current.exceeds200kTokens = exceeds200kTokens;
+        previousStateRef.current.exceedsHalfContext = exceedsHalfContext;
       }
-      const statusInput = buildStatusLineCommandInput(permissionModeRef.current, exceeds200kTokens, settingsRef.current, msgs, Array.from(addedDirsRef.current.keys()), mainLoopModelRef.current, vimModeRef.current);
+      const statusInput = buildStatusLineCommandInput(permissionModeRef.current, exceedsHalfContext, settingsRef.current, msgs, Array.from(addedDirsRef.current.keys()), mainLoopModelRef.current, vimModeRef.current);
       const text = await executeStatusLineCommand(statusInput, controller.signal, undefined, logResult);
       if (!controller.signal.aborted) {
         setAppState(prev => {
@@ -237,7 +237,7 @@ function StatusLineInner({
   useEffect(() => {
     if (lastAssistantMessageId !== previousStateRef.current.messageId || permissionMode !== previousStateRef.current.permissionMode || vimMode !== previousStateRef.current.vimMode || mainLoopModel !== previousStateRef.current.mainLoopModel) {
       // Don't update messageId here — let doUpdate handle it so
-      // exceeds200kTokens is recalculated with the latest messages
+      // exceedsHalfContext is recalculated with the latest messages
       previousStateRef.current.permissionMode = permissionMode;
       previousStateRef.current.vimMode = vimMode;
       previousStateRef.current.mainLoopModel = mainLoopModel;

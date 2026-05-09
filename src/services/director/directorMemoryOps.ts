@@ -6,7 +6,6 @@
 import { mkdir, readdir, readFile, stat, writeFile } from 'fs/promises'
 import { basename, join, relative, resolve } from 'path'
 import { logForDebugging } from '../../utils/debug.js'
-import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import type {
   DirectorMemoryState,
   DirectorProject,
@@ -18,12 +17,8 @@ import { createEmptyState } from './directorMemory.js'
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
 
-// Per-project state: stored inside the project's .localclawd/ directory.
-// The global registry only exists as a fallback for sessions that didn't
-// register a project root yet; per the user's preference, real memory
-// lives per-environment.
-const GLOBAL_DIRECTOR_DIR = join(getClaudeConfigHomeDir(), 'director')
-export const DIRECTOR_MEMORY_DIR = join(GLOBAL_DIRECTOR_DIR, 'memory')
+// State is always stored inside the project's .localclawd/ directory.
+// There is no global fallback — director memory is per-project only.
 
 let _projectStateDir = ''
 
@@ -32,16 +27,18 @@ export function setDirectorProjectRoot(projectPath: string): void {
   _projectStateDir = join(projectPath, '.localclawd')
 }
 
-function getStatePath(): string {
+function getStatePath(): string | null {
   if (_projectStateDir) return join(_projectStateDir, 'director-memory.json')
-  return join(GLOBAL_DIRECTOR_DIR, 'state.json')
+  return null
 }
 
 // ─── State I/O ───────────────────────────────────────────────────────────────
 
 export async function loadDirectorState(): Promise<DirectorMemoryState> {
+  const path = getStatePath()
+  if (!path) return createEmptyState()
   try {
-    const raw = await readFile(getStatePath(), 'utf-8')
+    const raw = await readFile(path, 'utf-8')
     const parsed = JSON.parse(raw) as DirectorMemoryState
     if (parsed.version !== 1) return createEmptyState()
     return parsed
@@ -51,9 +48,9 @@ export async function loadDirectorState(): Promise<DirectorMemoryState> {
 }
 
 export async function saveDirectorState(state: DirectorMemoryState): Promise<void> {
-  const dir = _projectStateDir || GLOBAL_DIRECTOR_DIR
-  await mkdir(dir, { recursive: true })
-  await writeFile(getStatePath(), JSON.stringify(state, null, 2), 'utf-8')
+  if (!_projectStateDir) return
+  await mkdir(_projectStateDir, { recursive: true })
+  await writeFile(join(_projectStateDir, 'director-memory.json'), JSON.stringify(state, null, 2), 'utf-8')
 }
 
 // ─── Project operations ──────────────────────────────────────────────────────
@@ -151,7 +148,7 @@ export function boostProject(state: DirectorMemoryState, projectId: string): voi
 const KEY_FILES = [
   'package.json',
   'README.md',
-  'CLAUDE.md',
+  'LOCALCLAWD.md',
   'Cargo.toml',
   'pyproject.toml',
   'go.mod',

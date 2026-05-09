@@ -153,15 +153,15 @@ export function getDefaultHaikuModel(): ModelName {
 export function getRuntimeMainLoopModel(params: {
   permissionMode: PermissionMode
   mainLoopModel: string
-  exceeds200kTokens?: boolean
+  exceedsHalfContext?: boolean
 }): ModelName {
-  const { permissionMode, mainLoopModel, exceeds200kTokens = false } = params
+  const { permissionMode, mainLoopModel, exceedsHalfContext = false } = params
 
-  // opusplan uses Opus in plan mode without [1m] suffix.
+  // opusplan uses Opus in plan mode unless context is already over half the window.
   if (
     getUserSpecifiedModelSetting() === 'opusplan' &&
     permissionMode === 'plan' &&
-    !exceeds200kTokens
+    !exceedsHalfContext
   ) {
     return getDefaultOpusModel()
   }
@@ -513,10 +513,10 @@ export function parseUserSpecifiedModel(
  * the `[1m]` suffix over when the target family supports it.
  *
  * A skill author writing `model: opus` means "use opus-class reasoning" — not
- * "downgrade to 200K". If the user is on opus[1m] at 230K tokens and invokes a
- * skill with `model: opus`, passing the bare alias through drops the effective
- * context window from 1M to 200K, which trips autocompact at 23% apparent usage
- * and surfaces "Context limit reached" even though nothing overflowed.
+ * "downgrade to the base context window". If the user is on opus[1m] at 230K tokens
+ * and invokes a skill with `model: opus`, passing the bare alias through drops the
+ * effective context window from 1M to the default, tripping autocompact at 23%
+ * apparent usage and surfacing "Context limit reached" even though nothing overflowed.
  *
  * We only carry [1m] when the target actually supports it (sonnet/opus). A skill
  * with `model: haiku` on a 1M session still downgrades — haiku has no 1M variant,
