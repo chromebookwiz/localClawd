@@ -619,6 +619,7 @@ async function* iterateSseEvents(body: ReadableStream<Uint8Array>) {
 function createStreamingResponse(
   upstream: Response,
   model: string,
+  estimatedInputTokens = 0,
 ): Response {
   const requestId = upstream.headers.get('x-request-id') || randomUUID()
   const stream = new ReadableStream<Uint8Array>({
@@ -626,7 +627,11 @@ function createStreamingResponse(
       const messageId = `msg_${randomUUID()}`
       const contentBlockIndexes = new Map<number, { type: 'text' | 'tool_use' }>()
       let nextIndex = 0
-      let finalUsage = toAnthropicUsage(undefined)
+      // Seed input_tokens from the pre-stream estimate so autocompact and the
+      // status bar have a reasonable count while the model generates. The real
+      // prompt_tokens arrive in the final usage chunk and overwrite this via
+      // the message_delta event below.
+      let finalUsage = { ...toAnthropicUsage(undefined), input_tokens: estimatedInputTokens }
       let finalStopReason: string | null = null
 
       controller.enqueue(
@@ -859,7 +864,7 @@ export function buildLocalLLMFetch(
 
     const model = openAiRequest.model
     if (requestBody.stream) {
-      return createStreamingResponse(upstream, model)
+      return createStreamingResponse(upstream, model, estimateTokensFromRequest(requestBody))
     }
 
     const payload = (await upstream.json()) as OpenAIChatResponse

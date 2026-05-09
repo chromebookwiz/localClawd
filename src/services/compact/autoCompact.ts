@@ -6,7 +6,6 @@ import type { ToolUseContext } from '../../Tool.js'
 import type { Message } from '../../types/message.js'
 import { getGlobalConfig } from '../../utils/config.js'
 import {
-  getConfiguredCompactContextWindow,
   getContextWindowForModel,
 } from '../../utils/context.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -38,12 +37,7 @@ export function getEffectiveContextWindowSize(model: string): number {
     getMaxOutputTokensForModel(model),
     MAX_OUTPUT_TOKENS_FOR_SUMMARY,
   )
-  let contextWindow = getContextWindowForModel(model, getSdkBetas())
-
-  const autoCompactWindow = getConfiguredCompactContextWindow()
-  if (autoCompactWindow) {
-    contextWindow = Math.min(contextWindow, autoCompactWindow)
-  }
+  const contextWindow = getContextWindowForModel(model, getSdkBetas())
 
   // Floor: ensure effective window never goes below 25% of the raw context
   // window. Small-context models (8k-32k) can go negative after subtracting
@@ -175,8 +169,8 @@ export async function shouldAutoCompact(
   snipTokensFreed = 0,
 ): Promise<boolean> {
   // Recursion guards. session_memory and compact are forked agents that
-  // would deadlock.
-  if (querySource === 'session_memory' || querySource === 'compact') {
+  // would deadlock. keepgoing_synthesis is a single-turn directive agent.
+  if (querySource === 'session_memory' || querySource === 'compact' || querySource === 'keepgoing_synthesis') {
     return false
   }
   // marble_origami is the ctx-agent — if ITS context blows up and

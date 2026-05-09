@@ -1,12 +1,17 @@
-***BROKEN AT THE MOMENT, I NEED MORE TOKENS!***
-
 # localclawd
 
-localclawd is a local-first fork of the upstream hosted coding CLI focused on self-hosted inference. It preserves the terminal-first coding loop, tool orchestration, agents, and computer-use workflow, while replacing the hosted model dependency with user-controlled backends such as vLLM, Ollama, and OpenAI-compatible gateways.
+localclawd is a local-first coding CLI for self-hosted and user-controlled inference. It preserves the terminal-first workflow, tool orchestration, agents, and computer-use capabilities of the upstream coding assistant experience while replacing the hosted model dependency with local or privately managed backends such as vLLM, Ollama, and OpenAI-compatible gateways.
 
 ## Overview
 
-localclawd keeps the parts of the upstream CLI that were operationally strong and extends them for local deployment. The project is designed for users who want the same terminal-first workflow without depending on hosted Anthropic inference.
+localclawd is designed for teams and individual developers who want an autonomous coding assistant in the terminal without depending on a vendor-hosted runtime. It supports local inference, project-local workflows, multimodal review when the connected model supports it, and a release/install story that works across Windows, Linux, and macOS.
+
+The project focuses on four areas:
+
+- Local-first model connectivity for vLLM, Ollama, and compatible APIs.
+- Autonomous coding workflows with shell tools, file tools, slash commands, and agent loops.
+- Project-local state and workflow scaffolding under `.localclawd/`.
+- Cross-platform installation with npm, bootstrap scripts, and native release assets.
 
 ### Key additions
 
@@ -17,12 +22,23 @@ localclawd keeps the parts of the upstream CLI that were operationally strong an
 - Compact-context controls for local models that degrade before their advertised context limit.
 - Multimodal passthrough for local models that support image and screenshot input.
 - **Lattice memory scoring** — memory files tagged with `tags:` frontmatter are ranked using Jaccard similarity and co-occurrence lattice math. Works offline as a fallback when a hosted side-query model is unavailable.
-- **`/keepgoing`** — autonomous task continuation loop. The model works through all outstanding steps without waiting for user input and re-queues itself after each response. Stops when the model emits `TASK COMPLETE:` or `NEEDS INPUT:`. Aliases: `/kg`, `/continue`.
+- **`/keepgoing`** — autonomous task continuation loop. After each round, a lightweight synthesis agent analyzes the full conversation and writes a precise directive for the next round — the model doesn't need to self-direct. Stops when the user presses Ctrl+C or sends `/stop`. Aliases: `/kg`, `/continue`.
 - **`/buddy`** — spawns a named ASCII animal companion for the session with a personality. Use `/buddy pet` to hear their thoughts on the current codebase.
 - **`/images`** — quick-start slash command that forwards into the project-local image pipeline setup flow, with ComfyUI-first defaults and helper scaffolding.
 - **`/image-pipeline`** — scaffolds and uses a project-local image generation workflow for game textures, sprites, and related art assets under `.localclawd/image-pipeline/`, then visually reviews outputs when the current model/runtime supports image reads.
 - **`/thinkharder`** — enables careful mode: the model double-checks its reasoning at each step, verifies assumptions by reading files, and queries memory more frequently. Use `/thinknormal` to return to the default pipeline.
 - **`/thinknormal`** — resets to the default pipeline. Lattice memory is fallback-only, as designed. Alias: `/tn`.
+
+## Quick start
+
+Install the CLI, launch it in a project, and complete backend setup from inside the terminal UI:
+
+```bash
+npm install -g localclawd
+localclawd
+```
+
+After launch, use `/setup` to configure a local or remote-compatible backend. The same flow is available later through `/config` if you need to change model, endpoint, or auth settings.
 
 ## Installation
 
@@ -41,8 +57,6 @@ Run without installing globally:
 ```bash
 npx localclawd --version
 ```
-
-The npm package name is lowercase: `localclawd`. Any mixed-case install attempt will fail because npm package names cannot contain capital letters. The published CLI command is also `localclawd`.
 
 ### Windows
 
@@ -124,6 +138,35 @@ Default macOS paths:
 - Source fallback checkout: `~/.localclawd/source`
 - Source fallback launcher: `~/.local/bin/localclawd`
 
+## Core workflows
+
+### Backend configuration
+
+localclawd does not require an account or managed login flow. Connect it directly to a local model server or any OpenAI-compatible endpoint.
+
+- Use `/setup` for first-run configuration.
+- Use `/config` to update provider, endpoint, model, or key later.
+- Use `localclawd doctor` to verify reachability, auth, and backend health.
+
+### Autonomous task execution
+
+The CLI is built for longer coding loops, not only one-shot prompts.
+
+- `/keepgoing` continues through pending work until the model emits a completion or input-needed signal.
+- `/thinkharder` increases verification rigor and model self-checking for complex changes.
+- `/buddy` creates a persistent ASCII companion persona for the current session.
+
+### Project-local image workflow
+
+localclawd can scaffold a reproducible local art pipeline inside each repository under `.localclawd/image-pipeline/`.
+
+- `/images` starts the workflow with ComfyUI-first defaults.
+- `/images setup pixel-art UI icons` creates prompts, helper files, config, and workflow placeholders for a concrete brief.
+- `/images review stone floor texture batch` reviews the latest outputs and produces the next-pass refinement guidance.
+- `/image-pipeline` exposes the full underlying skill and workflow directly.
+
+The bundled workflow keeps prompts, generated outputs, reviews, and backend configuration inside the project. It prefers ComfyUI on `http://127.0.0.1:8188`, falls back to Automatic1111 on `http://127.0.0.1:7860`, and supports a project-defined custom command when needed. When the connected runtime supports image reads, generated images are reviewed visually rather than only by prompt text or filenames.
+
 ### Release asset naming
 
 The bootstrap scripts expect release assets to follow the native installer platform naming already used in the codebase:
@@ -169,16 +212,6 @@ Then run:
 localclawd
 ```
 
-## Project-local image workflow
-
-localclawd can now scaffold a reproducible local art pipeline inside each repo under `.localclawd/image-pipeline/`.
-
-- Use `/images` to bootstrap the workflow quickly with ComfyUI-first defaults.
-- Use `/images setup pixel-art UI icons` to scaffold prompts, helper files, and workflow placeholders tailored to a concrete asset brief.
-- Use `/images review stone floor texture batch` to review the latest generated images and write a tighter next-pass prompt.
-
-The bundled workflow keeps prompts, generated outputs, reviews, and backend config in the project. It prefers ComfyUI on `http://127.0.0.1:8188`, falls back to Automatic1111 on `http://127.0.0.1:7860`, and can use a project-defined custom command when needed. When the current runtime supports image reads, generated images are reviewed visually instead of only by prompt text or filenames.
-
 ## No account required
 
 localclawd does not require any account, login, or subscription. Connect it to a local model (vLLM, Ollama) or any OpenAI-compatible endpoint and start coding immediately. Use `/setup` at any time to configure or change your backend.
@@ -189,10 +222,11 @@ If you want to use the Anthropic API directly, set `ANTHROPIC_API_KEY` in your e
 
 `v1.7.2` is live on npm. Install globally with `npm install -g localclawd` or run without installing with `npx localclawd`.
 
-**Recent changes**
-- `1.7.2` — add `/images` as a quick-start command, ship the bundled `/image-pipeline` skill, scaffold a project-local `.localclawd/image-pipeline/` workflow, include a ComfyUI helper/template set, and require visual image review when the current runtime supports image reads.
-- `1.7.1` — ship the autonomous `/keepgoing` loop, the `/buddy` companion flow, lattice-ranked local memory fallback, and the paired `/thinkharder` / `/thinknormal` operating modes.
-- `1.0.0` — initial public localclawd release.
+Current release highlights:
+
+- `1.7.2` adds `/images`, the bundled `/image-pipeline` workflow, project-local image pipeline scaffolding, ComfyUI helper/templates, and visual review for generated assets when the runtime supports image reads.
+- `1.7.1` introduced the autonomous `/keepgoing` loop, the `/buddy` companion flow, lattice-ranked local memory fallback, and the paired `/thinkharder` / `/thinknormal` operating modes.
+- `1.0.0` was the initial public release.
 
 External native update metadata is now expected under `release-manifests/`, the main verification workflow lives in `.github/workflows/ci.yml`, and the native asset publication workflow lives in `.github/workflows/publish-release-assets.yml`. See `docs/release.md` for the expected asset set and publish sequence.
 

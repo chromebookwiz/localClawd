@@ -42,6 +42,15 @@ import {
 } from '../../services/signal/signalBot.js'
 import { globalStopSignal } from '../../services/telegram/telegramSignals.js'
 import { enqueue } from '../../utils/messageQueueManager.js'
+import {
+  runForkedAgent,
+  getLastCacheSafeParams,
+} from '../../utils/forkedAgent.js'
+import {
+  createUserMessage,
+  getLastAssistantMessage,
+  extractTextContent,
+} from '../../utils/messages.js'
 
 // ─── Module-level loop state ─────────────────────────────────────────────────
 
@@ -107,6 +116,49 @@ function extractLastAssistantText(
   return ''
 }
 
+// ─── Inter-turn synthesis agent ──────────────────────────────────────────────
+
+// Runs a single-turn forked agent using the full conversation context to write
+// the next round's directive. The agent sees everything the main model saw.
+// Falls back to '' on any error so callers can use NEXT: extraction instead.
+async function synthesizeNextDirective(focus: string): Promise<string> {
+  try {
+    const cacheSafeParams = getLastCacheSafeParams()
+    if (!cacheSafeParams) return ''
+
+    const focusLine = focus ? `\nThe overall session focus is: ${focus}` : ''
+    const prompt = `You are a task director reviewing an autonomous coding session.${focusLine}
+
+Based on the conversation above, write a precise 2-3 sentence directive for the NEXT round of work.
+- Reference specific files, functions, or tests by name
+- Build directly on what was just completed or unblocked
+- Be concrete: name the exact next action, what to verify, and what "done" looks like
+
+Write ONLY the directive. No preamble, no markdown, no tool calls. Start immediately with the action.`
+
+    const result = await runForkedAgent({
+      promptMessages: [createUserMessage({ content: prompt })],
+      cacheSafeParams,
+      canUseTool: async () => ({
+        behavior: 'deny' as const,
+        message: 'Synthesis agent is text-only',
+        decisionReason: { type: 'other' as const, reason: 'synthesis' },
+      }),
+      querySource: 'keepgoing_synthesis',
+      forkLabel: 'keepgoing_synthesis',
+      maxTurns: 1,
+      skipTranscript: true,
+      skipCacheWrite: true,
+    })
+
+    const assistantMsg = getLastAssistantMessage(result.messages)
+    if (!assistantMsg || assistantMsg.isApiErrorMessage) return ''
+    return extractTextContent(assistantMsg.message.content, '\n').trim().slice(0, 600)
+  } catch {
+    return ''
+  }
+}
+
 // ─── Prompt builders ─────────────────────────────────────────────────────────
 
 // Sent on round 1 (or whenever we have no self-directive, e.g. after compact).
@@ -145,15 +197,13 @@ TodoCreate, TodoUpdate
 · Run builds/tests after significant changes
 · If genuinely blocked: state the blocker clearly, spawn a subagent to research it, or try an alternative approach — do NOT stall
 
-━━━ REQUIRED ENDING ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-At the END of every response, write exactly these two lines:
+━━━ OPTIONAL ENDING ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You may end your response with:
 
 SUMMARY: <1-2 sentences of what you accomplished this round>
-NEXT: <1–3 sentences describing your specific plan for the next round>
+NEXT: <your plan for the following round (used as fallback if needed)>
 
-Both lines are required every round without exception.
-NEXT: becomes your only prompt next round — be precise about files,
-actions, and outcomes to verify.`
+These help with context continuity but are not required.`
 }
 
 // Sent on rounds 2+ when the model has written a NEXT: directive.
@@ -177,9 +227,7 @@ ${telegramSection}${thinkHarder}
 DIRECTIVE:
 ${directive}
 
-Proceed. End your response with:
-SUMMARY: <what you accomplished this round>
-NEXT: <your plan for the following round>`
+Proceed.`
 }
 
 // ─── UI Components ────────────────────────────────────────────────────────────
@@ -346,10 +394,24 @@ async function callInner(
   // Context compacted: model returned nothing (overflow or compaction event)
   const contextCompacted = lastText === NO_CONTENT_MESSAGE || lastText.trim() === ''
 
-  // Update self-directive from the model's last response
+  // Update self-directive using synthesis agent (primary) or NEXT: extraction (fallback).
+  // Synthesis runs a single-turn forked agent against the full conversation to produce
+  // a contextually accurate directive. Falls back gracefully on any error.
   if (!contextCompacted) {
-    const newDirective = extractSelfDirective(lastText)
-    if (newDirective) sessionSelfDirective = newDirective
+    const extracted = extractSelfDirective(lastText)
+    const synthesized = lastText.trim() && sessionRound >= 1
+      ? await synthesizeNextDirective(focus)
+      : ''
+    if (synthesized) {
+      sessionSelfDirective = synthesized
+    } else if (extracted) {
+      sessionSelfDirective = extracted
+    } else if (sessionRound > 1) {
+      const preview = lastText.slice(0, 300).replace(/\n/g, ' ').trim()
+      sessionSelfDirective = preview
+        ? `Continue from where you left off: ${preview.slice(0, 200)}`
+        : 'Continue with the next most important task.'
+    }
   } else {
     // After compaction the directive may be stale — clear it so we re-onboard
     sessionSelfDirective = ''
