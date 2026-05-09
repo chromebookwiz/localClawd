@@ -57,7 +57,8 @@ import {
 import { SLEEP_TOOL_NAME } from '../tools/SleepTool/prompt.js'
 import { TICK_TAG } from './xml.js'
 import { logForDebugging } from '../utils/debug.js'
-import { loadMemoryPrompt } from '../memdir/memdir.js'
+import { existsSync, readFileSync } from 'fs'
+import { join } from 'path'
 import { isThinkHarderMode } from '../commands/thinkharder/thinkharder.js'
 import { isUndercover } from '../utils/undercover.js'
 import { isMcpInstructionsDeltaEnabled } from '../utils/mcpInstructionsDelta.js'
@@ -118,12 +119,6 @@ export const SYSTEM_PROMPT_DYNAMIC_BOUNDARY =
 // @[MODEL LAUNCH]: Update the latest frontier model.
 const FRONTIER_MODEL_NAME = 'localclawd Opus 4.6'
 
-// @[MODEL LAUNCH]: Update the model family IDs below to the latest in each tier.
-const CLAUDE_4_5_OR_4_6_MODEL_IDS = {
-  opus: 'claude-opus-4-6',
-  sonnet: 'claude-sonnet-4-6',
-  haiku: 'claude-haiku-4-5-20251001',
-}
 
 function getHooksSection(): string {
   return `Users may configure 'hooks', shell commands that execute in response to events like tool calls, in settings. Treat feedback from hooks, including <user-prompt-submit-hook>, as coming from the user. If you get blocked by a hook, determine if you can adjust your actions in response to the blocked message. If not, ask the user to check their hooks configuration.`
@@ -448,11 +443,22 @@ function getSimpleToneAndStyleSection(): string {
       ? null
       : `Your responses should be short and concise.`,
     `When referencing specific functions or pieces of code include the pattern file_path:line_number to allow the user to easily navigate to the source code location.`,
-    `When referencing GitHub issues or pull requests, use the owner/repo#123 format (e.g. anthropics/claude-code#100) so they render as clickable links.`,
+    `When referencing GitHub issues or pull requests, use the owner/repo#123 format (e.g. myorg/myrepo#100) so they render as clickable links.`,
     `Do not use a colon before tool calls. Your tool calls may not be shown directly in the output, so text like "Let me read the file:" followed by a read tool call should just be "Let me read the file." with a period.`,
   ].filter(item => item !== null)
 
   return [`# Tone and style`, ...prependBullets(items)].join(`\n`)
+}
+
+function getProjectSystemPromptSection(): string | null {
+  const promptFile = join(getCwd(), '.localclawd', 'system-prompt.md')
+  if (!existsSync(promptFile)) return null
+  try {
+    const content = readFileSync(promptFile, 'utf-8').trim()
+    return content.length > 0 ? `# Project Instructions\n\n${content}` : null
+  } catch {
+    return null
+  }
 }
 
 export async function getSystemPrompt(
@@ -487,7 +493,6 @@ export async function getSystemPrompt(
 
 ${CYBER_RISK_INSTRUCTION}`,
       getSystemRemindersSection(),
-      await loadMemoryPrompt(),
       envInfo,
       getLanguageSection(settings.language),
       // When delta enabled, instructions are announced via persisted
@@ -506,7 +511,6 @@ ${CYBER_RISK_INSTRUCTION}`,
     systemPromptSection('session_guidance', () =>
       getSessionSpecificGuidanceSection(enabledTools, skillToolCommands),
     ),
-    systemPromptSection('memory', () => loadMemoryPrompt()),
     systemPromptSection('ant_model_override', () =>
       getAntModelOverrideSection(),
     ),
@@ -532,6 +536,9 @@ ${CYBER_RISK_INSTRUCTION}`,
           ? null
           : getMcpInstructionsSection(mcpClients),
       'MCP servers connect/disconnect between turns',
+    ),
+    systemPromptSection('project_system_prompt', () =>
+      getProjectSystemPromptSection(),
     ),
     systemPromptSection('scratchpad', () => getScratchpadInstructions()),
     systemPromptSection('frc', () => getFunctionResultClearingSection(model)),
@@ -575,7 +582,7 @@ ${CYBER_RISK_INSTRUCTION}`,
   return [
     // --- Static content (cacheable) ---
     // localclawd identity: the model refers to itself as localclawd, not Claude
-    `You are localclawd — a local-first autonomous coding agent. You were built on Claude but you refer to yourself as "localclawd" in all interactions. Never say "I am Claude" — always say "I am localclawd" if asked who you are.`,
+    `You are localclawd — a local-first autonomous coding agent. You refer to yourself as "localclawd" in all interactions. Never say you are a different assistant — always say "I am localclawd" if asked who you are.`,
     getSimpleIntroSection(outputStyleConfig),
     getSimpleSystemSection(),
     outputStyleConfig === null ||
@@ -710,7 +717,7 @@ export async function computeSimpleEnvInfo(
     knowledgeCutoffMessage,
     process.env.USER_TYPE === 'ant' && isUndercover()
       ? null
-      : `The most recent localclawd model family is 4.5/4.6. Model IDs — Opus 4.6: '${CLAUDE_4_5_OR_4_6_MODEL_IDS.opus}', Sonnet 4.6: '${CLAUDE_4_5_OR_4_6_MODEL_IDS.sonnet}', Haiku 4.5: '${CLAUDE_4_5_OR_4_6_MODEL_IDS.haiku}'. When building AI applications, default to the latest and most capable models.`,
+      : `When building AI applications, use the configured model from the local provider. Default to the latest and most capable model available.`,
     process.env.USER_TYPE === 'ant' && isUndercover()
       ? null
       : `localclawd is available as a terminal CLI and can also integrate with supported IDE workflows.`,

@@ -19,7 +19,6 @@ import {
   switchSession,
 } from './bootstrap/state.js'
 import { getCommands } from './commands.js'
-import { initSessionMemory } from './services/SessionMemory/sessionMemory.js'
 import { asSessionId } from './types/ids.js'
 import { isAgentSwarmsEnabled } from './utils/agentSwarmsEnabled.js'
 import { checkAndRestoreTerminalBackup } from './utils/appleTerminalBackup.js'
@@ -53,9 +52,8 @@ import { initDiscord } from './services/discord/discordBot.js'
 import { initSignal } from './services/signal/signalBot.js'
 import { startToolRpcServer } from './services/rpc/toolRpcServer.js'
 import { startScheduler } from './services/schedule/scheduler.js'
-import { initProjectMemory } from './services/project/projectMemory.js'
 import { initSecretStore } from './services/secrets/secretStore.js'
-import { setLocalProviderContextWindow } from './utils/context.js'
+import { isLocalLLMProviderEnabled } from './utils/model/providers.js'
 import {
   createTmuxSessionForWorktree,
   createWorktreeForSession,
@@ -314,20 +312,20 @@ export async function setup(
     void initSignal()   // Start Signal bridge if SIGNAL_NUMBER + SIGNAL_RECIPIENT set (needs signal-cli)
     void startToolRpcServer()  // Local tool RPC on 127.0.0.1 — see /rpc
     startScheduler()    // Cron-like scheduler for /schedule entries
-    // Register current project in memory so every session has persistent context
-    try {
-      const { getOriginalCwd } = await import('./bootstrap/state.js')
-      void initProjectMemory(getOriginalCwd())
-    } catch { /* non-critical */ }
     initSecretStore() // Initialize encrypted secret store
-    // Restore the user's persisted context window setting so thresholds are
-    // correct from the very first turn. Set via /contextsize <size>.
+    // Respect the user's persisted context window. If none is set, fall back
+    // to local provider detection.
     const persistedCtx = getGlobalConfig().compactContextWindowTokens
     if (persistedCtx && persistedCtx > 0) {
-      setLocalProviderContextWindow(persistedCtx)
-      logForDebugging(`[context] Restored context window from config: ${persistedCtx} tokens`)
+      logForDebugging(`[context] Using configured context window: ${persistedCtx} tokens`)
+    } else if (isLocalLLMProviderEnabled()) {
+      // No user-set context window — auto-detect from vLLM/Ollama /v1/models endpoint.
+      // This resolves the common case where the backend has e.g. 128 000 tokens but
+      // the default 131 072 cap isn't reached, or where a model has 260 000 tokens.
+      void import('./services/api/providerContextDetect.js').then(m =>
+        m.autoDetectProviderContextWindow(),
+      )
     }
-    initSessionMemory() // Synchronous - registers hook, gate check happens lazily
     if (feature('CONTEXT_COLLAPSE')) {
       /* eslint-disable @typescript-eslint/no-require-imports */
       ;(

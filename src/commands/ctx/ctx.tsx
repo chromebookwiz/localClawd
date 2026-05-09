@@ -14,7 +14,6 @@ import {
   getConfiguredCompactContextWindow,
   parseContextWindowString,
   getLocalProviderContextWindow,
-  setLocalProviderContextWindow,
 } from '../../utils/context.js'
 import {
   getEffectiveContextWindowSize,
@@ -60,7 +59,6 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     }
 
     saveGlobalConfig(c => ({ ...c, compactContextWindowTokens: parsed }))
-    setLocalProviderContextWindow(parsed)
     onDone(
       [
         `Context window set to ${fmtTokens(parsed)} tokens.`,
@@ -78,7 +76,6 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
       const { compactContextWindowTokens: _, ...rest } = c
       return rest as typeof c
     })
-    setLocalProviderContextWindow(null)
     onDone(
       [
         'Context window reset to model default.',

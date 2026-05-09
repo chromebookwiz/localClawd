@@ -106,6 +106,11 @@ export function getContextWindowForModel(
     return 1_000_000
   }
 
+  const persisted = getGlobalConfig().compactContextWindowTokens
+  if (persisted && persisted > 0) {
+    return persisted
+  }
+
   const cap = getModelCapability(model)
   if (cap?.max_input_tokens && cap.max_input_tokens >= 100_000) {
     if (
@@ -132,13 +137,6 @@ export function getContextWindowForModel(
   // Use context window detected from local provider (vLLM/Ollama model info)
   if (_localProviderContextWindow && _localProviderContextWindow > 0) {
     return _localProviderContextWindow
-  }
-  // Fall back to persisted config (set via /contextsize). This ensures
-  // thresholds are correct even if the in-memory value hasn't been restored
-  // yet (e.g. very early in startup).
-  const persisted = getGlobalConfig().compactContextWindowTokens
-  if (persisted && persisted > 0) {
-    return persisted
   }
   return MODEL_CONTEXT_WINDOW_DEFAULT
 }

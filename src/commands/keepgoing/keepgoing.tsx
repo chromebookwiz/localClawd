@@ -335,9 +335,7 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     const msg = error instanceof Error ? error.message : String(error)
     // Re-enqueue so the loop can restart after showing the error
     try {
-      const rawArgs = args?.trim() ?? ''
-      const nextCmd = rawArgs ? `/keepgoing ${rawArgs}` : '/keepgoing'
-      enqueue({ value: nextCmd, mode: 'prompt', isMeta: true })
+      enqueue({ value: '/keepgoing', mode: 'prompt', isMeta: true })
     } catch { /* ignore */ }
     onDone(`⚠ keepgoing error (restarting): ${msg}`, { display: 'system' })
     return null
@@ -353,7 +351,8 @@ async function callInner(
   const { extractChain } =
     await import('../../utils/commandChaining.js')
   const { ownArgs: chainedArgs } = extractChain(rawArgs)
-  const focus = parseFocus(chainedArgs)
+  const requestedFocus = parseFocus(chainedArgs)
+  const focus = requestedFocus || sessionFocus
 
   if (sessionRound === 0 && !focus) {
     onDone('What should I keep going on?', {
@@ -363,7 +362,7 @@ async function callInner(
     return null
   }
 
-  const isNewSession = sessionRound === 0 || (focus && focus !== sessionFocus)
+  const isNewSession = sessionRound === 0 || (requestedFocus && requestedFocus !== sessionFocus)
   if (isNewSession) {
     const currentMode = context.getAppState().toolPermissionContext.mode
     resetSession(focus, currentMode)
@@ -471,7 +470,7 @@ async function callInner(
     ? buildOnboardingPrompt(round, focus, externalMsg, contextCompacted)
     : buildSelfDirectedPrompt(round, sessionSelfDirective, focus, externalMsg)
 
-  const nextCmd = focus ? `/keepgoing ${focus}` : '/keepgoing'
+  const nextCmd = '/keepgoing'
 
   const handleReady = () => {
     try {

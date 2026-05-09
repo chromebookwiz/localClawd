@@ -97,3 +97,43 @@ export async function addFileGlobRuleToGitignore(
     logError(error)
   }
 }
+
+export type RemoveGitignoreRuleResult = {
+  path: string
+  removed: boolean
+}
+
+/**
+ * Removes exact gitignore lines from a gitignore file.
+ * Comments, negated patterns, and unrelated entries are preserved.
+ */
+export async function removeGitignoreRulesFromFile(
+  gitignorePath: string,
+  patterns: readonly string[],
+): Promise<RemoveGitignoreRuleResult> {
+  try {
+    const content = await readFile(gitignorePath, { encoding: 'utf-8' })
+    const patternSet = new Set(patterns)
+    const trailingNewline = content.endsWith('\n') || content.endsWith('\r\n')
+    const body = trailingNewline ? content.replace(/\r?\n$/, '') : content
+    const lines = body.split(/\r?\n/)
+    const filtered = lines.filter(line => !patternSet.has(line.trim()))
+    const removed = filtered.length !== lines.length
+
+    if (removed) {
+      await writeFile(
+        gitignorePath,
+        filtered.join('\n') + (trailingNewline ? '\n' : ''),
+        'utf-8',
+      )
+    }
+
+    return { path: gitignorePath, removed }
+  } catch (error) {
+    const code = getErrnoCode(error)
+    if (code === 'ENOENT') {
+      return { path: gitignorePath, removed: false }
+    }
+    throw error
+  }
+}

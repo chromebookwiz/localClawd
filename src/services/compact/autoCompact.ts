@@ -1,5 +1,4 @@
 import { feature } from 'bun:bundle'
-import { markPostCompaction } from 'src/bootstrap/state.js'
 import { getSdkBetas } from '../../bootstrap/state.js'
 import type { QuerySource } from '../../constants/querySource.js'
 import type { ToolUseContext } from '../../Tool.js'
@@ -16,8 +15,6 @@ import { logError } from '../../utils/log.js'
 import { tokenCountWithEstimation } from '../../utils/tokens.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../analytics/growthbook.js'
 import { getMaxOutputTokensForModel } from '../api/llm.js'
-import { notifyCompaction } from '../api/promptCacheBreakDetection.js'
-import { setLastSummarizedMessageId } from '../SessionMemory/sessionMemoryUtils.js'
 import {
   type CompactionResult,
   compactConversation,
@@ -25,7 +22,6 @@ import {
   type RecompactionInfo,
 } from './compact.js'
 import { runPostCompactCleanup } from './postCompactCleanup.js'
-import { trySessionMemoryCompaction } from './sessionMemoryCompact.js'
 
 // Reserve this many tokens for output during compaction
 // Based on p99.99 of compact summary output being 17,387 tokens.
@@ -71,7 +67,7 @@ export function getAutoCompactThreshold(model: string): number {
   const effectiveContextWindow = getEffectiveContextWindowSize(model)
 
   // Scale buffer proportionally for smaller context windows.
-  // Large windows (200k+) use the full 13k buffer; smaller windows use 10%
+  // Large windows use the full 13k buffer; smaller windows use 10%
   // of effective size so compaction doesn't trigger too aggressively.
   const scaledBuffer = Math.min(AUTOCOMPACT_BUFFER_TOKENS, Math.floor(effectiveContextWindow * 0.10))
   const autocompactThreshold =
@@ -284,36 +280,6 @@ export async function autoCompactIfNeeded(
     previousCompactTurnId: tracking?.turnId,
     autoCompactThreshold: getAutoCompactThreshold(model),
     querySource,
-  }
-
-  // EXPERIMENT: Try session memory compaction first
-  let sessionMemoryResult: Awaited<ReturnType<typeof trySessionMemoryCompaction>> = null
-  try {
-    sessionMemoryResult = await trySessionMemoryCompaction(
-      messages,
-      toolUseContext.agentId,
-      recompactionInfo.autoCompactThreshold,
-    )
-  } catch (smError) {
-    logError(smError)
-  }
-  if (sessionMemoryResult) {
-    // Reset lastSummarizedMessageId since session memory compaction prunes messages
-    // and the old message UUID will no longer exist after the REPL replaces messages
-    setLastSummarizedMessageId(undefined)
-    runPostCompactCleanup(querySource)
-    // Reset cache read baseline so the post-compact drop isn't flagged as a
-    // break. compactConversation does this internally; SM-compact doesn't.
-    // BQ 2026-03-01: missing this made 20% of tengu_prompt_cache_break events
-    // false positives (systemPromptChanged=true, timeSinceLastAssistantMsg=-1).
-    if (feature('PROMPT_CACHE_BREAK_DETECTION')) {
-      notifyCompaction(querySource ?? 'compact', toolUseContext.agentId)
-    }
-    markPostCompaction()
-    return {
-      wasCompacted: true,
-      compactionResult: sessionMemoryResult,
-    }
   }
 
   try {

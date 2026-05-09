@@ -155,6 +155,7 @@ The CLI is built for longer coding loops, not only one-shot prompts.
 - `/keepgoing` continues through pending work until the model emits a completion or input-needed signal.
 - `/thinkharder` increases verification rigor and model self-checking for complex changes.
 - `/buddy` creates a persistent ASCII companion persona for the current session.
+- `/includememory` removes `CLAUDE.local.md` from gitignore so local memory can be committed when you want to share it.
 
 ### Project-local image workflow
 
@@ -216,8 +217,6 @@ localclawd
 
 localclawd does not require any account, login, or subscription. Connect it to a local model (vLLM, Ollama) or any OpenAI-compatible endpoint and start coding immediately. Use `/setup` at any time to configure or change your backend.
 
-If you want to use the Anthropic API directly, set `ANTHROPIC_API_KEY` in your environment — no login flow needed.
-
 ## Release status
 
 `v1.7.2` is live on npm. Install globally with `npm install -g localclawd` or run without installing with `npx localclawd`.
@@ -225,7 +224,7 @@ If you want to use the Anthropic API directly, set `ANTHROPIC_API_KEY` in your e
 Current release highlights:
 
 - `1.7.2` adds `/images`, the bundled `/image-pipeline` workflow, project-local image pipeline scaffolding, ComfyUI helper/templates, and visual review for generated assets when the runtime supports image reads.
-- `1.7.1` introduced the autonomous `/keepgoing` loop, the `/buddy` companion flow, lattice-ranked local memory fallback, and the paired `/thinkharder` / `/thinknormal` operating modes.
+- `1.7.1` introduced the autonomous `/keepgoing` loop, the `/buddy` companion flow, and the paired `/thinkharder` / `/thinknormal` operating modes.
 - `1.0.0` was the initial public release.
 
 External native update metadata is now expected under `release-manifests/`, the main verification workflow lives in `.github/workflows/ci.yml`, and the native asset publication workflow lives in `.github/workflows/publish-release-assets.yml`. See `docs/release.md` for the expected asset set and publish sequence.
@@ -312,7 +311,7 @@ During first-run setup, localclawd asks for a compact context window cap. Use th
 
 ## Why use it instead of the upstream hosted CLI
 
-- You can point the CLI at your own inference stack instead of a Claude-hosted backend.
+- You can point the CLI at your own inference stack instead of a hosted backend.
 - Backend configuration lives inside the app, not only in shell variables.
 - `doctor` validates the configured local backend instead of only checking install state.
 - vLLM, Ollama, and generic OpenAI-compatible gateways are all supported under the same terminal UX.

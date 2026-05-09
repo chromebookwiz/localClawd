@@ -58,6 +58,7 @@ import research from './commands/research/index.js'
 import thinkharder from './commands/thinkharder/index.js'
 import thinknormal from './commands/thinkharder/thinknormal-index.js'
 import memory from './commands/memory/index.js'
+import includeMemory from './commands/includememory/index.js'
 import help from './commands/help/index.js'
 import ide from './commands/ide/index.js'
 import init from './commands/init.js'
@@ -306,6 +307,7 @@ const COMMANDS = memoize((): Command[] => [
   thinknormal,
   mcp,
   memory,
+  includeMemory,
   model,
   outputStyle,
   provider,

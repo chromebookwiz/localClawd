@@ -10,7 +10,7 @@
 
 import type { LocalJSXCommandCall } from '../../types/command.js'
 import { saveGlobalConfig } from '../../utils/config.js'
-import { parseContextWindowString, setLocalProviderContextWindow } from '../../utils/context.js'
+import { parseContextWindowString } from '../../utils/context.js'
 import { getAutoCompactThreshold } from '../../services/compact/autoCompact.js'
 
 function fmtTokens(n: number): string {
@@ -34,7 +34,6 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   }
 
   saveGlobalConfig(c => ({ ...c, compactContextWindowTokens: parsed }))
-  setLocalProviderContextWindow(parsed)
 
   const model = context.options.mainLoopModel
   onDone(
