@@ -1133,6 +1133,135 @@ export function createCompactCanUseTool(): CanUseToolFn {
   })
 }
 
+/**
+ * Serialize messages to a plain-text transcript for clean-room compaction.
+ * Skips tool calls, images, attachments — keeps only human-readable text.
+ * Truncates to maxChars to keep the clean-room request manageable.
+ */
+function serializeMessagesForCleanRoom(messages: Message[], maxChars = 240_000): string {
+  const parts: string[] = []
+  for (const msg of messages) {
+    if (msg.type === 'user') {
+      const content = msg.message.content
+      const blocks = Array.isArray(content) ? content : []
+      const text = blocks
+        .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+        .map(b => b.text)
+        .join('\n')
+        .trim()
+      if (text) parts.push(`[User]\n${text}`)
+    } else if (msg.type === 'assistant') {
+      const content = msg.message.content
+      const blocks = Array.isArray(content) ? content : []
+      const text = blocks
+        .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+        .map(b => b.text)
+        .join('\n')
+        .trim()
+      if (text) parts.push(`[Assistant]\n${text}`)
+    }
+  }
+  const full = parts.join('\n\n')
+  if (full.length <= maxChars) return full
+  // Truncate from the beginning (oldest messages), keep recent context
+  return '[earlier conversation truncated]\n\n' + full.slice(full.length - maxChars)
+}
+
+/**
+ * Clean-room compaction: serialize the conversation to plain text and summarize
+ * in a fresh API call with no shared context, no tool schemas, no system prompt
+ * overhead. Independent of the main model thread — cannot interfere with an
+ * existing session. This is the primary fallback for local backends where
+ * sending the full message history for re-processing would re-exhaust context.
+ */
+async function tryCleanRoomCompactSummary({
+  messages,
+  summaryRequest,
+  context,
+  preCompactTokenCount,
+}: {
+  messages: Message[]
+  summaryRequest: UserMessage
+  context: ToolUseContext
+  preCompactTokenCount: number
+}): Promise<AssistantMessage | null> {
+  try {
+    const serialized = serializeMessagesForCleanRoom(messages)
+    if (!serialized.trim()) return null
+
+    // Extract the compact prompt text from the summary request
+    const promptContent = summaryRequest.message.content
+    const compactPromptText = typeof promptContent === 'string'
+      ? promptContent
+      : Array.isArray(promptContent)
+        ? promptContent
+            .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+            .map(b => b.text)
+            .join('\n')
+        : ''
+
+    const cleanRequest = createUserMessage({
+      content: `<conversation>\n${serialized}\n</conversation>\n\n${compactPromptText}`,
+    })
+
+    const appState = context.getAppState()
+    const model = context.options.mainLoopModel
+
+    const streamingGen = queryModelWithStreaming({
+      messages: [cleanRequest],
+      systemPrompt: asSystemPrompt(['You are a helpful assistant that summarizes conversations.']),
+      thinkingConfig: { type: 'disabled' as const },
+      tools: [FileReadTool],
+      signal: context.abortController.signal,
+      options: {
+        async getToolPermissionContext() {
+          return appState.toolPermissionContext
+        },
+        model,
+        toolChoice: undefined,
+        isNonInteractiveSession: context.options.isNonInteractiveSession,
+        hasAppendSystemPrompt: false,
+        maxOutputTokensOverride: Math.min(
+          COMPACT_MAX_OUTPUT_TOKENS,
+          getMaxOutputTokensForModel(model),
+        ),
+        querySource: 'compact',
+        agents: context.options.agentDefinitions.activeAgents,
+        mcpTools: [],
+        effortValue: appState.effortValue,
+      },
+    })
+
+    let response: AssistantMessage | undefined
+    for await (const event of streamingGen) {
+      if (
+        event.type === 'stream_event' &&
+        event.event.type === 'content_block_delta' &&
+        event.event.delta.type === 'text_delta'
+      ) {
+        context.setResponseLength?.(len => len + event.event.delta.text.length)
+      }
+      if (event.type === 'assistant') {
+        response = event
+      }
+    }
+
+    const text = response ? getAssistantMessageText(response) : null
+    if (!text || response?.isApiErrorMessage) return null
+
+    logForDebugging(
+      `compact clean-room: success (pre=${preCompactTokenCount} out=${response?.message?.usage?.output_tokens ?? 0})`,
+    )
+    return response
+  } catch (error) {
+    logForDebugging(
+      `compact clean-room: failed, falling back to streaming path. Error: ${error instanceof Error ? error.message : String(error)}`,
+      { level: 'warn' },
+    )
+    return null
+  }
+}
+
 async function streamCompactSummary({
   messages,
   summaryRequest,
@@ -1247,7 +1376,24 @@ async function streamCompactSummary({
       }
     }
 
-    // Regular streaming path (fallback when cache sharing fails or is disabled)
+    // Clean-room path: serialize conversation to plain text, send as a fresh
+    // API call with no shared context overhead. Independent of the main thread.
+    // Preferred for local backends where re-sending the full message history
+    // would itself exhaust the context window.
+    const cleanRoomResponse = await tryCleanRoomCompactSummary({
+      messages,
+      summaryRequest,
+      context,
+      preCompactTokenCount,
+    })
+    if (cleanRoomResponse) {
+      const cleanText = getAssistantMessageText(cleanRoomResponse)
+      if (cleanText && !cleanRoomResponse.isApiErrorMessage && !cleanText.startsWith(PROMPT_TOO_LONG_ERROR_MESSAGE)) {
+        return cleanRoomResponse
+      }
+    }
+
+    // Regular streaming path (last-resort fallback — re-sends all messages)
     const retryEnabled = getFeatureValue_CACHED_MAY_BE_STALE(
       'tengu_compact_streaming_retry',
       false,

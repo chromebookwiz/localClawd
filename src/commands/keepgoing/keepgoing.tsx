@@ -406,7 +406,7 @@ async function callInner(
       sessionSelfDirective = synthesized
     } else if (extracted) {
       sessionSelfDirective = extracted
-    } else if (sessionRound > 1) {
+    } else if (sessionRound >= 1) {
       const preview = lastText.slice(0, 300).replace(/\n/g, ' ').trim()
       sessionSelfDirective = preview
         ? `Continue from where you left off: ${preview.slice(0, 200)}`

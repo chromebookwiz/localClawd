@@ -40,6 +40,7 @@ function parseFlags(text: string): {
   seed?: number
   model?: string
   negative?: string
+  out?: string
 } {
   let s = text
   const result: ReturnType<typeof parseFlags> = { cleaned: '' }
@@ -52,6 +53,8 @@ function parseFlags(text: string): {
   extract('height', v => { result.height = parseInt(v, 10) || undefined })
   extract('seed', v => { result.seed = parseInt(v, 10) })
   extract('model', v => { result.model = v })
+  extract('out', v => { result.out = v })
+  extract('dir', v => { result.out = result.out ?? v })
   // --size 1024x1024 shorthand
   s = s.replace(/--size\s+(\d+)[xX×](\d+)/i, (_, w, h) => {
     result.width = parseInt(w, 10)
@@ -69,6 +72,76 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
 
   const { getOriginalCwd } = await import('../../bootstrap/state.js')
   const projectRoot = getOriginalCwd() ?? process.cwd()
+  const defaultOutputDir = join(projectRoot, '.localclawd', 'image-pipeline', 'generated')
+
+  // Sub-commands: /image copy <filename> [dest]  or  /image move <filename> [dest]
+  const copyMatch = raw.match(/^(copy|move|mv|cp)\s+(.+)$/i)
+  if (copyMatch) {
+    const isCopy = /^(copy|cp)$/i.test(copyMatch[1]!)
+    const rest = copyMatch[2]!.trim()
+    const parts = rest.split(/\s+/)
+    const srcName = parts[0]!
+    const destArg = parts.slice(1).join(' ')
+
+    const srcPath = srcName.includes('/') || srcName.includes('\\')
+      ? srcName
+      : join(defaultOutputDir, srcName)
+
+    const { copyFile, rename } = await import('fs/promises')
+    const { basename } = await import('path')
+
+    let destPath: string
+    if (!destArg) {
+      destPath = join(projectRoot, basename(srcName))
+    } else if (!destArg.includes('/') && !destArg.includes('\\') && !destArg.includes('.')) {
+      // Destination is a directory name — put file inside it
+      destPath = join(projectRoot, destArg, basename(srcName))
+    } else {
+      destPath = destArg.startsWith('.') || (!destArg.includes(':') && !destArg.startsWith('/'))
+        ? join(projectRoot, destArg)
+        : destArg
+    }
+
+    const { mkdir: mkdirCopy } = await import('fs/promises')
+    const { dirname } = await import('path')
+    try {
+      await mkdirCopy(dirname(destPath), { recursive: true })
+      if (isCopy) {
+        await copyFile(srcPath, destPath)
+        onDone(`◆ /image copy — Done\n\n  Copied to: ${destPath}`, { display: 'system' })
+      } else {
+        await rename(srcPath, destPath)
+        onDone(`◆ /image move — Done\n\n  Moved to: ${destPath}`, { display: 'system' })
+      }
+    } catch (e) {
+      onDone(`◆ /image ${isCopy ? 'copy' : 'move'} — Error\n\n  ${String(e)}`, { display: 'system' })
+    }
+    return null
+  }
+
+  // Sub-command: /image list
+  if (/^list$/i.test(raw)) {
+    const { readdir } = await import('fs/promises')
+    try {
+      await mkdir(defaultOutputDir, { recursive: true })
+      const files = (await readdir(defaultOutputDir))
+        .filter(f => /\.(png|jpg|jpeg|webp|gif|bmp)$/i.test(f))
+        .sort()
+      if (files.length === 0) {
+        onDone(`◆ /image list — No images in ${defaultOutputDir}`, { display: 'system' })
+      } else {
+        const lines = [`◆ /image list — ${files.length} image(s) in ${defaultOutputDir}`, '']
+        for (const f of files) lines.push(`  ${f}`)
+        lines.push('')
+        lines.push('  Use /image copy <filename> [dest] to copy to project root')
+        lines.push('  Use /image move <filename> [dest] to move to project root')
+        onDone(lines.join('\n'), { display: 'system' })
+      }
+    } catch (e) {
+      onDone(`◆ /image list — Error: ${String(e)}`, { display: 'system' })
+    }
+    return null
+  }
 
   if (!raw) {
     const config = await loadConfig(projectRoot)
@@ -88,14 +161,23 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
       '    --cfg N      — guidance scale (use 1 for flow models)',
       '    --seed N     — fixed seed for reproducibility',
       '    --model NAME — checkpoint filename',
+      '    --out PATH   — output directory (default: .localclawd/image-pipeline/generated/)',
+      '    --dir PATH   — alias for --out',
+      '',
+      '  Sub-commands:',
+      '    /image list               — list generated images',
+      '    /image copy <file> [dest] — copy image from generated folder',
+      '    /image move <file> [dest] — move image from generated folder',
       '',
       '  Examples:',
       '    /image a misty forest at dawn, cinematic lighting',
       '    /image --size 1024x1024 a detailed portrait',
-      '    /image --size 512x768 --steps 30 an elderly scholar by candlelight',
+      '    /image --out ./assets --size 512x768 rolling hills at sunset',
       '    /image txt2img: --width 768 --height 512 rolling hills at sunset',
+      '    /image copy 2025-01-01_landscape.png art/',
       '',
       `  Default workflow: ${defaultWf}`,
+      `  Default output:   ${defaultOutputDir}`,
     ]
     if (workflows.length > 0) {
       lines.push('  Available workflows:')
@@ -229,7 +311,12 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
     return null
   }
 
-  const outputDir = join(projectRoot, '.localclawd', 'image-pipeline', 'generated').replace(/\\/g, '/')
+  const outputDir = flags.out
+    ? (flags.out.startsWith('.') || (!flags.out.includes(':') && !flags.out.startsWith('/'))
+        ? join(projectRoot, flags.out)
+        : flags.out
+      ).replace(/\\/g, '/')
+    : defaultOutputDir.replace(/\\/g, '/')
   await mkdir(outputDir, { recursive: true })
 
   const comfyImages = extractOutputImages(result)
@@ -271,6 +358,9 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
         `  Prompt:   ${promptText.length > 80 ? promptText.slice(0, 80) + '…' : promptText}`,
         `  Seed:     ${seed}`,
         ...(flagOverrides ? [`  Overrides: ${flagOverrides}`] : []),
+        '',
+        '  Use /image copy <filename> [dest] to copy to another location',
+        '  Use /image list to see all generated images',
       ]
     : [
         '◆ /image — Done (download failed)',
@@ -279,6 +369,9 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
         `  ComfyUI filenames: ${comfyImages.join(', ') || '(none)'}`,
         `  Workflow: ${usedWorkflow}  ·  Seed: ${seed}`,
         `  Try fetching manually: ${backendUrl}/view?filename=${comfyImages[0] ?? ''}&type=output`,
+        '',
+        '  Use /image list to see all generated images',
+        '  Use /image copy <filename> to copy to project root',
       ]
 
   onDone(lines.join('\n'), { display: 'system' })

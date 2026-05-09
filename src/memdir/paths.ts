@@ -282,5 +282,10 @@ export function getAutoMemEntrypoint(): string {
 export function isAutoMemPath(absolutePath: string): boolean {
   // SECURITY: Normalize to prevent path traversal bypasses via .. segments
   const normalizedPath = normalize(absolutePath)
+  // Windows filesystems are case-insensitive; git root detection and the
+  // model's write path may differ in casing (e.g. vllmClawd vs vllmclawd).
+  if (process.platform === 'win32') {
+    return normalizedPath.toLowerCase().startsWith(getAutoMemPath().toLowerCase())
+  }
   return normalizedPath.startsWith(getAutoMemPath())
 }

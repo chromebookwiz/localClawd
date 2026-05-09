@@ -89,7 +89,7 @@ export function CompactSummary(t0) {
   }
   let t4;
   if ($[16] !== t3) {
-    t4 = <Box flexDirection="row">{t2}<Box flexDirection="column"><Text bold={true}>Compact summary{t3}</Text></Box></Box>;
+    t4 = <Box flexDirection="row">{t2}<Box flexDirection="column"><Text bold={true}>Compacted conversation{t3}</Text></Box></Box>;
     $[16] = t3;
     $[17] = t4;
   } else {

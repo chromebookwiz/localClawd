@@ -2498,7 +2498,7 @@ export function REPL({
             setSpinnerMessage(event.hookType === 'pre_compact' ? 'Running PreCompact hooks\u2026' : event.hookType === 'post_compact' ? 'Running PostCompact hooks\u2026' : 'Running SessionStart hooks\u2026');
             break;
           case 'compact_start':
-            setSpinnerMessage('Compressing context');
+            setSpinnerMessage('Compacting conversation…');
             break;
           case 'compact_end':
             setSpinnerMessage(null);
