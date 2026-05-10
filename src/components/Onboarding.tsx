@@ -4,7 +4,11 @@ import {
   shouldOfferTerminalSetup,
 } from '../commands/terminalSetup/terminalSetup.js'
 import { Box, Newline, Text, useInput, useTheme } from '../ink.js'
-import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
+import {
+  getGlobalConfig,
+  saveCurrentProjectConfig,
+  saveGlobalConfig,
+} from '../utils/config.js'
 import {
   COMPACT_CONTEXT_WINDOW_CHOICES,
   formatCompactContextWindowOption,
@@ -189,7 +193,10 @@ export function Onboarding({ onDone, showWelcome = true }: Props): React.ReactNo
               onSelect={value => {
                 const compactContextWindowTokens =
                   value === 'default' ? undefined : parseInt(value, 10)
-                saveGlobalConfig(current => ({ ...current, compactContextWindowTokens }))
+                saveCurrentProjectConfig(current => ({
+                  ...current,
+                  compactContextWindowTokens,
+                }))
                 goToNextStep()
               }}
               onCancel={goToNextStep}

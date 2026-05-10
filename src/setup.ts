@@ -313,9 +313,9 @@ export async function setup(
     void startToolRpcServer()  // Local tool RPC on 127.0.0.1 — see /rpc
     startScheduler()    // Cron-like scheduler for /schedule entries
     initSecretStore() // Initialize encrypted secret store
-    // Respect the user's persisted context window. If none is set, fall back
+    // Respect the current project's context window. If none is set, fall back
     // to local provider detection.
-    const persistedCtx = getGlobalConfig().compactContextWindowTokens
+    const persistedCtx = getCurrentProjectConfig().compactContextWindowTokens
     if (persistedCtx && persistedCtx > 0) {
       logForDebugging(`[context] Using configured context window: ${persistedCtx} tokens`)
     } else if (isLocalLLMProviderEnabled()) {

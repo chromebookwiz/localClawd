@@ -7,8 +7,11 @@ import {
 import { buildTool, type ToolDef } from '../../Tool.js'
 import {
   type GlobalConfig,
+  type ProjectConfig,
+  getCurrentProjectConfig,
   getGlobalConfig,
   getRemoteControlAtStartup,
+  saveCurrentProjectConfig,
   saveGlobalConfig,
 } from '../../utils/config.js'
 import { errorMessage } from '../../utils/errors.js'
@@ -63,6 +66,7 @@ type OutputSchema = ReturnType<typeof outputSchema>
 
 export type Input = z.infer<InputSchema>
 export type Output = z.infer<OutputSchema>
+type ConfigSource = 'global' | 'settings' | 'project'
 
 export const ConfigTool = buildTool({
   name: CONFIG_TOOL_NAME,
@@ -181,10 +185,25 @@ export const ConfigTool = buildTool({
 
     let finalValue: unknown = value
 
+    if (config.coerceOnWrite) {
+      const result = config.coerceOnWrite(finalValue)
+      if ('error' in result) {
+        return {
+          data: {
+            success: false,
+            operation: 'set',
+            setting,
+            error: result.error,
+          },
+        }
+      }
+      finalValue = result.value
+    }
+
     // Coerce and validate boolean values
     if (config.type === 'boolean') {
-      if (typeof value === 'string') {
-        const lower = value.toLowerCase().trim()
+      if (typeof finalValue === 'string') {
+        const lower = finalValue.toLowerCase().trim()
         if (lower === 'true') finalValue = true
         else if (lower === 'false') finalValue = false
       }
@@ -195,6 +214,25 @@ export const ConfigTool = buildTool({
             operation: 'set',
             setting,
             error: `${setting} requires true or false.`,
+          },
+        }
+      }
+    }
+
+    if (config.type === 'number') {
+      if (typeof finalValue === 'string' && finalValue.trim()) {
+        finalValue = Number(finalValue)
+      }
+      if (
+        typeof finalValue !== 'number' ||
+        !Number.isFinite(finalValue)
+      ) {
+        return {
+          data: {
+            success: false,
+            operation: 'set',
+            setting,
+            error: `${setting} requires a finite number.`,
           },
         }
       }
@@ -327,6 +365,22 @@ export const ConfigTool = buildTool({
           if (prev[key as keyof GlobalConfig] === finalValue) return prev
           return { ...prev, [key]: finalValue }
         })
+      } else if (config.source === 'project') {
+        const key = path[0]
+        if (!key) {
+          return {
+            data: {
+              success: false,
+              operation: 'set',
+              setting,
+              error: 'Invalid setting path',
+            },
+          }
+        }
+        saveCurrentProjectConfig(prev => {
+          if (prev[key as keyof ProjectConfig] === finalValue) return prev
+          return { ...prev, [key]: finalValue }
+        })
       } else {
         const update = buildNestedObject(path, finalValue)
         const result = updateSettingsForSource('userSettings', update)
@@ -433,15 +487,15 @@ export const ConfigTool = buildTool({
   },
 } satisfies ToolDef<InputSchema, Output>)
 
-function getValue(source: 'global' | 'settings', path: string[]): unknown {
+function getValue(source: ConfigSource, path: string[]): unknown {
   if (source === 'global') {
     const config = getGlobalConfig()
     const key = path[0]
     if (!key) return undefined
     return config[key as keyof GlobalConfig]
   }
-  const settings = getInitialSettings()
-  let current: unknown = settings
+  let current: unknown =
+    source === 'project' ? getCurrentProjectConfig() : getInitialSettings()
   for (const key of path) {
     if (current && typeof current === 'object' && key in current) {
       current = (current as Record<string, unknown>)[key]

@@ -1,13 +1,8 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
-import { getGlobalConfig } from './config.js'
-import { isEnvTruthy } from './envUtils.js'
+import { getCurrentProjectConfig } from './config.js'
 import { getCanonicalName } from './model/model.js'
 import { resolveAntModel } from './model/antModels.js'
 import { getModelCapability } from './model/modelCapabilities.js'
-
-function getEnvAlias(localKey: string, legacyKey: string): string | undefined {
-  return process.env[localKey] ?? process.env[legacyKey]
-}
 
 // Default context window when nothing else is set or detected.
 // 131072 = 128k — conservative default; set via /ctx set to match your model.
@@ -71,22 +66,19 @@ export function getLocalProviderContextWindow(): number | null {
 /**
  * Single source of truth for context window size.
  * Precedence:
- *   1. env var (LOCALCLAWD_MAX_CONTEXT_TOKENS / CLAUDE_CODE_MAX_CONTEXT_TOKENS)
- *   2. compactContextWindowTokens in global config (set by /ctx set, or persisted by auto-detect)
- *   3. in-memory provider auto-detection (this session)
- *   4. 128k default
+ *   1. compactContextWindowTokens in the current project config
+ *   2. in-memory provider auto-detection (this session)
+ *   3. 128k default
+ *
+ * Context size intentionally does not read process env. A shell-level value
+ * outlives the backend/model it was meant for and can make compaction fire far
+ * too early in unrelated projects.
  */
 export function getContextWindowForModel(
   _model?: string,
   _betas?: string[],
 ): number {
-  const envOverrideStr = getEnvAlias('LOCALCLAWD_MAX_CONTEXT_TOKENS', 'CLAUDE_CODE_MAX_CONTEXT_TOKENS')
-  if (envOverrideStr) {
-    const override = parseContextWindowString(envOverrideStr)
-    if (override !== null) return override
-  }
-
-  const persisted = getGlobalConfig().compactContextWindowTokens
+  const persisted = getCurrentProjectConfig().compactContextWindowTokens
   if (persisted && persisted > 0) return persisted
 
   if (_localProviderContextWindow && _localProviderContextWindow > 0) {
@@ -110,16 +102,7 @@ export function formatCompactContextWindowOption(
 }
 
 export function getConfiguredCompactContextWindow(): number | undefined {
-  const envOverride = getEnvAlias(
-    'LOCALCLAWD_AUTO_COMPACT_WINDOW',
-    'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
-  )
-  if (envOverride) {
-    const parsed = parseContextWindowString(envOverride)
-    if (parsed !== null) return parsed
-  }
-
-  const configured = getGlobalConfig().compactContextWindowTokens
+  const configured = getCurrentProjectConfig().compactContextWindowTokens
   if (typeof configured === 'number' && configured > 0) {
     return configured
   }

@@ -131,6 +131,10 @@ export type ProjectConfig = {
   }
   /** Spawn mode for `claude remote-control` multi-session. Set by first-run dialog or `w` toggle. */
   remoteControlSpawnMode?: 'same-dir' | 'worktree'
+  /** Project-local cap for context-window accounting and compaction thresholds. */
+  compactContextWindowTokens?: number
+  /** Project-local auto-compact preference. Defaults to enabled. */
+  autoCompactEnabled?: boolean
 }
 
 const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
@@ -231,8 +235,16 @@ export type GlobalConfig = {
   editorMode?: EditorMode
   bypassPermissionsModeAccepted?: boolean
   hasUsedBackslashReturn?: boolean
-  autoCompactEnabled: boolean // Controls whether auto-compact is enabled
-  compactContextWindowTokens?: number // Single source of truth for context window size (set by /ctx set or auto-detected)
+  /**
+   * @deprecated Auto-compact is project-local. Kept as a read-only fallback
+   * for older config files.
+   */
+  autoCompactEnabled: boolean
+  /**
+   * @deprecated Context windows are project-local. Kept only so older config
+   * files can be read and cleaned up without losing unrelated settings.
+   */
+  compactContextWindowTokens?: number
   localBackendProvider?: LocalBackendProvider
   localBackendBaseUrl?: string
   localBackendModel?: string
@@ -640,8 +652,6 @@ export const GLOBAL_CONFIG_KEYS = [
   'shiftEnterKeyBindingInstalled',
   'editorMode',
   'hasUsedBackslashReturn',
-  'autoCompactEnabled',
-  'compactContextWindowTokens',
   'localBackendProvider',
   'localBackendBaseUrl',
   'localBackendModel',
@@ -685,6 +695,8 @@ export const PROJECT_CONFIG_KEYS = [
   'allowedTools',
   'hasTrustDialogAccepted',
   'hasCompletedProjectOnboarding',
+  'compactContextWindowTokens',
+  'autoCompactEnabled',
 ] as const
 
 export type ProjectConfigKey = (typeof PROJECT_CONFIG_KEYS)[number]
@@ -919,14 +931,27 @@ registerCleanup(async () => {
  * Migrates old autoUpdaterStatus to new installMethod and autoUpdates fields
  * @internal
  */
-function migrateConfigFields(config: GlobalConfig): GlobalConfig {
-  // Already migrated
-  if (config.installMethod !== undefined) {
+function removeLegacyGlobalProjectSettings(config: GlobalConfig): GlobalConfig {
+  const legacyLocalOnlyFields = config as GlobalConfig & {
+    compactContextWindowTokens?: number
+  }
+  if (legacyLocalOnlyFields.compactContextWindowTokens === undefined) {
     return config
+  }
+  const { compactContextWindowTokens: _legacy, ...rest } =
+    legacyLocalOnlyFields
+  return rest as GlobalConfig
+}
+
+function migrateConfigFields(config: GlobalConfig): GlobalConfig {
+  const normalizedConfig = removeLegacyGlobalProjectSettings(config)
+  // Already migrated
+  if (normalizedConfig.installMethod !== undefined) {
+    return normalizedConfig
   }
 
   // autoUpdaterStatus is removed from the type but may exist in old configs
-  const legacy = config as GlobalConfig & {
+  const legacy = normalizedConfig as GlobalConfig & {
     autoUpdaterStatus?:
       | 'migrated'
       | 'installed'
@@ -938,7 +963,7 @@ function migrateConfigFields(config: GlobalConfig): GlobalConfig {
 
   // Determine install method and auto-update preference from old field
   let installMethod: InstallMethod = 'unknown'
-  let autoUpdates = config.autoUpdates ?? true // Default to enabled unless explicitly disabled
+  let autoUpdates = normalizedConfig.autoUpdates ?? true // Default to enabled unless explicitly disabled
 
   switch (legacy.autoUpdaterStatus) {
     case 'migrated':
@@ -963,7 +988,7 @@ function migrateConfigFields(config: GlobalConfig): GlobalConfig {
   }
 
   return {
-    ...config,
+    ...normalizedConfig,
     installMethod,
     autoUpdates,
   }

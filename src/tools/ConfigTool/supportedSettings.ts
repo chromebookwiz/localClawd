@@ -1,10 +1,17 @@
 import { feature } from 'bun:bundle'
-import { getRemoteControlAtStartup } from '../../utils/config.js'
+import {
+  getGlobalConfig,
+  getRemoteControlAtStartup,
+} from '../../utils/config.js'
 import {
   EDITOR_MODES,
   NOTIFICATION_CHANNELS,
   TEAMMATE_MODES,
 } from '../../utils/configConstants.js'
+import {
+  formatCompactContextWindowOption,
+  parseContextWindowString,
+} from '../../utils/context.js'
 import { getModelOptions } from '../../utils/model/modelOptions.js'
 import { validateModel } from '../../utils/model/validateModel.js'
 import { THEME_NAMES, THEME_SETTINGS } from '../../utils/theme.js'
@@ -13,13 +20,15 @@ import { THEME_NAMES, THEME_SETTINGS } from '../../utils/theme.js'
 type SyncableAppStateKey = 'verbose' | 'mainLoopModel' | 'thinkingEnabled'
 
 type SettingConfig = {
-  source: 'global' | 'settings'
-  type: 'boolean' | 'string'
+  source: 'global' | 'settings' | 'project'
+  type: 'boolean' | 'string' | 'number'
   description: string
   path?: string[]
   options?: readonly string[]
   getOptions?: () => string[]
   appStateKey?: SyncableAppStateKey
+  /** Normalize shorthand or display values before generic type validation. */
+  coerceOnWrite?: (v: unknown) => { value: unknown } | { error: string }
   /** Async validation called when writing/setting a value */
   validateOnWrite?: (v: unknown) => Promise<{ valid: boolean; error?: string }>
   /** Format value when reading/getting for display */
@@ -52,9 +61,30 @@ export const SUPPORTED_SETTINGS: Record<string, SettingConfig> = {
     options: NOTIFICATION_CHANNELS,
   },
   autoCompactEnabled: {
-    source: 'global',
+    source: 'project',
     type: 'boolean',
-    description: 'Auto-compact when context is full',
+    description: 'Auto-compact when this project approaches its context limit',
+    formatOnRead: v =>
+      typeof v === 'boolean' ? v : getGlobalConfig().autoCompactEnabled,
+  },
+  compactContextWindowTokens: {
+    source: 'project',
+    type: 'number',
+    description:
+      'Project-local context window cap used for usage and compaction thresholds',
+    coerceOnWrite: v => {
+      const parsed =
+        typeof v === 'number'
+          ? Number.isFinite(v)
+            ? Math.trunc(v)
+            : null
+          : parseContextWindowString(String(v))
+      return parsed
+        ? { value: parsed }
+        : { error: 'compactContextWindowTokens requires a value like 200k, 1m, or 131072.' }
+    },
+    formatOnRead: v =>
+      formatCompactContextWindowOption(typeof v === 'number' ? v : undefined),
   },
   autoMemoryEnabled: {
     source: 'settings',

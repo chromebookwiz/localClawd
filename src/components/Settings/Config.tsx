@@ -7,7 +7,7 @@ import * as React from 'react';
 import { useState, useCallback } from 'react';
 import { useKeybinding, useKeybindings } from '../../keybindings/useKeybinding.js';
 import figures from 'figures';
-import { type GlobalConfig, saveGlobalConfig, getCurrentProjectConfig, type OutputStyle } from '../../utils/config.js';
+import { type GlobalConfig, saveCurrentProjectConfig, saveGlobalConfig, getCurrentProjectConfig, type OutputStyle } from '../../utils/config.js';
 import { normalizeApiKeyForConfig } from '../../utils/authPortable.js';
 import { getGlobalConfig, getAutoUpdaterDisabledReason, formatAutoUpdaterDisabledReason, getRemoteControlAtStartup } from '../../utils/config.js';
 import chalk from 'chalk';
@@ -100,7 +100,9 @@ export function Config({
   const [, setTheme] = useTheme();
   const themeSetting = useThemeSetting();
   const [globalConfig, setGlobalConfig] = useState(getGlobalConfig());
+  const [projectConfig, setProjectConfig] = useState(getCurrentProjectConfig());
   const initialConfig = React.useRef(getGlobalConfig());
+  const initialProjectConfig = React.useRef(getCurrentProjectConfig());
   const [settingsData, setSettingsData] = useState(getInitialSettings());
   const initialSettingsData = React.useRef(getInitialSettings());
   const [currentOutputStyle, setCurrentOutputStyle] = useState<OutputStyle>(settingsData?.outputStyle || DEFAULT_OUTPUT_STYLE_NAME);
@@ -269,15 +271,15 @@ export function Config({
   {
     id: 'autoCompactEnabled',
     label: 'Auto-compact',
-    value: globalConfig.autoCompactEnabled,
+    value: projectConfig.autoCompactEnabled ?? globalConfig.autoCompactEnabled,
     type: 'boolean' as const,
     onChange(autoCompactEnabled: boolean) {
-      saveGlobalConfig(current_0 => ({
+      saveCurrentProjectConfig(current_0 => ({
         ...current_0,
         autoCompactEnabled
       }));
-      setGlobalConfig({
-        ...getGlobalConfig(),
+      setProjectConfig({
+        ...getCurrentProjectConfig(),
         autoCompactEnabled
       });
       logEvent('tengu_auto_compact_setting_changed', {
@@ -287,17 +289,17 @@ export function Config({
   }, {
     id: 'compactContextWindowTokens',
     label: 'Compact context window',
-    value: formatCompactContextWindowOption(globalConfig.compactContextWindowTokens),
+    value: formatCompactContextWindowOption(projectConfig.compactContextWindowTokens),
     options: [formatCompactContextWindowOption(undefined), ...COMPACT_CONTEXT_WINDOW_CHOICES.map(formatCompactContextWindowOption)],
     type: 'enum' as const,
     onChange(value: string) {
       const compactContextWindowTokens = COMPACT_CONTEXT_WINDOW_CHOICES.find(tokens => formatCompactContextWindowOption(tokens) === value);
-      saveGlobalConfig(current_0 => ({
+      saveCurrentProjectConfig(current_0 => ({
         ...current_0,
         compactContextWindowTokens
       }));
-      setGlobalConfig({
-        ...getGlobalConfig(),
+      setProjectConfig({
+        ...getCurrentProjectConfig(),
         compactContextWindowTokens
       });
       logEvent('tengu_compact_context_window_changed', {
@@ -1147,11 +1149,11 @@ export function Config({
     if (globalConfig.autoInstallIdeExtension !== initialConfig.current.autoInstallIdeExtension) {
       formattedChanges.push(`${globalConfig.autoInstallIdeExtension ? 'Enabled' : 'Disabled'} auto-install IDE extension`);
     }
-    if (globalConfig.autoCompactEnabled !== initialConfig.current.autoCompactEnabled) {
-      formattedChanges.push(`${globalConfig.autoCompactEnabled ? 'Enabled' : 'Disabled'} auto-compact`);
+    if (projectConfig.autoCompactEnabled !== initialProjectConfig.current.autoCompactEnabled) {
+      formattedChanges.push(`${(projectConfig.autoCompactEnabled ?? globalConfig.autoCompactEnabled) ? 'Enabled' : 'Disabled'} auto-compact`);
     }
-    if (globalConfig.compactContextWindowTokens !== initialConfig.current.compactContextWindowTokens) {
-      formattedChanges.push(`Set compact context window to ${chalk.bold(formatCompactContextWindowOption(globalConfig.compactContextWindowTokens))}`);
+    if (projectConfig.compactContextWindowTokens !== initialProjectConfig.current.compactContextWindowTokens) {
+      formattedChanges.push(`Set compact context window to ${chalk.bold(formatCompactContextWindowOption(projectConfig.compactContextWindowTokens))}`);
     }
     if (globalConfig.respectGitignore !== initialConfig.current.respectGitignore) {
       formattedChanges.push(`${globalConfig.respectGitignore ? 'Enabled' : 'Disabled'} respect .gitignore in file picker`);

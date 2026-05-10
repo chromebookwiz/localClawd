@@ -3,7 +3,7 @@ import { getSdkBetas } from '../../bootstrap/state.js'
 import type { QuerySource } from '../../constants/querySource.js'
 import type { ToolUseContext } from '../../Tool.js'
 import type { Message } from '../../types/message.js'
-import { getGlobalConfig } from '../../utils/config.js'
+import { getCurrentProjectConfig, getGlobalConfig } from '../../utils/config.js'
 import {
   getContextWindowForModel,
 } from '../../utils/context.js'
@@ -147,13 +147,12 @@ export function isAutoCompactEnabled(): boolean {
   if (isEnvTruthy(process.env.DISABLE_COMPACT)) {
     return false
   }
-  // Allow disabling just auto-compact (keeps manual /compact working)
-  if (isEnvTruthy(process.env.DISABLE_AUTO_COMPACT)) {
-    return false
+  // Project-local config controls auto-compact; global config is legacy.
+  const projectSetting = getCurrentProjectConfig().autoCompactEnabled
+  if (typeof projectSetting === 'boolean') {
+    return projectSetting
   }
-  // Always enabled — compact automatically whenever context fills, no user
-  // config needed. Set DISABLE_AUTO_COMPACT=1 to opt out.
-  return true
+  return getGlobalConfig().autoCompactEnabled !== false
 }
 
 export async function shouldAutoCompact(

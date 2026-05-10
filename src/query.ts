@@ -841,7 +841,7 @@ async function* queryLoop(
     // reactiveCompact. A synthetic preempt here would return before the
     // API call and starve both recovery paths. The isAutoCompactEnabled()
     // conjunct preserves the user's explicit "no automatic anything"
-    // config — if they set DISABLE_AUTO_COMPACT, they get the preempt.
+    // config — if they disable auto-compact in project config, they get the preempt.
     let collapseOwnsIt = false
     if (feature('CONTEXT_COLLAPSE')) {
       collapseOwnsIt =

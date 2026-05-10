@@ -1,16 +1,17 @@
 /**
  * Auto-detect context window size from vLLM/Ollama /v1/models endpoint.
  * Called once at startup; result stored via setLocalProviderContextWindow
- * and persisted to compactContextWindowTokens so the next session starts
- * with the correct value immediately (no startup race condition).
+ * and persisted to the current project's compactContextWindowTokens so the
+ * next session starts with the correct value immediately.
  *
  * vLLM exposes max_model_len on each model entry.
  * Ollama exposes context_length inside model_info.
  * If detection fails (non-vLLM backend, network error) we do nothing —
  * the caller falls back to /contextsize config or the 131 072 default.
  *
- * Detection is skipped when compactContextWindowTokens is already set
- * (either by the user via /contextsize, or by a previous auto-detection).
+ * Detection is skipped when project-local compactContextWindowTokens is
+ * already set (either by the user via /contextsize, or by a previous
+ * auto-detection).
  * Use /contextsize auto to clear the setting and force re-detection.
  */
 
@@ -22,7 +23,10 @@ import {
   getLocalLLMProvider,
 } from '../../utils/model/providers.js'
 import { setLocalProviderContextWindow } from '../../utils/context.js'
-import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
+import {
+  getCurrentProjectConfig,
+  saveCurrentProjectConfig,
+} from '../../utils/config.js'
 
 /** Normalize base URL to always include /v1 prefix (matches localBackend.ts). */
 function normalizeUrl(base: string): string {
@@ -98,7 +102,7 @@ export function resetContextWindowDetection(): void {
 /**
  * Auto-detect context window from the local provider's /v1/models endpoint.
  * Safe to call multiple times — only runs detection once per process.
- * Skips if compactContextWindowTokens is already set.
+ * Skips if project-local compactContextWindowTokens is already set.
  */
 export async function autoDetectProviderContextWindow(): Promise<void> {
   if (_detected) return
@@ -106,7 +110,7 @@ export async function autoDetectProviderContextWindow(): Promise<void> {
 
   try {
     // Skip if already configured (user-set or previously auto-detected)
-    const configured = getGlobalConfig().compactContextWindowTokens
+    const configured = getCurrentProjectConfig().compactContextWindowTokens
     if (configured && configured > 0) {
       // Still set in-memory so getContextWindowForModel works correctly this session.
       setLocalProviderContextWindow(configured)
@@ -134,9 +138,12 @@ export async function autoDetectProviderContextWindow(): Promise<void> {
       setLocalProviderContextWindow(detected)
       // Persist so the next session uses the correct value immediately,
       // eliminating the startup race where the first API call uses the default.
-      saveGlobalConfig(c => ({ ...c, compactContextWindowTokens: detected! }))
+      saveCurrentProjectConfig(c => ({
+        ...c,
+        compactContextWindowTokens: detected!,
+      }))
       logForDebugging(
-        `[context] Auto-detected context window from ${provider}: ${detected} tokens (persisted)`,
+        `[context] Auto-detected context window from ${provider}: ${detected} tokens (persisted for project)`,
       )
     }
   } catch (err) {

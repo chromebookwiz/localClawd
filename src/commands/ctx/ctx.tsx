@@ -7,13 +7,18 @@
  * /ctx reset          — clear configured size, re-detect from provider
  * /ctx compact on/off — enable/disable autocompact
  *
- * Context size is one number stored in compactContextWindowTokens. The same
- * number powers auto-compact thresholds, the status display, and any other
- * context-aware feature. /ctx reset deletes it; auto-detect repopulates it.
+ * Context size is one number stored in the current project's
+ * compactContextWindowTokens. The same number powers auto-compact thresholds,
+ * the status display, and any other context-aware feature. /ctx reset deletes
+ * it; auto-detect repopulates it for this project.
  */
 
 import type { LocalJSXCommandCall } from '../../types/command.js'
-import { saveGlobalConfig, getGlobalConfig } from '../../utils/config.js'
+import {
+  saveCurrentProjectConfig,
+  saveGlobalConfig,
+  getCurrentProjectConfig,
+} from '../../utils/config.js'
 import {
   resetContextWindowDetection,
   autoDetectProviderContextWindow,
@@ -45,7 +50,11 @@ function barLine(used: number, total: number, width = 40): string {
 }
 
 function applySize(parsed: number, model: string, onDone: (s: string, opts: { display: 'system' }) => void): null {
-  saveGlobalConfig(c => ({ ...c, compactContextWindowTokens: parsed }))
+  saveCurrentProjectConfig(c => ({ ...c, compactContextWindowTokens: parsed }))
+  saveGlobalConfig(c => {
+    const { compactContextWindowTokens: _legacy, ...rest } = c
+    return rest as typeof c
+  })
   setLocalProviderContextWindow(parsed)
   onDone(
     [
@@ -84,20 +93,16 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   }
 
   if (sub === 'reset') {
+    saveCurrentProjectConfig(c => {
+      const { compactContextWindowTokens: _drop, ...rest } = c
+      return rest as typeof c
+    })
     saveGlobalConfig(c => {
       const { compactContextWindowTokens: _drop, ...rest } = c
       return rest as typeof c
     })
     setLocalProviderContextWindow(null)
     resetContextWindowDetection()
-    // Clear env-var overrides for this process so detection actually wins.
-    // Persistent shell env survives — out of scope, but we surface it below.
-    const hadEnv =
-      process.env.LOCALCLAWD_MAX_CONTEXT_TOKENS ||
-      process.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS
-    delete process.env.LOCALCLAWD_MAX_CONTEXT_TOKENS
-    delete process.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS
-
     await autoDetectProviderContextWindow()
     const detected = getLocalProviderContextWindow()
     const effective = getContextWindowForModel(model)
@@ -110,14 +115,6 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
       `Effective window: ${fmtTokens(getEffectiveContextWindowSize(model))} (minus output reservation).`,
       `Auto-compact threshold: ${fmtTokens(getAutoCompactThreshold(model))}.`,
     ]
-    if (hadEnv) {
-      lines.push(
-        '',
-        'Note: LOCALCLAWD_MAX_CONTEXT_TOKENS / CLAUDE_CODE_MAX_CONTEXT_TOKENS were set in this',
-        'process and have been cleared for this session. Unset them in your shell to make it',
-        'permanent.',
-      )
-    }
     onDone(lines.join('\n'), { display: 'system' })
     return null
   }
@@ -126,7 +123,7 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     const toggle = parts[1]?.toLowerCase()
     if (toggle === 'on' || toggle === 'off') {
       const enable = toggle === 'on'
-      saveGlobalConfig(c => ({ ...c, autoCompactEnabled: enable }))
+      saveCurrentProjectConfig(c => ({ ...c, autoCompactEnabled: enable }))
       onDone(`Auto-compact ${enable ? 'enabled' : 'disabled'}.`, { display: 'system' })
       return null
     }
@@ -138,7 +135,7 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const totalWindow = getContextWindowForModel(model)
   const effectiveWindow = getEffectiveContextWindowSize(model)
   const autoCompactThreshold = getAutoCompactThreshold(model)
-  const persisted = getGlobalConfig().compactContextWindowTokens
+  const persisted = getCurrentProjectConfig().compactContextWindowTokens
   const detectedFromProvider = getLocalProviderContextWindow()
   const tokenUsage = tokenCountWithEstimation(context.messages)
   const autoCompact = isAutoCompactEnabled()

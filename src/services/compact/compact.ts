@@ -60,10 +60,12 @@ import {
   getLocalLLMBaseUrl,
   getLocalLLMApiKey,
   getLocalLLMModel,
+  isLocalLLMProviderEnabled,
 } from '../../utils/model/providers.js'
 import { MEMORY_TYPE_VALUES } from '../../utils/memory/types.js'
 import {
   createAssistantMessage,
+  createAssistantAPIErrorMessage,
   createCompactBoundaryMessage,
   createUserMessage,
   getAssistantMessageText,
@@ -135,6 +137,17 @@ export const POST_COMPACT_MAX_TOKENS_PER_FILE = 5_000
 export const POST_COMPACT_MAX_TOKENS_PER_SKILL = 5_000
 export const POST_COMPACT_SKILLS_TOKEN_BUDGET = 25_000
 const MAX_COMPACT_STREAMING_RETRIES = 2
+const LOCAL_COMPACT_TIMEOUT_MS = 120_000
+
+const LOCAL_CONTEXT_OVERFLOW_PATTERNS = [
+  /prompt is too long/i,
+  /context.{0,20}(length|limit|window).{0,30}exceeded/i,
+  /input.{0,20}(length|limit).{0,30}exceeded/i,
+  /maximum.{0,20}(context|token)/i,
+  /tokens?.{0,20}exceeds?.{0,20}(max|limit|context)/i,
+  /too.{0,5}many.{0,10}tokens/i,
+  /\bKV.{0,10}cache.{0,20}(full|exceeded)/i,
+]
 
 /**
  * Strip image blocks from user messages before sending for compaction.
@@ -1139,6 +1152,40 @@ export function createCompactCanUseTool(): CanUseToolFn {
   })
 }
 
+function normalizeLocalChatCompletionsUrl(baseUrl: string): string {
+  const trimmed = baseUrl.trim().replace(/\/+$/, '')
+  const withV1 = trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`
+  return `${withV1}/chat/completions`
+}
+
+function isLocalContextOverflowMessage(message: string): boolean {
+  return LOCAL_CONTEXT_OVERFLOW_PATTERNS.some(pattern => pattern.test(message))
+}
+
+async function readProviderErrorMessage(response: Response): Promise<string> {
+  try {
+    const payload = (await response.clone().json()) as {
+      error?: { message?: unknown }
+      message?: unknown
+    }
+    const message = payload.error?.message ?? payload.message
+    if (typeof message === 'string' && message.trim()) {
+      return message.trim()
+    }
+  } catch {
+    // Fall through to text body.
+  }
+
+  try {
+    const text = await response.clone().text()
+    if (text.trim()) return text.trim()
+  } catch {
+    // Fall through to status text.
+  }
+
+  return `HTTP ${response.status}`
+}
+
 /**
  * Serialize messages to a plain-text transcript for clean-room compaction.
  * Skips tool calls, images, attachments — keeps only human-readable text.
@@ -1169,8 +1216,15 @@ function serializeMessagesForCleanRoom(messages: Message[], maxChars: number): s
   }
   const full = parts.join('\n\n')
   if (full.length <= maxChars) return full
-  // Truncate from the beginning (oldest messages), keep recent context
-  return '[earlier conversation truncated]\n\n' + full.slice(full.length - maxChars)
+  // Preserve both setup context and recent state when the transcript is too
+  // large for a single local compact request.
+  const headChars = Math.max(1_000, Math.floor(maxChars * 0.2))
+  const tailChars = Math.max(1_000, maxChars - headChars)
+  return [
+    full.slice(0, headChars),
+    '[middle conversation omitted for local compaction budget]',
+    full.slice(full.length - tailChars),
+  ].join('\n\n')
 }
 
 /**
@@ -1216,10 +1270,9 @@ async function tryDirectLocalCompact({
 
   const userText = `<conversation>\n${serialized}\n</conversation>\n\n${compactPromptText}`
 
-  // Hard timeout — anything over 5 minutes for a single compact call is the
-  // hang, not the summary. Configurable via COMPACT_TIMEOUT_MS for very
-  // slow backends.
-  const timeoutMs = parseInt(process.env.COMPACT_TIMEOUT_MS || '', 10) || 5 * 60_000
+  // Hard timeout — anything over 2 minutes for a single compact call is the
+  // hang, not the summary.
+  const timeoutMs = LOCAL_COMPACT_TIMEOUT_MS
 
   // Combine the caller's abort signal (user Esc) with our timeout.
   const timeoutController = new AbortController()
@@ -1228,7 +1281,7 @@ async function tryDirectLocalCompact({
   context.abortController.signal.addEventListener('abort', onAbort, { once: true })
 
   try {
-    const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`
+    const url = normalizeLocalChatCompletionsUrl(baseUrl)
     const res = await fetch(url, {
       method: 'POST',
       headers: {
@@ -1249,7 +1302,16 @@ async function tryDirectLocalCompact({
     })
 
     if (!res.ok) {
-      logForDebugging(`compact direct-local: HTTP ${res.status}`, { level: 'warn' })
+      const providerMessage = await readProviderErrorMessage(res)
+      logForDebugging(
+        `compact direct-local: HTTP ${res.status}: ${providerMessage}`,
+        { level: 'warn' },
+      )
+      if (isLocalContextOverflowMessage(providerMessage)) {
+        return createAssistantAPIErrorMessage({
+          content: `${PROMPT_TOO_LONG_ERROR_MESSAGE}: ${providerMessage}`,
+        })
+      }
       return null
     }
 
@@ -1444,10 +1506,16 @@ async function streamCompactSummary({
       preCompactTokenCount,
     })
     if (directResp) {
-      const directText = getAssistantMessageText(directResp)
-      if (directText && !directResp.isApiErrorMessage && !directText.startsWith(PROMPT_TOO_LONG_ERROR_MESSAGE)) {
-        return directResp
-      }
+      return directResp
+    }
+
+    if (isLocalLLMProviderEnabled()) {
+      logEvent('tengu_compact_failed', {
+        reason:
+          'local_direct_compact_failed' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        preCompactTokenCount,
+      })
+      throw new Error(ERROR_MESSAGE_INCOMPLETE_RESPONSE)
     }
 
     // Clean-room SDK path: serializes to plain text and sends through the

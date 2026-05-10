@@ -13,7 +13,8 @@ export const DESCRIPTION = 'Get or set localclawd configuration settings.'
  */
 export function generatePrompt(): string {
   const globalSettings: string[] = []
-  const projectSettings: string[] = []
+  const userSettings: string[] = []
+  const projectLocalSettings: string[] = []
 
   for (const [key, config] of Object.entries(SUPPORTED_SETTINGS)) {
     // Skip model - it gets its own section with dynamic options
@@ -34,14 +35,18 @@ export function generatePrompt(): string {
       line += `: ${options.map(o => `"${o}"`).join(', ')}`
     } else if (config.type === 'boolean') {
       line += `: true/false`
+    } else if (config.type === 'number') {
+      line += `: number`
     }
 
     line += ` - ${config.description}`
 
     if (config.source === 'global') {
       globalSettings.push(line)
+    } else if (config.source === 'project') {
+      projectLocalSettings.push(line)
     } else {
-      projectSettings.push(line)
+      userSettings.push(line)
     }
   }
 
@@ -62,8 +67,11 @@ The following settings are available for you to change:
 ### Global Settings (stored in ~/.claude.json)
 ${globalSettings.join('\n')}
 
-### Project Settings (stored in settings.json)
-${projectSettings.join('\n')}
+### User Settings (stored in settings.json)
+${userSettings.join('\n')}
+
+### Project-Local Settings (stored per project)
+${projectLocalSettings.join('\n')}
 
 ${modelSection}
 ## Examples

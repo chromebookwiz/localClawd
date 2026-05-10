@@ -275,7 +275,6 @@ localclawd currently recognizes both native and legacy variable names for the lo
 - `LOCALCLAWD_LOCAL_BASE_URL`
 - `LOCALCLAWD_LOCAL_MODEL`
 - `LOCALCLAWD_LOCAL_API_KEY`
-- `LOCALCLAWD_AUTO_COMPACT_WINDOW`
 
 Legacy compatibility aliases that still work:
 
@@ -307,7 +306,7 @@ The native installer places the executable at `~/.local/bin/localclawd` on Unix-
 
 ## Compact context window
 
-During first-run setup, localclawd asks for a compact context window cap. Use this when your local model becomes unstable before its advertised maximum context size. You can change it later in `/config` under `Compact context window`.
+During first-run setup, localclawd asks for a project-local compact context window cap. Use this when your local model becomes unstable before its advertised maximum context size. You can change it later in `/config` under `Compact context window` or with `/ctx`.
 
 ## Why use it instead of the upstream hosted CLI
 
