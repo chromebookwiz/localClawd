@@ -15,6 +15,7 @@
 import { logForDebugging } from '../../utils/debug.js'
 import { globalStopSignal } from './telegramSignals.js'
 import { killAllIncludingSelf } from './telegramKill.js'
+import { respondToTelegramMessage, clearTelegramHistory } from './telegramAgent.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,13 @@ export function isTelegramActive(): boolean {
 
 export async function sendTelegramMessage(text: string): Promise<void> {
   if (!_polling || !_chatId) return
+  // Record main-agent-originated messages so the Telegram agent can answer
+  // "what are you working on?" with real context. Internal echoes from the
+  // Telegram agent itself are short and won't pollute the snapshot heavily.
+  try {
+    const { recordMainAgentActivity } = await import('./telegramAgent.js')
+    recordMainAgentActivity(text)
+  } catch { /* circular-import safe */ }
   // Telegram has a 4096-char limit; chunk if needed
   const chunks = chunkText(text, 4000)
   for (const chunk of chunks) {
@@ -357,7 +365,12 @@ async function handleUpdate(update: TelegramUpdate): Promise<void> {
       return
     }
     if (text === '/start') {
-      void sendTelegramMessage('*localclawd ready*\nSend me a task and I\'ll start working on it.\n\nCommands:\n/stop — stop current task\n/kill — kill all instances\n/status — show current status')
+      void sendTelegramMessage('*localclawd ready*\nI\'m a separate Telegram agent — I chat with you and steer the main coding agent when needed.\n\nCommands:\n/stop — stop current task\n/kill — kill all instances\n/status — show current status\n/reset — clear Telegram conversation history')
+      return
+    }
+    if (text === '/reset') {
+      clearTelegramHistory()
+      void sendTelegramMessage('Telegram conversation history cleared. (Main agent context is unchanged.)')
       return
     }
     if (text === '/status') {
@@ -379,8 +392,9 @@ async function handleUpdate(update: TelegramUpdate): Promise<void> {
         '/kill — kill all instances\n' +
         '/status — project status\n' +
         '/schedules — list scheduled jobs\n' +
+        '/reset — clear Telegram chat history\n' +
         '/help — this message\n\n' +
-        'Any other message is forwarded to the agent.',
+        'Any other message is handled by a separate Telegram agent that talks to you and steers the main coding agent when needed.',
       )
       return
     }
@@ -389,14 +403,29 @@ async function handleUpdate(update: TelegramUpdate): Promise<void> {
     return
   }
 
-  // Plain message — queue it as a prompt. The agent on the CLI side picks it up.
-  void sendTypingIndicator()
+  // Plain message — handled by the separate Telegram agent. It always replies
+  // and may optionally enqueue/steer the main agent. The Telegram agent's
+  // conversation context is independent of the main agent's transcript.
+  startTypingIndicator()
   try {
-    const { enqueue } = await import('../../utils/messageQueueManager.js')
-    enqueue({ value: text, mode: 'prompt', priority: 'now' })
+    const { reply, action } = await respondToTelegramMessage(text)
+    let suffix = ''
+    if (action.type === 'prompt') suffix = '\n\n_(forwarded to main agent)_'
+    else if (action.type === 'steer') suffix = '\n\n_(steering main agent)_'
+    await sendTelegramMessage(reply + suffix)
   } catch (e) {
-    _queue.push(text)
-    logForDebugging(`[telegram] Failed to enqueue message: ${e}`)
+    logForDebugging(`[telegram] agent failed: ${e}`, { level: 'warn' })
+    // Fallback: queue the raw text so we don't drop the user's request.
+    try {
+      const { enqueue } = await import('../../utils/messageQueueManager.js')
+      enqueue({ value: text, mode: 'prompt', priority: 'next' })
+      await sendTelegramMessage('I had trouble responding, but I forwarded your message to the main agent.')
+    } catch (e2) {
+      _queue.push(text)
+      logForDebugging(`[telegram] Failed to enqueue fallback: ${e2}`)
+    }
+  } finally {
+    stopTypingIndicator()
   }
 
   for (const cb of _listeners) {
