@@ -440,7 +440,10 @@ const result = await Bun.build({
     '@aws-sdk/client-sts',
     '@aws-sdk/credential-providers',
     '@azure/identity',
-    'google-auth-library',
+    // google-auth-library and @anthropic-ai/vertex-sdk are bundled (not
+    // external) to keep their transitive deps (uuid@9, node-domexception)
+    // out of consumer installs. They emit deprecation warnings on npm
+    // install otherwise.
   ],
 })
 
