@@ -51,7 +51,6 @@ import rpc from './commands/rpc/index.js'
 import heartbeat from './commands/heartbeat/index.js'
 import sysprompt from './commands/sysprompt/index.js'
 import ctx from './commands/ctx/index.js'
-import contextsize from './commands/ctx/contextsize-index.js'
 import research from './commands/research/index.js'
 import thinkharder from './commands/thinkharder/index.js'
 import thinknormal from './commands/thinkharder/thinknormal-index.js'
@@ -287,7 +286,6 @@ const COMMANDS = memoize((): Command[] => [
   copy,
   context,
   contextNonInteractive,
-  contextsize,
   cost,
   diff,
   doctor,

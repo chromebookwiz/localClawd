@@ -1,6 +1,6 @@
 {
   "name": "localclawd",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "description": "Local-first coding CLI for vLLM, Ollama, and OpenAI-compatible backends.",
   "private": false,
   "type": "module",

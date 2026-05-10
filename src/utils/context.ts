@@ -1,29 +1,14 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
-import { CONTEXT_1M_BETA_HEADER } from '../constants/betas.js'
-import { getCwd } from './cwd.js'
 import { getGlobalConfig } from './config.js'
 import { isEnvTruthy } from './envUtils.js'
 import { getCanonicalName } from './model/model.js'
-import { getModelCapability } from './model/modelCapabilities.js'
-
-/** Per-project/model override key: `<cwd>|<model>`. Saved by /ctx set / /contextsize. */
-export function getContextWindowOverrideKey(model: string): string {
-  return `${getCwd()}|${model}`
-}
-
-export function getContextWindowOverride(model: string): number | undefined {
-  const overrides = getGlobalConfig().contextWindowOverrides
-  if (!overrides) return undefined
-  const v = overrides[getContextWindowOverrideKey(model)]
-  return typeof v === 'number' && v > 0 ? v : undefined
-}
 
 function getEnvAlias(localKey: string, legacyKey: string): string | undefined {
   return process.env[localKey] ?? process.env[legacyKey]
 }
 
-// Default context window when no model capability or local config is set.
-// 131072 = 128k — conservative default; set via /contextsize to match your model.
+// Default context window when nothing else is set or detected.
+// 131072 = 128k — conservative default; set via /ctx set to match your model.
 export const MODEL_CONTEXT_WINDOW_DEFAULT = 131_072
 export const COMPACT_CONTEXT_WINDOW_CHOICES = [
   32_000,
@@ -51,34 +36,12 @@ const MAX_OUTPUT_TOKENS_UPPER_LIMIT = 64_000
 export const CAPPED_DEFAULT_MAX_TOKENS = 8_000
 export const ESCALATED_MAX_TOKENS = 64_000
 
-/**
- * Check if 1M context is disabled via environment variable.
- * Used by C4E admins to disable 1M context for HIPAA compliance.
- */
-export function is1mContextDisabled(): boolean {
-  return isEnvTruthy(
-    getEnvAlias(
-      'LOCALCLAWD_DISABLE_1M_CONTEXT',
-      'CLAUDE_CODE_DISABLE_1M_CONTEXT',
-    ),
-  )
-}
-
-export function has1mContext(model: string): boolean {
-  if (is1mContextDisabled()) {
-    return false
-  }
-  return /\[1m\]/i.test(model)
-}
-
-// @[MODEL LAUNCH]: Update this pattern if the new model supports 1M context
-export function modelSupports1M(model: string): boolean {
-  if (is1mContextDisabled()) {
-    return false
-  }
-  const canonical = getCanonicalName(model)
-  return canonical.includes('claude-sonnet-4') || canonical.includes('opus-4-6')
-}
+// localclawd targets local backends (vLLM/Ollama/OpenAI-compatible). The
+// Anthropic 1M-context feature flags are no-ops here — context size is a
+// single number set via /ctx or auto-detected from the provider.
+export function is1mContextDisabled(): boolean { return true }
+export function has1mContext(_model: string): boolean { return false }
+export function modelSupports1M(_model: string): boolean { return false }
 
 /** Parse a context window string like "200k", "1m", "131072" → number | null */
 export function parseContextWindowString(s: string): number | null {
@@ -103,57 +66,27 @@ export function getLocalProviderContextWindow(): number | null {
   return _localProviderContextWindow
 }
 
+/**
+ * Single source of truth for context window size.
+ * Precedence:
+ *   1. env var (LOCALCLAWD_MAX_CONTEXT_TOKENS / CLAUDE_CODE_MAX_CONTEXT_TOKENS)
+ *   2. compactContextWindowTokens in global config (set by /ctx set, or persisted by auto-detect)
+ *   3. in-memory provider auto-detection (this session)
+ *   4. 128k default
+ */
 export function getContextWindowForModel(
-  model: string,
-  betas?: string[],
+  _model?: string,
+  _betas?: string[],
 ): number {
-  // Allow override via environment variable (available to all users, not ant-only)
   const envOverrideStr = getEnvAlias('LOCALCLAWD_MAX_CONTEXT_TOKENS', 'CLAUDE_CODE_MAX_CONTEXT_TOKENS')
   if (envOverrideStr) {
     const override = parseContextWindowString(envOverrideStr)
     if (override !== null) return override
   }
 
-  // [1m] suffix — explicit client-side opt-in, respected over all detection
-  if (has1mContext(model)) {
-    return 1_000_000
-  }
-
-  // Per-project/model override (set via /contextsize or /ctx set in this dir).
-  // Takes precedence over auto-detected global value until the user runs
-  // /ctx reset or switches to a different model.
-  const projectOverride = getContextWindowOverride(model)
-  if (projectOverride) return projectOverride
-
   const persisted = getGlobalConfig().compactContextWindowTokens
-  if (persisted && persisted > 0) {
-    return persisted
-  }
+  if (persisted && persisted > 0) return persisted
 
-  const cap = getModelCapability(model)
-  if (cap?.max_input_tokens && cap.max_input_tokens >= 100_000) {
-    if (
-      cap.max_input_tokens > MODEL_CONTEXT_WINDOW_DEFAULT &&
-      is1mContextDisabled()
-    ) {
-      return MODEL_CONTEXT_WINDOW_DEFAULT
-    }
-    return cap.max_input_tokens
-  }
-
-  if (betas?.includes(CONTEXT_1M_BETA_HEADER) && modelSupports1M(model)) {
-    return 1_000_000
-  }
-  if (getSonnet1mExpTreatmentEnabled(model)) {
-    return 1_000_000
-  }
-  if (process.env.USER_TYPE === 'ant') {
-    const antModel = resolveAntModel(model)
-    if (antModel?.contextWindow) {
-      return antModel.contextWindow
-    }
-  }
-  // Use context window detected from local provider (vLLM/Ollama model info)
   if (_localProviderContextWindow && _localProviderContextWindow > 0) {
     return _localProviderContextWindow
   }
@@ -192,18 +125,8 @@ export function getConfiguredCompactContextWindow(): number | undefined {
   return undefined
 }
 
-export function getSonnet1mExpTreatmentEnabled(model: string): boolean {
-  if (is1mContextDisabled()) {
-    return false
-  }
-  // Only applies to sonnet 4.6 without an explicit [1m] suffix
-  if (has1mContext(model)) {
-    return false
-  }
-  if (!getCanonicalName(model).includes('sonnet-4-6')) {
-    return false
-  }
-  return getGlobalConfig().clientDataCache?.['coral_reef_sonnet'] === 'true'
+export function getSonnet1mExpTreatmentEnabled(_model: string): boolean {
+  return false
 }
 
 /**

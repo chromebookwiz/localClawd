@@ -1190,7 +1190,12 @@ async function tryCleanRoomCompactSummary({
     // Derive char budget from the live context window: tokens × ~3.5 chars/token,
     // minus output reserve and a small overhead for the compact prompt + XML tags.
     const contextTokens = getContextWindowForModel(model, [])
-    const charBudget = Math.floor((contextTokens - COMPACT_MAX_OUTPUT_TOKENS - 2_000) * 3.5)
+    // Reserve output + a small overhead. For small windows (8k–32k models),
+    // fall back to 50% of the window so we still send something — and use a
+    // smaller per-call output cap.
+    const reserve = Math.min(COMPACT_MAX_OUTPUT_TOKENS, Math.max(2_000, Math.floor(contextTokens * 0.25)))
+    const inputTokens = Math.max(Math.floor(contextTokens * 0.5), contextTokens - reserve - 2_000)
+    const charBudget = Math.max(4_000, Math.floor(inputTokens * 3.5))
     const serialized = serializeMessagesForCleanRoom(messages, charBudget)
     if (!serialized.trim()) return null
 
