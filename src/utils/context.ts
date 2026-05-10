@@ -2,6 +2,8 @@
 import { getGlobalConfig } from './config.js'
 import { isEnvTruthy } from './envUtils.js'
 import { getCanonicalName } from './model/model.js'
+import { resolveAntModel } from './model/antModels.js'
+import { getModelCapability } from './model/modelCapabilities.js'
 
 function getEnvAlias(localKey: string, legacyKey: string): string | undefined {
   return process.env[localKey] ?? process.env[legacyKey]
