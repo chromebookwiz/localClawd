@@ -59,52 +59,15 @@ Query forms:
  * A tool is NEVER deferred if it has alwaysLoad: true (MCP tools set this via
  * _meta['anthropic/alwaysLoad']). This check runs first, before any other rule.
  */
-export function isDeferredTool(tool: Tool): boolean {
-  // Explicit opt-out via _meta['anthropic/alwaysLoad'] — tool appears in the
-  // initial prompt with full schema. Checked first so MCP tools can opt out.
-  if (tool.alwaysLoad === true) return false
-
-  // MCP tools are always deferred (workflow-specific)
-  if (tool.isMcp === true) return true
-
-  // Never defer ToolSearch itself — the model needs it to load everything else
-  if (tool.name === TOOL_SEARCH_TOOL_NAME) return false
-
-  // Fork-first experiment: Agent must be available turn 1, not behind ToolSearch.
-  // Lazy require: static import of forkSubagent → coordinatorMode creates a cycle
-  // through constants/tools.ts at module init.
-  if (feature('FORK_SUBAGENT') && tool.name === AGENT_TOOL_NAME) {
-    type ForkMod = typeof import('../AgentTool/forkSubagent.js')
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const m = require('../AgentTool/forkSubagent.js') as ForkMod
-    if (m.isForkSubagentEnabled()) return false
-  }
-
-  // Brief is the primary communication channel whenever the tool is present.
-  // Its prompt contains the text-visibility contract, which the model must
-  // see without a ToolSearch round-trip. No runtime gate needed here: this
-  // tool's isEnabled() IS isBriefEnabled(), so being asked about its deferral
-  // status implies the gate already passed.
-  if (
-    (feature('KAIROS') || feature('KAIROS_BRIEF')) &&
-    BRIEF_TOOL_NAME &&
-    tool.name === BRIEF_TOOL_NAME
-  ) {
-    return false
-  }
-
-  // SendUserFile is a file-delivery communication channel (sibling of Brief).
-  // Must be immediately available without a ToolSearch round-trip.
-  if (
-    feature('KAIROS') &&
-    SEND_USER_FILE_TOOL_NAME &&
-    tool.name === SEND_USER_FILE_TOOL_NAME &&
-    isReplBridgeActive()
-  ) {
-    return false
-  }
-
-  return tool.shouldDefer === true
+export function isDeferredTool(_tool: Tool): boolean {
+  // localclawd disables the deferred-tools / ToolSearch two-phase load.
+  // Local backends don't always honor the protocol: the model picks a
+  // deferred tool name, calls it without first invoking ToolSearch to
+  // fetch the schema, and the harness rejects the call with an
+  // InputValidationError ("This tool's schema was not sent to the API…").
+  // Always-load every tool with its full schema — prompts get longer
+  // but tool calls always have a valid schema to validate against.
+  return false
 }
 
 /**

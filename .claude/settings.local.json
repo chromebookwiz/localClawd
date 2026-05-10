@@ -74,7 +74,8 @@
       "Bash(npm init *)",
       "Bash(grep -E \"from ['\\\\\"]@anthropic-ai/vertex|from ['\\\\\"]@aws-sdk|from ['\\\\\"]@azure|require\\\\\\\\\\(['\\\\\"]@anthropic-ai/vertex|require\\\\\\\\\\(['\\\\\"]@aws-sdk|require\\\\\\\\\\(['\\\\\"]@azure\" C:/code/vllmclawd/dist/cli.mjs)",
       "Bash(mkdir -p /tmp/test-warn2)",
-      "Bash(rm -f package*.json node_modules -rf)"
+      "Bash(rm -f package*.json node_modules -rf)",
+      "Bash(grep -rEn \"fetch\\\\\\([\\\\\"'\\\\\\\\\\\\`]https?://\" C:/code/vllmclawd/src --include=\"*.ts\" --include=\"*.tsx\")"
     ]
   }
 }
