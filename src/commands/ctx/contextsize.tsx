@@ -10,7 +10,7 @@
 
 import type { LocalJSXCommandCall } from '../../types/command.js'
 import { saveGlobalConfig } from '../../utils/config.js'
-import { parseContextWindowString } from '../../utils/context.js'
+import { parseContextWindowString, getContextWindowOverrideKey } from '../../utils/context.js'
 import { getAutoCompactThreshold } from '../../services/compact/autoCompact.js'
 
 function fmtTokens(n: number): string {
@@ -33,11 +33,15 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     return null
   }
 
-  saveGlobalConfig(c => ({ ...c, compactContextWindowTokens: parsed }))
-
   const model = context.options.mainLoopModel
+  const key = getContextWindowOverrideKey(model)
+  saveGlobalConfig(c => ({
+    ...c,
+    contextWindowOverrides: { ...(c.contextWindowOverrides ?? {}), [key]: parsed },
+  }))
+
   onDone(
-    `Context size set to ${fmtTokens(parsed)}. Auto-compact triggers at ${fmtTokens(getAutoCompactThreshold(model))}.`,
+    `Context size set to ${fmtTokens(parsed)} for ${model} in this directory. Auto-compact triggers at ${fmtTokens(getAutoCompactThreshold(model))}.`,
     { display: 'system' },
   )
   return null

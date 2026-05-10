@@ -9,11 +9,14 @@
 
 import type { LocalJSXCommandCall } from '../../types/command.js'
 import { saveGlobalConfig, getGlobalConfig } from '../../utils/config.js'
+import { resetContextWindowDetection, autoDetectProviderContextWindow } from '../../services/api/providerContextDetect.js'
 import {
   getContextWindowForModel,
   getConfiguredCompactContextWindow,
   parseContextWindowString,
   getLocalProviderContextWindow,
+  getContextWindowOverrideKey,
+  getContextWindowOverride,
 } from '../../utils/context.js'
 import {
   getEffectiveContextWindowSize,
@@ -58,12 +61,17 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
       return null
     }
 
-    saveGlobalConfig(c => ({ ...c, compactContextWindowTokens: parsed }))
+    const key = getContextWindowOverrideKey(model)
+    saveGlobalConfig(c => ({
+      ...c,
+      contextWindowOverrides: { ...(c.contextWindowOverrides ?? {}), [key]: parsed },
+    }))
     onDone(
       [
-        `Context window set to ${fmtTokens(parsed)} tokens.`,
+        `Context window set to ${fmtTokens(parsed)} tokens for ${model} in this directory.`,
         `Effective window: ${fmtTokens(getEffectiveContextWindowSize(model))} (minus output reservation).`,
         `Auto-compact threshold: ${fmtTokens(getAutoCompactThreshold(model))}.`,
+        `Persists until /ctx reset or model switch.`,
       ].join('\n'),
       { display: 'system' },
     )
@@ -72,14 +80,23 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
 
   // ── /ctx reset ────────────────────────────────────────────────────────────
   if (sub === 'reset') {
+    const key = getContextWindowOverrideKey(model)
     saveGlobalConfig(c => {
-      const { compactContextWindowTokens: _, ...rest } = c
-      return rest as typeof c
+      const { compactContextWindowTokens: _, contextWindowOverrides, ...rest } = c
+      const nextOverrides = { ...(contextWindowOverrides ?? {}) }
+      delete nextOverrides[key]
+      return {
+        ...rest,
+        ...(Object.keys(nextOverrides).length > 0 ? { contextWindowOverrides: nextOverrides } : {}),
+      } as typeof c
     })
+    // Reset detection gate so the next auto-detect call re-queries the provider.
+    resetContextWindowDetection()
+    void autoDetectProviderContextWindow()
     onDone(
       [
-        'Context window reset to model default.',
-        `Current model default: ${fmtTokens(getContextWindowForModel(model))} tokens.`,
+        'Context window reset. Re-detecting from provider...',
+        `Will use ${fmtTokens(getContextWindowForModel(model))} tokens until detection completes.`,
       ].join('\n'),
       { display: 'system' },
     )
@@ -110,11 +127,14 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
 
   const usagePct = Math.min(100, Math.round((tokenUsage / totalWindow) * 100))
 
-  const source = configuredCap
-    ? `user-configured (${fmtTokens(configuredCap)})`
-    : detectedFromProvider
-      ? `detected (${fmtTokens(detectedFromProvider)})`
-      : 'model default'
+  const projectOverride = getContextWindowOverride(model)
+  const source = projectOverride
+    ? `project override (${fmtTokens(projectOverride)} for ${model} here)`
+    : configuredCap
+      ? `user-configured (${fmtTokens(configuredCap)})`
+      : detectedFromProvider
+        ? `detected (${fmtTokens(detectedFromProvider)})`
+        : 'model default'
 
   const lines = [
     '─── Context Window ───────────────────────────────────────',

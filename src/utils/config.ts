@@ -232,7 +232,8 @@ export type GlobalConfig = {
   bypassPermissionsModeAccepted?: boolean
   hasUsedBackslashReturn?: boolean
   autoCompactEnabled: boolean // Controls whether auto-compact is enabled
-  compactContextWindowTokens?: number // Optional cap used for auto-compact decisions
+  compactContextWindowTokens?: number // Optional cap used for auto-compact decisions (global / auto-detected)
+  contextWindowOverrides?: Record<string, number> // Per-project, per-model overrides keyed by `<cwd>|<model>`
   localBackendProvider?: LocalBackendProvider
   localBackendBaseUrl?: string
   localBackendModel?: string
@@ -642,6 +643,7 @@ export const GLOBAL_CONFIG_KEYS = [
   'hasUsedBackslashReturn',
   'autoCompactEnabled',
   'compactContextWindowTokens',
+  'contextWindowOverrides',
   'localBackendProvider',
   'localBackendBaseUrl',
   'localBackendModel',

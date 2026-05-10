@@ -45,7 +45,31 @@
       "Bash(sed -i \"s/# localclawd in Chrome browser automation/# localclawd in Chrome browser automation/g; s/localclawd in Chrome skill availability/localclawd in Chrome skill availability/g\" src/utils/browserIntegration/prompt.ts)",
       "Bash(sed -i \"s/localclawd in Chrome extension/localclawd in Chrome extension/g\" src/utils/browserIntegration/setupPortable.ts)",
       "Bash(grep -v \"node_modules\\\\|//.* claude\\\\|import \")",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(grep -l \"isCommandInput\" /c/code/vllmclawd/src/**/*.tsx /c/code/vllmclawd/src/**/*.ts)",
+      "Bash(awk '/^[0-9]+.*return.*</{print NR\": \" $0}' /c/code/vllmclawd/src/components/PromptInput/PromptInput.tsx)",
+      "Bash(grep -nE \"color|#[0-9a-fA-F]{3,6}\" src/components/Logo/AnimatedClawd.tsx)",
+      "Bash(Get-ChildItem -Path \"C:\\\\code\\\\vllmclawd\\\\src\" -Recurse -File)",
+      "Bash(Select-Object -First 50)",
+      "Bash(Format-Table Name, FullName)",
+      "Bash(Get-ChildItem \"C:\\\\code\\\\vllmclawd\\\\src\\\\commands\" -Recurse -Filter \"*.tsx\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\code\\\\vllmclawd\" -Directory -Depth 0 | ForEach-Object { $_.Name })",
+      "Bash(gh api *)",
+      "WebSearch",
+      "WebFetch(domain:docs.comfy.org)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(Get-ChildItem -Path \"C:\\\\code\\\\vllmclawd\" -Recurse -Filter \"*.ts\")",
+      "Bash(git grep *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\code\\\\vllmclawd\\\\src\" -Recurse -Directory)",
+      "Bash(npm config *)",
+      "Bash(npm ls *)",
+      "Bash(npm info *)",
+      "Bash(npm install *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\code\\\\vllmclawd\\\\src\" -Recurse -Filter \"*statusLine*\")",
+      "Bash(Select-Object FullName)"
     ]
   }
 }

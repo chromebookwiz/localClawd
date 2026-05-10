@@ -1309,6 +1309,23 @@ async function streamCompactSummary({
     : undefined
 
   try {
+    // Clean-room path first: serializes to plain text and sends a fresh API
+    // call with no shared context overhead. Critical for local backends where
+    // re-sending the full message history (or prompt-cache-sharing fork) would
+    // itself exhaust the context window and stall indefinitely.
+    const cleanRoomFirst = await tryCleanRoomCompactSummary({
+      messages,
+      summaryRequest,
+      context,
+      preCompactTokenCount,
+    })
+    if (cleanRoomFirst) {
+      const cleanText = getAssistantMessageText(cleanRoomFirst)
+      if (cleanText && !cleanRoomFirst.isApiErrorMessage && !cleanText.startsWith(PROMPT_TOO_LONG_ERROR_MESSAGE)) {
+        return cleanRoomFirst
+      }
+    }
+
     if (promptCacheSharingEnabled) {
       try {
         // DO NOT set maxOutputTokens here. The fork piggybacks on the main thread's
@@ -1377,23 +1394,6 @@ async function streamCompactSummary({
             'error' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           preCompactTokenCount,
         })
-      }
-    }
-
-    // Clean-room path: serialize conversation to plain text, send as a fresh
-    // API call with no shared context overhead. Independent of the main thread.
-    // Preferred for local backends where re-sending the full message history
-    // would itself exhaust the context window.
-    const cleanRoomResponse = await tryCleanRoomCompactSummary({
-      messages,
-      summaryRequest,
-      context,
-      preCompactTokenCount,
-    })
-    if (cleanRoomResponse) {
-      const cleanText = getAssistantMessageText(cleanRoomResponse)
-      if (cleanText && !cleanRoomResponse.isApiErrorMessage && !cleanText.startsWith(PROMPT_TOO_LONG_ERROR_MESSAGE)) {
-        return cleanRoomResponse
       }
     }
 

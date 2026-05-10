@@ -22,6 +22,7 @@ import {
   type RecompactionInfo,
 } from './compact.js'
 import { runPostCompactCleanup } from './postCompactCleanup.js'
+import { setLastSummarizedMessageId } from '../SessionMemory/sessionMemoryUtils.js'
 
 // Reserve this many tokens for output during compaction
 // Based on p99.99 of compact summary output being 17,387 tokens.

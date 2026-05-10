@@ -1,9 +1,22 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { CONTEXT_1M_BETA_HEADER } from '../constants/betas.js'
+import { getCwd } from './cwd.js'
 import { getGlobalConfig } from './config.js'
 import { isEnvTruthy } from './envUtils.js'
 import { getCanonicalName } from './model/model.js'
 import { getModelCapability } from './model/modelCapabilities.js'
+
+/** Per-project/model override key: `<cwd>|<model>`. Saved by /ctx set / /contextsize. */
+export function getContextWindowOverrideKey(model: string): string {
+  return `${getCwd()}|${model}`
+}
+
+export function getContextWindowOverride(model: string): number | undefined {
+  const overrides = getGlobalConfig().contextWindowOverrides
+  if (!overrides) return undefined
+  const v = overrides[getContextWindowOverrideKey(model)]
+  return typeof v === 'number' && v > 0 ? v : undefined
+}
 
 function getEnvAlias(localKey: string, legacyKey: string): string | undefined {
   return process.env[localKey] ?? process.env[legacyKey]
@@ -105,6 +118,12 @@ export function getContextWindowForModel(
   if (has1mContext(model)) {
     return 1_000_000
   }
+
+  // Per-project/model override (set via /contextsize or /ctx set in this dir).
+  // Takes precedence over auto-detected global value until the user runs
+  // /ctx reset or switches to a different model.
+  const projectOverride = getContextWindowOverride(model)
+  if (projectOverride) return projectOverride
 
   const persisted = getGlobalConfig().compactContextWindowTokens
   if (persisted && persisted > 0) {

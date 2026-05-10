@@ -1,11 +1,17 @@
 /**
  * Auto-detect context window size from vLLM/Ollama /v1/models endpoint.
- * Called once at startup; result stored via setLocalProviderContextWindow.
+ * Called once at startup; result stored via setLocalProviderContextWindow
+ * and persisted to compactContextWindowTokens so the next session starts
+ * with the correct value immediately (no startup race condition).
  *
  * vLLM exposes max_model_len on each model entry.
- * Ollama exposes context_length inside model_info / options.
+ * Ollama exposes context_length inside model_info.
  * If detection fails (non-vLLM backend, network error) we do nothing —
  * the caller falls back to /contextsize config or the 131 072 default.
+ *
+ * Detection is skipped when compactContextWindowTokens is already set
+ * (either by the user via /contextsize, or by a previous auto-detection).
+ * Use /contextsize auto to clear the setting and force re-detection.
  */
 
 import { logForDebugging } from '../../utils/debug.js'
@@ -16,10 +22,12 @@ import {
   getLocalLLMProvider,
 } from '../../utils/model/providers.js'
 import { setLocalProviderContextWindow } from '../../utils/context.js'
-import { getGlobalConfig } from '../../utils/config.js'
+import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
 
+/** Normalize base URL to always include /v1 prefix (matches localBackend.ts). */
 function normalizeUrl(base: string): string {
-  return base.replace(/\/+$/, '')
+  const trimmed = base.trim().replace(/\/+$/, '')
+  return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`
 }
 
 async function fetchJson(url: string, apiKey?: string): Promise<unknown> {
@@ -58,14 +66,13 @@ function parseVllmContextWindow(data: unknown, modelHint?: string): number | nul
 }
 
 /**
- * Parse context length from an Ollama /api/show or /v1/models response.
- * Ollama /v1/models wraps a standard OpenAI list but with context info inside model_info.
+ * Parse context length from an Ollama /v1/models response.
+ * Ollama /v1/models wraps a standard OpenAI list with context info inside model_info.
  */
 function parseOllamaContextWindow(data: unknown, modelHint?: string): number | null {
   if (!data || typeof data !== 'object') return null
   const d = data as Record<string, unknown>
 
-  // /v1/models list style
   const models: unknown[] = Array.isArray(d['data']) ? (d['data'] as unknown[]) : []
   for (const m of models) {
     if (!m || typeof m !== 'object') continue
@@ -83,19 +90,28 @@ function parseOllamaContextWindow(data: unknown, modelHint?: string): number | n
 
 let _detected = false
 
+/** Reset the detection gate — call this after /ctx reset so the next call re-detects. */
+export function resetContextWindowDetection(): void {
+  _detected = false
+}
+
 /**
- * Auto-detect context window and store it if larger than the current setting.
+ * Auto-detect context window from the local provider's /v1/models endpoint.
  * Safe to call multiple times — only runs detection once per process.
+ * Skips if compactContextWindowTokens is already set.
  */
 export async function autoDetectProviderContextWindow(): Promise<void> {
   if (_detected) return
   _detected = true
 
   try {
+    // Skip if already configured (user-set or previously auto-detected)
     const configured = getGlobalConfig().compactContextWindowTokens
     if (configured && configured > 0) {
+      // Still set in-memory so getContextWindowForModel works correctly this session.
+      setLocalProviderContextWindow(configured)
       logForDebugging(
-        `[context] Skipping auto-detect because context window is user-configured: ${configured} tokens`,
+        `[context] Using persisted context window: ${configured} tokens`,
       )
       return
     }
@@ -111,14 +127,16 @@ export async function autoDetectProviderContextWindow(): Promise<void> {
     if (provider === 'ollama') {
       detected = parseOllamaContextWindow(data, modelHint)
     } else {
-      // vllm and generic OpenAI-compatible
       detected = parseVllmContextWindow(data, modelHint)
     }
 
     if (detected && detected > 0) {
       setLocalProviderContextWindow(detected)
+      // Persist so the next session uses the correct value immediately,
+      // eliminating the startup race where the first API call uses the default.
+      saveGlobalConfig(c => ({ ...c, compactContextWindowTokens: detected! }))
       logForDebugging(
-        `[context] Auto-detected context window from ${provider} /models: ${detected} tokens`,
+        `[context] Auto-detected context window from ${provider}: ${detected} tokens (persisted)`,
       )
     }
   } catch (err) {
