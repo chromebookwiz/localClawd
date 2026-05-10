@@ -90,14 +90,35 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
     })
     setLocalProviderContextWindow(null)
     resetContextWindowDetection()
-    void autoDetectProviderContextWindow()
-    onDone(
-      [
-        'Context window reset. Cleared saved size; re-detecting from provider...',
-        `Until detection completes this session uses ${fmtTokens(getContextWindowForModel(model))} tokens.`,
-      ].join('\n'),
-      { display: 'system' },
-    )
+    // Clear env-var overrides for this process so detection actually wins.
+    // Persistent shell env survives — out of scope, but we surface it below.
+    const hadEnv =
+      process.env.LOCALCLAWD_MAX_CONTEXT_TOKENS ||
+      process.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS
+    delete process.env.LOCALCLAWD_MAX_CONTEXT_TOKENS
+    delete process.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS
+
+    await autoDetectProviderContextWindow()
+    const detected = getLocalProviderContextWindow()
+    const effective = getContextWindowForModel(model)
+
+    const lines = [
+      'Context window reset.',
+      detected
+        ? `Detected ${fmtTokens(detected)} tokens from provider.`
+        : `Detection did not return a value — using ${fmtTokens(effective)} tokens (default). Set with /ctx <size>.`,
+      `Effective window: ${fmtTokens(getEffectiveContextWindowSize(model))} (minus output reservation).`,
+      `Auto-compact threshold: ${fmtTokens(getAutoCompactThreshold(model))}.`,
+    ]
+    if (hadEnv) {
+      lines.push(
+        '',
+        'Note: LOCALCLAWD_MAX_CONTEXT_TOKENS / CLAUDE_CODE_MAX_CONTEXT_TOKENS were set in this',
+        'process and have been cleared for this session. Unset them in your shell to make it',
+        'permanent.',
+      )
+    }
+    onDone(lines.join('\n'), { display: 'system' })
     return null
   }
 
