@@ -56,8 +56,14 @@ import {
   executePreCompactHooks,
 } from '../../utils/hooks.js'
 import { logError } from '../../utils/log.js'
+import {
+  getLocalLLMBaseUrl,
+  getLocalLLMApiKey,
+  getLocalLLMModel,
+} from '../../utils/model/providers.js'
 import { MEMORY_TYPE_VALUES } from '../../utils/memory/types.js'
 import {
+  createAssistantMessage,
   createCompactBoundaryMessage,
   createUserMessage,
   getAssistantMessageText,
@@ -1168,6 +1174,118 @@ function serializeMessagesForCleanRoom(messages: Message[], maxChars: number): s
 }
 
 /**
+ * Direct compaction against the local provider — plain HTTP POST to
+ * /chat/completions with a hard timeout. Bypasses the SDK streaming
+ * machinery (forked-agent, prompt-cache sharing, withRetry, VCR), all of
+ * which assume Anthropic-API semantics and have been the actual hang
+ * source for local backends. Returns a synthesized AssistantMessage on
+ * success, null otherwise so the caller falls through.
+ */
+async function tryDirectLocalCompact({
+  messages,
+  summaryRequest,
+  context,
+  preCompactTokenCount,
+}: {
+  messages: Message[]
+  summaryRequest: UserMessage
+  context: ToolUseContext
+  preCompactTokenCount: number
+}): Promise<AssistantMessage | null> {
+  const baseUrl = getLocalLLMBaseUrl()
+  const model = getLocalLLMModel() ?? context.options.mainLoopModel
+  const apiKey = getLocalLLMApiKey()
+  if (!baseUrl || !model) return null
+
+  // Char budget: 50% of context window in chars (rough 3.5 chars/token).
+  // Floor at 4k chars so tiny windows still send something.
+  const contextTokens = getContextWindowForModel(model, [])
+  const charBudget = Math.max(4_000, Math.floor(contextTokens * 0.5 * 3.5))
+  const serialized = serializeMessagesForCleanRoom(messages, charBudget)
+  if (!serialized.trim()) return null
+
+  const promptContent = summaryRequest.message.content
+  const compactPromptText = typeof promptContent === 'string'
+    ? promptContent
+    : Array.isArray(promptContent)
+      ? promptContent
+          .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+          .map(b => b.text)
+          .join('\n')
+      : ''
+
+  const userText = `<conversation>\n${serialized}\n</conversation>\n\n${compactPromptText}`
+
+  // Hard timeout — anything over 5 minutes for a single compact call is the
+  // hang, not the summary. Configurable via COMPACT_TIMEOUT_MS for very
+  // slow backends.
+  const timeoutMs = parseInt(process.env.COMPACT_TIMEOUT_MS || '', 10) || 5 * 60_000
+
+  // Combine the caller's abort signal (user Esc) with our timeout.
+  const timeoutController = new AbortController()
+  const timer = setTimeout(() => timeoutController.abort(new Error('compact timeout')), timeoutMs)
+  const onAbort = () => timeoutController.abort(context.abortController.signal.reason)
+  context.abortController.signal.addEventListener('abort', onAbort, { once: true })
+
+  try {
+    const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant that summarizes conversations.' },
+          { role: 'user', content: userText },
+        ],
+        max_tokens: COMPACT_MAX_OUTPUT_TOKENS,
+        temperature: 0.2,
+        stream: false,
+      }),
+      signal: timeoutController.signal,
+    })
+
+    if (!res.ok) {
+      logForDebugging(`compact direct-local: HTTP ${res.status}`, { level: 'warn' })
+      return null
+    }
+
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>
+      usage?: {
+        prompt_tokens?: number
+        completion_tokens?: number
+      }
+    }
+    const text = data.choices?.[0]?.message?.content?.trim()
+    if (!text) return null
+
+    logForDebugging(
+      `compact direct-local: success (pre=${preCompactTokenCount} out=${data.usage?.completion_tokens ?? 0})`,
+    )
+
+    // Synthesize an AssistantMessage with the right shape for the caller.
+    const usage = {
+      input_tokens: data.usage?.prompt_tokens ?? 0,
+      output_tokens: data.usage?.completion_tokens ?? 0,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+    }
+    return createAssistantMessage({ content: text, usage: usage as never })
+  } catch (e) {
+    const reason = (e as { name?: string })?.name === 'AbortError' ? 'aborted/timeout' : String(e)
+    logForDebugging(`compact direct-local: ${reason}`, { level: 'warn' })
+    return null
+  } finally {
+    clearTimeout(timer)
+    context.abortController.signal.removeEventListener('abort', onAbort)
+  }
+}
+
+/**
  * Clean-room compaction: serialize the conversation to plain text and summarize
  * in a fresh API call with no shared context, no tool schemas, no system prompt
  * overhead. Independent of the main model thread — cannot interfere with an
@@ -1314,10 +1432,27 @@ async function streamCompactSummary({
     : undefined
 
   try {
-    // Clean-room path first: serializes to plain text and sends a fresh API
-    // call with no shared context overhead. Critical for local backends where
-    // re-sending the full message history (or prompt-cache-sharing fork) would
-    // itself exhaust the context window and stall indefinitely.
+    // Direct local compact: plain HTTP to /chat/completions with a hard
+    // timeout. Bypasses the SDK streaming machinery entirely. This is the
+    // path that actually completes for local providers — the others were
+    // hanging because forked-agent / prompt-cache / VCR layers assume
+    // Anthropic-API semantics that local backends don't always honor.
+    const directResp = await tryDirectLocalCompact({
+      messages,
+      summaryRequest,
+      context,
+      preCompactTokenCount,
+    })
+    if (directResp) {
+      const directText = getAssistantMessageText(directResp)
+      if (directText && !directResp.isApiErrorMessage && !directText.startsWith(PROMPT_TOO_LONG_ERROR_MESSAGE)) {
+        return directResp
+      }
+    }
+
+    // Clean-room SDK path: serializes to plain text and sends through the
+    // streaming pipeline. Used when the direct path isn't applicable
+    // (e.g. Anthropic API in use, or direct path returned null).
     const cleanRoomFirst = await tryCleanRoomCompactSummary({
       messages,
       summaryRequest,
